@@ -231,7 +231,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.12</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.13</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -543,9 +543,9 @@ function renderLessonBody(el, l, parts, sc, single) {
   let h = '';
   const holder = el.closest('.variant') || el.closest('.scheme'); const schemeAges = holder ? holder.dataset.schemeAges : '';
   if (!single) h += `<div class="lmeta">${lessonMeta(l, lessonAges(l) !== schemeAges)}<a class="btn small outline" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
-  let body = schemeBody(l);
-  // In a single-lesson scheme the lesson text usually restates the scheme text: show it only when it adds something.
-  if (single && el.dataset.schemeText) { const lt = (l.body_opening_text || l.description || '').trim().slice(0, 80); if (lt && lt === el.dataset.schemeText) body = ''; }
+  const holderTxt = holder && holder.querySelector('.intro .txt');
+  const shownAbove = single ? [holderTxt ? holderTxt.textContent : ''] : [l.description];
+  let body = schemeBody(l, shownAbove);
   const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
   if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) txt.insertAdjacentHTML('beforeend', `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`); }
   else if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
@@ -554,12 +554,18 @@ function renderLessonBody(el, l, parts, sc, single) {
   el.querySelectorAll('.part button.ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
 }
 
-function schemeBody(s) {
+// Text comparison that ignores case, punctuation and spacing - used to spot repeated copy.
+const norm = t => String(t || '').toLowerCase().replace(/<[^>]+>/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+// Assemble a scheme's or lesson's text, dropping any paragraph that repeats one already shown
+// (staff often paste the same sentence into two fields). `already` holds text shown above it.
+function schemeBody(s, already = []) {
+  const seen = already.map(norm).filter(Boolean);
+  const fresh = t => { const k = norm(t); if (!k) return false; if (seen.some(x => x === k || (k.length > 20 && x.includes(k)))) return false; seen.push(k); return true; };
   let h = '';
-  if (s.description) h += `<p>${nl(s.description)}</p>`;
-  if (s.body_opening_text) h += `<p>${nl(s.body_opening_text)}</p>`;
-  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`]) h += `<h4>${esc(s[`body_subheading_${i}`])}</h4><p>${nl(s[`body_subheading_${i}_text`])}</p>`;
-  if (s.body_closing_text) h += `<p>${nl(s.body_closing_text)}</p>`;
+  if (fresh(s.description)) h += `<p>${nl(s.description)}</p>`;
+  if (fresh(s.body_opening_text)) h += `<p>${nl(s.body_opening_text)}</p>`;
+  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`] && fresh(s[`body_subheading_${i}_text`])) h += `<h4>${esc(s[`body_subheading_${i}`])}</h4><p>${nl(s[`body_subheading_${i}_text`])}</p>`;
+  if (fresh(s.body_closing_text)) h += `<p>${nl(s.body_closing_text)}</p>`;
   return h;
 }
 
@@ -580,7 +586,7 @@ async function pageLesson(id, scId) {
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, sc && { name: sc.name, href: subcatHref(sc) }, scheme && { name: scheme.name }].filter(Boolean));
   html += `<div class="lesson-layout"><div>`;
   html += `<section class="scheme"><div class="sh">${esc(l.name)}${l.heading_2 ? `<small>${esc(l.heading_2)}</small>` : ''}<span class="right">${ageStripRange(lessonAges(l), 'lg')}</span></div>`;
-  html += `<div class="intro"><img src="${esc(img(scheme?.image))}" alt="" loading="lazy"><div class="txt">${schemeBody(l)}</div></div>`;
+  html += `<div class="intro"><img src="${esc(img(scheme?.image))}" alt="" loading="lazy"><div class="txt">${schemeBody(l, [l.heading_2])}</div></div>`;
   html += `<div class="parts">${renderParts(parts)}</div>`;
   if (seq.length > 1) {
     const label = sc ? noun(sc, 1) : 'lesson';
