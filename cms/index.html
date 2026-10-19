@@ -266,6 +266,14 @@ section.editor { overflow: auto; padding: 0 0 80px; }
   </div>
 </div>
 
+<div class="modal" id="ask" role="dialog" aria-modal="true">
+  <div class="box narrow">
+    <div class="mhead"><h2 id="askTitle">Name</h2></div>
+    <div class="mbody" style="padding:16px 18px"><div class="field"><label id="askLabel">Name</label><input type="text" id="askInput" autocomplete="off"></div><div class="help" id="askHelp"></div></div>
+    <div class="mfoot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="askOk">Create</button></div>
+  </div>
+</div>
+
 <div class="modal" id="login" role="dialog" aria-modal="true">
   <div class="box narrow">
     <h2>Sign in to edit</h2>
@@ -391,6 +399,17 @@ function confirmDialog(title, body, okLabel = 'Continue') {
     const done = v => { m.classList.remove('open'); $('#confirmOk').onclick = null; res(v); };
     $('#confirmOk').onclick = () => done(true);
     $$('[data-close]', m).forEach(b => b.onclick = () => done(false));
+  });
+}
+
+function askDialog(title, label, help = '', okLabel = 'Create') {
+  return new Promise(res => {
+    $('#askTitle').textContent = title; $('#askLabel').textContent = label; $('#askHelp').textContent = help; $('#askOk').textContent = okLabel;
+    const m = $('#ask'), input = $('#askInput'); input.value = ''; m.classList.add('open'); setTimeout(() => input.focus(), 50);
+    const done = v => { m.classList.remove('open'); $('#askOk').onclick = null; input.onkeydown = null; res(v); };
+    $('#askOk').onclick = () => { const v = input.value.trim(); if (v) done(v); else input.focus(); };
+    input.onkeydown = e => { if (e.key === 'Enter') $('#askOk').click(); if (e.key === 'Escape') done(null); };
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(null));
   });
 }
 
@@ -708,7 +727,7 @@ function closeEditor() { $('#editor').innerHTML = '<div class="empty" style="pad
 
 async function newScheme(cat) {
   if (!requireWrite()) return;
-  const name = prompt(`Name for the new scheme in “${cat.name}”`); if (!name) return;
+  const name = await askDialog('New scheme', 'Display name', `It will be added to “${cat.name}”, hidden until you mark it live.`); if (!name) return;
   try {
     const maxOrder = Math.max(0, ...schemesInCat(cat.id).map(s => s.order || 0));
     const row = await insert('schemes', { name, internal_name: name, live_flag: false, order: maxOrder + 10 });
@@ -891,7 +910,7 @@ function fmtDur(s) { if (!s) return ''; const m = Math.floor(s / 60), x = Math.f
 
 async function newLesson(scheme) {
   if (!requireWrite()) return;
-  const name = prompt(`Title for the new lesson in “${scheme.name}”`); if (!name) return;
+  const name = await askDialog('New lesson', 'Title', `It will be added at the end of “${scheme.name}”, hidden until you mark it live.`); if (!name) return;
   try {
     const maxOrder = Math.max(0, ...S.lessons.map(l => l.lesson_order || 0));
     const row = await insert('lessons', { name, internal_name: name, scheme_id: scheme.id, live_status: 'Hidden', lesson_order: maxOrder + 1, age_ranges: [], flags: [], location: [] });
