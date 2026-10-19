@@ -1,0 +1,1219 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>imoves accounts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f4fa; --surface: #ffffff; --surface-2: #eeedf5; --ink: #1f1b2e; --ink-2: #5a5670; --ink-3: #8c88a0;
+  --line: #dcd9e8; --line-2: #ebe9f3; --accent: #5b3fd1; --accent-ink: #ffffff; --accent-soft: #ece7fb;
+  --live: #1e8e5a; --live-soft: #e3f4ea; --hidden: #8c88a0; --hidden-soft: #ededf1; --pending: #c47a12; --pending-soft: #fbefd9;
+  --danger: #b42a3a; --danger-soft: #fbe5e8; --info: #1f6fb2; --info-soft: #e3eefa; --radius: 8px; --nav-w: 250px;
+  font-family: 'Figtree', system-ui, sans-serif; font-size: 14px; line-height: 1.45; color: var(--ink);
+  font-feature-settings: 'tnum' 1;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #16141f; --surface: #1f1c2b; --surface-2: #272336; --ink: #ecebf3; --ink-2: #b7b3c8; --ink-3: #847f9a;
+  --line: #342f48; --line-2: #2a2639; --accent: #9c86f0; --accent-ink: #16141f; --accent-soft: #2d2747;
+  --live: #4dc48a; --live-soft: #173426; --hidden: #847f9a; --hidden-soft: #2a2639; --pending: #e4a43c; --pending-soft: #3d2d14;
+  --danger: #e8707d; --danger-soft: #3b1b21; --info: #6ea8e6; --info-soft: #1b2c40;
+}}
+:root[data-theme="dark"] {
+  --bg: #16141f; --surface: #1f1c2b; --surface-2: #272336; --ink: #ecebf3; --ink-2: #b7b3c8; --ink-3: #847f9a;
+  --line: #342f48; --line-2: #2a2639; --accent: #9c86f0; --accent-ink: #16141f; --accent-soft: #2d2747;
+  --live: #4dc48a; --live-soft: #173426; --hidden: #847f9a; --hidden-soft: #2a2639; --pending: #e4a43c; --pending-soft: #3d2d14;
+  --danger: #e8707d; --danger-soft: #3b1b21; --info: #6ea8e6; --info-soft: #1b2c40;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+body { display: grid; grid-template-rows: 52px 1fr; height: 100vh; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+.muted { color: var(--ink-3); }
+.small { font-size: 12.5px; }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+
+header { display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+header .brand { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+header .brand span { color: var(--accent); }
+header .search { flex: 1; max-width: 560px; position: relative; }
+header .search input { width: 100%; padding: 8px 12px 8px 36px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); }
+header .search svg { position: absolute; left: 12px; top: 9px; width: 18px; height: 18px; color: var(--ink-3); }
+header .search .results { position: absolute; top: 40px; left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(20,10,60,.15); max-height: 460px; overflow: auto; z-index: 30; display: none; }
+header .search .results.open { display: block; }
+header .search .results button { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; }
+header .search .results button:hover, header .search .results button:focus { background: var(--accent-soft); outline: none; }
+header .search .results .kind { font-size: 11px; color: var(--ink-3); width: 46px; flex: none; text-transform: uppercase; letter-spacing: .04em; }
+header .search .results .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+header .search .results .t span { color: var(--ink-3); font-size: 12.5px; }
+header .search .results .hd { padding: 8px 12px 2px; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+header .spacer { flex: 1; }
+header .who { font-size: 13px; color: var(--ink-2); }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: default; filter: none; }
+.btn.danger { color: var(--danger); }
+.btn.quiet { border-color: transparent; background: none; }
+.btn.quiet:hover { background: var(--surface-2); }
+.btn.sm { padding: 4px 9px; font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.live { background: var(--live-soft); color: var(--live); }
+.pill.hidden { background: var(--hidden-soft); color: var(--hidden); }
+.pill.pending { background: var(--pending-soft); color: var(--pending); }
+.pill.new, .pill.accent { background: var(--accent-soft); color: var(--accent); }
+.pill.danger { background: var(--danger-soft); color: var(--danger); }
+.pill.info { background: var(--info-soft); color: var(--info); }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+main { display: grid; grid-template-columns: var(--nav-w) 1fr; min-height: 0; }
+nav { background: var(--surface); border-right: 1px solid var(--line); min-height: 0; overflow: auto; padding: 10px 8px 24px; }
+nav .sec { padding: 12px 8px 4px; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+nav button.item { width: 100%; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; gap: 8px; align-items: center; font-weight: 500; }
+nav button.item:hover { background: var(--surface-2); }
+nav button.item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+nav button.item .count { margin-left: auto; color: var(--ink-3); font-size: 12px; font-weight: 500; }
+nav button.item.active .count { color: var(--accent); }
+nav button.item svg { width: 16px; height: 16px; flex: none; color: var(--ink-3); }
+nav button.item.active svg { color: var(--accent); }
+
+section.page { overflow: auto; padding: 0 0 80px; }
+.crumbs { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 24px 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+.crumbs button { border: 0; background: none; padding: 2px 4px; cursor: pointer; color: var(--accent); font-weight: 500; }
+.crumbs .sep { color: var(--ink-3); }
+.crumbs .cur { font-weight: 600; color: var(--ink); }
+.phead { position: sticky; top: 38px; z-index: 5; background: var(--bg); padding: 4px 24px 12px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.phead h1 { font-size: 20px; letter-spacing: -0.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phead .id { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-left: 8px; }
+.phead .spacer { flex: 1; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 16px 24px 0; }
+.panel > h3 { padding: 12px 16px 0; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+.panel > h3 .spacer { flex: 1; }
+.panel .body { padding: 12px 16px 16px; }
+.panel .body.tight { padding: 4px 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 20px; }
+.grid .span { grid-column: 1 / -1; }
+.field label { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+.field input[type=text], .field input[type=number], .field input[type=date], .field input[type=email], .field input[type=password], .field select, .field textarea { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.field textarea { min-height: 72px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field.dirty label::after { content: ' • unsaved'; color: var(--pending); }
+.field .ro { padding: 7px 0; color: var(--ink); }
+.check { display: inline-flex; align-items: center; gap: 6px; margin: 4px 14px 4px 0; cursor: pointer; }
+.check input { width: 15px; height: 15px; accent-color: var(--accent); }
+.help { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+table.list { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.list th { text-align: left; font-size: 11.5px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.list td { padding: 8px 10px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+table.list tr:last-child td { border-bottom: 0; }
+table.list tr.click { cursor: pointer; }
+table.list tr.click:hover td { background: var(--surface-2); }
+table.list td .sub { font-size: 12px; color: var(--ink-3); }
+table.list .acts { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap; }
+table.list td.num, table.list th.num { text-align: right; }
+.empty { padding: 24px 12px; color: var(--ink-3); text-align: center; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 16px 24px 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card .n { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+.card .l { font-weight: 600; }
+.card .d { font-size: 12.5px; color: var(--ink-3); }
+.card.warn .n { color: var(--pending); }
+.card.bad .n { color: var(--danger); }
+.card.good .n { color: var(--live); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.stat .v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.stat .k { font-size: 12px; color: var(--ink-3); }
+
+.listtools { display: flex; gap: 8px; align-items: center; padding: 12px 24px 0; flex-wrap: wrap; }
+.listtools input[type=search], .listtools select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.listtools input[type=search] { min-width: 280px; }
+.listtools .spacer { flex: 1; }
+
+.note { padding: 10px 0; border-bottom: 1px solid var(--line-2); }
+.note:last-child { border-bottom: 0; }
+.note .top { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; color: var(--ink-3); flex-wrap: wrap; }
+.note .top b { color: var(--ink); }
+.note .body { margin-top: 3px; white-space: pre-wrap; }
+.note .fu { margin-top: 5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; }
+
+.drawer { position: fixed; top: 52px; right: 0; bottom: 0; width: 440px; max-width: 100%; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(20,10,60,.12); transform: translateX(100%); transition: transform .2s; z-index: 20; display: grid; grid-template-rows: auto 1fr; }
+.drawer.open { transform: none; }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
+.drawer .head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.drawer .head h2 { font-size: 15px; flex: 1; }
+.drawer .items { overflow: auto; padding: 8px 16px 24px; }
+.change { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 13px; }
+.change .top { display: flex; gap: 8px; align-items: baseline; }
+.change .top .when { color: var(--ink-3); font-size: 12px; margin-left: auto; white-space: nowrap; }
+.change .what { color: var(--ink-2); margin-top: 2px; }
+.change .diff { margin-top: 4px; font-size: 12.5px; }
+.change .diff div { display: flex; gap: 6px; }
+.change .diff .k { color: var(--ink-3); min-width: 120px; }
+.change .diff .o { color: var(--danger); text-decoration: line-through; }
+.change .diff .n { color: var(--live); }
+
+.modal { position: fixed; inset: 0; background: rgba(20,10,60,.4); display: none; place-items: center; z-index: 40; padding: 16px; }
+.modal.open { display: grid; }
+.modal .box { background: var(--surface); border-radius: 12px; width: min(680px, 100%); max-height: 92vh; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; box-shadow: 0 20px 60px rgba(20,10,60,.3); }
+.modal .box.narrow { width: min(440px, 100%); }
+.modal .mhead { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.modal .mhead h2 { font-size: 16px; flex: 1; }
+.modal .mbody { overflow: auto; padding: 14px 18px; }
+.modal .mfoot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.modal .mfoot .err { color: var(--danger); font-size: 12.5px; margin-right: auto; }
+.pick { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 8px; border: 0; background: none; border-radius: 8px; cursor: pointer; }
+.pick:hover, .pick:focus { background: var(--accent-soft); outline: none; }
+.pick .meta { min-width: 0; flex: 1; }
+.pick .meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick .meta span { font-size: 12px; color: var(--ink-3); }
+
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .15s, transform .15s; z-index: 50; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+#toast.err { background: var(--danger); color: #fff; }
+
+#login .box { padding: 24px; display: block; }
+#login h2 { font-size: 18px; margin-bottom: 4px; }
+#login p { color: var(--ink-2); margin: 0 0 16px; }
+#login .field { margin-bottom: 12px; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+  :root { --nav-w: 100%; }
+  .phead { top: 0; }
+  .crumbs { position: static; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span>imoves</span> accounts</div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Find a school, teacher, email, postcode or id" autocomplete="off" aria-label="Find a school or user">
+    <div class="results" id="qres" role="listbox"></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="changesBtn">Changes <span class="pill pending" id="pendingCount" hidden>0</span></button>
+  <span class="who" id="who"></span>
+  <button class="btn quiet sm" id="signout" hidden>Sign out</button>
+</header>
+
+<main>
+  <nav id="nav"></nav>
+  <section class="page" id="page"><div class="empty" style="padding-top:120px">Sign in to continue.</div></section>
+</main>
+
+<aside class="drawer" id="drawer" aria-label="Recent changes">
+  <div class="head"><h2>Recent changes</h2><span class="small muted" id="drawerNote"></span><button class="btn quiet sm" id="drawerClose">Close</button></div>
+  <div class="items" id="changes"></div>
+</aside>
+
+<div class="modal" id="form" role="dialog" aria-modal="true">
+  <div class="box">
+    <div class="mhead"><h2 id="formTitle"></h2><button class="btn quiet sm" data-close>Close</button></div>
+    <div class="mbody" id="formBody"></div>
+    <div class="mfoot"><span class="err" id="formErr"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="formOk">Save</button></div>
+  </div>
+</div>
+
+<div class="modal" id="picker" role="dialog" aria-modal="true">
+  <div class="box narrow">
+    <div class="mhead"><h2 id="pickerTitle">Choose</h2><button class="btn quiet sm" data-close>Close</button></div>
+    <div class="mbody" style="padding-top:10px"><input id="pickerQ" type="search" placeholder="Search" autocomplete="off" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);margin-bottom:8px"><div id="pickerBody"></div></div>
+    <div class="mfoot"><span class="small muted" id="pickerCount" style="margin-right:auto"></span></div>
+  </div>
+</div>
+
+<div class="modal" id="login" role="dialog" aria-modal="true">
+  <div class="box narrow">
+    <h2>Sign in</h2>
+    <p>School, teacher and subscription records are personal data, so nothing here is shown without a staff login.</p>
+    <div class="field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password"></div>
+    <div class="help" id="loginErr" style="color:var(--danger);min-height:18px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn primary" id="loginGo">Sign in</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+// ------------------------------------------------------------------------------------------
+// Configuration: the imoves-poc Supabase project. The publishable key alone cannot read any
+// of the account tables (RLS allows signed-in staff only); a staff JWT is added on sign-in.
+// ------------------------------------------------------------------------------------------
+const CONFIG = { url: 'https://oscnzixjjganyzjppqqb.supabase.co', anonKey: 'sb_publishable_5XkVClKKeE1nbm1lRAqB5w_TAgaRNVE', restPath: '/rest/v1', authPath: '/auth/v1' };
+{
+  const p = new URLSearchParams(location.search);
+  let dev = null; try { dev = p.get('api') || localStorage.getItem('acc.devApi'); } catch (e) {}
+  if (dev) {
+    CONFIG.url = dev; CONFIG.anonKey = ''; CONFIG.restPath = '';
+    try { localStorage.setItem('acc.devApi', dev); CONFIG.devToken = p.get('token') || localStorage.getItem('acc.devToken') || ''; if (p.get('token')) localStorage.setItem('acc.devToken', p.get('token')); } catch (e) { CONFIG.devToken = p.get('token') || ''; }
+  }
+}
+const VAT = 0.2;
+const AGES = ['4-5', '5-6', '6-7', '7-8', '8-9', '9-10', '10-11'];
+const ROLES = ['Head Teacher', 'Assistant Head Teacher', 'Deputy Head Teacher', 'PE Lead', 'Teacher', 'Teaching Assistant', 'KS1 Coordinator', 'KS2 Coordinator', 'Literacy Coordinator', 'Maths Coordinator', 'Office / Admin', 'Other'];
+const PURPOSES = ['Sales Opportunity', 'Hot Lead', 'Account Setup', 'Low Usage', 'Nurture', 'Renewal Due', 'Potential Ambassador', 'Chase Renewal Details'];
+const CANCEL_REASONS = ['Availability of budget', 'Value for money', 'Quality of resources', 'Variety or resources', 'Usability of the platform', 'Not being used', 'Using a competitor product', 'Something else'];
+const ICONS = {
+  today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+  sub: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>',
+  pkg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 7.5 12 12l9-4.5zM3 7.5V16l9 4.5 9-4.5V7.5M12 12v8.5"/></svg>',
+  note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h14v16H5zM8 9h8M8 13h6"/></svg>',
+};
+
+// ------------------------------------------------------------------------------------------
+// Data access: PostgREST through the Supabase REST gateway. Every call carries the staff JWT.
+// ------------------------------------------------------------------------------------------
+const session = { token: null, email: null };
+function headers() {
+  const h = { 'Content-Type': 'application/json' };
+  if (CONFIG.anonKey) h.apikey = CONFIG.anonKey;
+  const t = session.token || CONFIG.devToken || '';
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
+async function api(method, path, body, prefer) {
+  const h = headers();
+  if (prefer) h.Prefer = prefer;
+  const r = await fetch(`${CONFIG.url}${CONFIG.restPath}/${path}`, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!r.ok) {
+    let msg = `${r.status}`;
+    try { const j = await r.json(); msg = j.message || j.hint || j.error_description || JSON.stringify(j); } catch (e) {}
+    if (r.status === 401 || /JWT expired/i.test(msg)) { session.token = null; renderWho(); $('#login').classList.add('open'); }
+    throw new Error(msg);
+  }
+  if (r.status === 204) return null;
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+const get = path => api('GET', path);
+async function count(path) {
+  const h = { ...headers(), Prefer: 'count=exact', Range: '0-0', 'Range-Unit': 'items' };
+  const r = await fetch(`${CONFIG.url}${CONFIG.restPath}/${path}`, { headers: h });
+  if (!r.ok && r.status !== 206) return null;
+  const cr = r.headers.get('content-range') || '';
+  const m = cr.match(/\/(\d+)/); return m ? Number(m[1]) : null;
+}
+const insert = (table, row) => api('POST', table, row, 'return=representation').then(r => r[0]);
+const update = (table, id, patch) => api('PATCH', `${table}?id=eq.${id}`, patch, 'return=representation').then(r => r[0]);
+const rpc = (fn, args) => api('POST', `rpc/${fn}`, args);
+const enc = encodeURIComponent;
+const like = q => `*${q.replace(/[%*,()]/g, ' ').trim()}*`;
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad2 = n => String(n).padStart(2, '0');
+const isoLocal = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;   // never via toISOString (UTC shifts the date in BST)
+const today = () => isoLocal(new Date());
+const fmtD = v => v ? new Date(v + (v.length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+const fmtDT = v => v ? new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+const ago = v => { if (!v) return 'never'; const d = Math.round((Date.now() - new Date(v)) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 60 ? `${d} days ago` : d < 730 ? `${Math.round(d / 30)} months ago` : `${Math.round(d / 365)} years ago`; };
+const gbp = v => (v === null || v === undefined || v === '') ? '' : new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(v);
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return isoLocal(d); };
+const addMonths = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setMonth(d.getMonth() + n); return isoLocal(d); };
+const name = u => [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || `User ${u.id}`;
+let toastTimer;
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : ''); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 5000 : 2200); }
+function explainError(e) { const m = e.message || String(e); if (/JWT|jwt|permission denied|row-level security|401|403/.test(m)) return 'Your sign-in has expired. Sign in again and retry.'; return m; }
+
+// ------------------------------------------------------------------------------------------
+// Auth
+// ------------------------------------------------------------------------------------------
+function decodeJwt(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return null; } }
+function signedIn() { return !!(session.token || CONFIG.devToken); }
+function renderWho() {
+  const who = $('#who');
+  if (session.token) { who.textContent = session.email; $('#signout').hidden = false; }
+  else if (CONFIG.devToken) { const c = decodeJwt(CONFIG.devToken); who.textContent = (c && c.email ? c.email : 'local') + ' (dev)'; $('#signout').hidden = true; }
+  else { who.textContent = ''; $('#signout').hidden = true; }
+}
+async function restoreSession() {
+  try {
+    const raw = localStorage.getItem('acc.session'); if (!raw) return;
+    const s = JSON.parse(raw); const c = decodeJwt(s.token);
+    if (c && c.exp * 1000 > Date.now() + 60000) { session.token = s.token; session.email = s.email; }
+    else if (s.refresh) await refreshSession(s.refresh);
+  } catch (e) {}
+}
+async function refreshSession(refresh) {
+  const r = await fetch(`${CONFIG.url}${CONFIG.authPath}/token?grant_type=refresh_token`, { method: 'POST', headers: { apikey: CONFIG.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }) });
+  if (!r.ok) return;
+  const j = await r.json(); session.token = j.access_token; session.email = j.user.email;
+  localStorage.setItem('acc.session', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email }));
+}
+$('#loginGo').onclick = async () => {
+  $('#loginErr').textContent = '';
+  try {
+    const r = await fetch(`${CONFIG.url}${CONFIG.authPath}/token?grant_type=password`, { method: 'POST', headers: { apikey: CONFIG.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('#loginEmail').value.trim(), password: $('#loginPass').value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.msg || j.message || 'Sign-in failed');
+    session.token = j.access_token; session.email = j.user.email;
+    localStorage.setItem('acc.session', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email }));
+    $('#login').classList.remove('open'); renderWho(); toast(`Signed in as ${session.email}`); start();
+  } catch (e) { $('#loginErr').textContent = e.message; }
+};
+$('#loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginGo').click(); });
+$('#signout').onclick = () => { session.token = null; session.email = null; localStorage.removeItem('acc.session'); renderWho(); $('#page').innerHTML = '<div class="empty" style="padding-top:120px">Signed out.</div>'; $('#nav').innerHTML = ''; $('#login').classList.add('open'); };
+$$('.modal [data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.remove('open'));
+const actor = () => session.email || (CONFIG.devToken && (decodeJwt(CONFIG.devToken) || {}).email) || 'staff';
+
+// ------------------------------------------------------------------------------------------
+// Generic form modal: fields -> values
+// ------------------------------------------------------------------------------------------
+function fieldHtml(f, v) {
+  const val = v ?? f.value ?? '';
+  const cls = 'field' + (f.span ? ' span' : '');
+  if (f.type === 'checkbox') return `<label class="check" style="margin-top:22px"><input type="checkbox" name="${f.name}" ${val ? 'checked' : ''}> ${esc(f.label)}</label>`;
+  if (f.type === 'select') return `<div class="${cls}"><label>${esc(f.label)}</label><select name="${f.name}">${(f.options || []).map(o => { const [ov, ol] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(ov)}" ${String(ov) === String(val) ? 'selected' : ''}>${esc(ol)}</option>`; }).join('')}</select>${f.help ? `<div class="help">${esc(f.help)}</div>` : ''}</div>`;
+  if (f.type === 'textarea') return `<div class="${cls}"><label>${esc(f.label)}</label><textarea name="${f.name}">${esc(val)}</textarea>${f.help ? `<div class="help">${esc(f.help)}</div>` : ''}</div>`;
+  if (f.type === 'checks') return `<div class="${cls}"><label>${esc(f.label)}</label>${f.options.map(o => `<label class="check"><input type="checkbox" name="${f.name}" value="${esc(o)}" ${(val || []).includes(o) ? 'checked' : ''}> ${esc(o)}</label>`).join('')}</div>`;
+  if (f.type === 'static') return `<div class="${cls}"><label>${esc(f.label)}</label><div class="ro">${f.html || esc(val)}</div></div>`;
+  return `<div class="${cls}"><label>${esc(f.label)}</label><input type="${f.type || 'text'}" name="${f.name}" value="${esc(val)}" ${f.step ? `step="${f.step}"` : ''} ${f.placeholder ? `placeholder="${esc(f.placeholder)}"` : ''} autocomplete="off">${f.help ? `<div class="help">${esc(f.help)}</div>` : ''}</div>`;
+}
+function readForm(root, fields) {
+  const out = {};
+  for (const f of fields) {
+    if (f.type === 'static') continue;
+    if (f.type === 'checkbox') { out[f.name] = $(`[name="${f.name}"]`, root).checked; continue; }
+    if (f.type === 'checks') { out[f.name] = $$(`[name="${f.name}"]:checked`, root).map(x => x.value); continue; }
+    const el = $(`[name="${f.name}"]`, root); let v = el.value;
+    if (f.type === 'number') v = v === '' ? null : Number(v);
+    else if (v === '') v = null;
+    out[f.name] = v;
+  }
+  return out;
+}
+// Opens the form modal. onSave(values, root) may throw to keep the modal open. onChange lets a field react.
+function formDialog({ title, fields, values = {}, okLabel = 'Save', onSave, onChange, intro }) {
+  return new Promise(res => {
+    const m = $('#form'), body = $('#formBody'), err = $('#formErr');
+    $('#formTitle').textContent = title; $('#formOk').textContent = okLabel; err.textContent = '';
+    body.innerHTML = (intro ? `<p class="small" style="margin:0 0 12px;color:var(--ink-2)">${intro}</p>` : '') + `<div class="grid">${fields.map(f => fieldHtml(f, values[f.name])).join('')}</div>`;
+    m.classList.add('open');
+    const first = $('input:not([type=checkbox]),select,textarea', body); if (first) setTimeout(() => first.focus(), 50);
+    if (onChange) body.oninput = e => onChange(e.target.name, readForm(body, fields), body);
+    const done = v => { m.classList.remove('open'); $('#formOk').onclick = null; body.oninput = null; res(v); };
+    $('#formOk').onclick = async () => {
+      const vals = readForm(body, fields); err.textContent = ''; $('#formOk').disabled = true;
+      try { const r = onSave ? await onSave(vals, body) : vals; done(r === undefined ? vals : r); }
+      catch (e) { err.textContent = explainError(e); }
+      finally { $('#formOk').disabled = false; }
+    };
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(null));
+  });
+}
+function confirmDialog(title, html, okLabel = 'Continue', danger = false) {
+  return formDialog({ title, fields: [{ type: 'static', name: '_', label: '', html }], okLabel }).then(v => !!v);
+}
+// Picker modal: search a table, choose one row.
+function pickDialog({ title, search, render }) {
+  return new Promise(res => {
+    const m = $('#picker'), body = $('#pickerBody'), q = $('#pickerQ');
+    $('#pickerTitle').textContent = title; body.innerHTML = ''; q.value = ''; $('#pickerCount').textContent = '';
+    m.classList.add('open'); setTimeout(() => q.focus(), 50);
+    const done = v => { m.classList.remove('open'); q.oninput = null; res(v); };
+    let t;
+    const run = async () => {
+      const rows = await search(q.value.trim());
+      body.innerHTML = rows.map((r, k) => `<button class="pick" data-k="${k}">${render(r)}</button>`).join('') || '<div class="empty">No matches</div>';
+      $('#pickerCount').textContent = rows.length ? `${rows.length} shown` : '';
+      $$('.pick', body).forEach(b => b.onclick = () => done(rows[Number(b.dataset.k)]));
+    };
+    q.oninput = () => { clearTimeout(t); t = setTimeout(run, 250); };
+    run();
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(null));
+  });
+}
+
+// ------------------------------------------------------------------------------------------
+// Routing and shell
+// ------------------------------------------------------------------------------------------
+const S = { packages: [], countries: [], route: null, counts: {} };
+function go(hash) { location.hash = hash; }
+window.addEventListener('hashchange', () => route());
+async function start() {
+  if (!signedIn()) { $('#login').classList.add('open'); return; }
+  try {
+    [S.packages, S.countries] = await Promise.all([
+      get('packages?select=*&order=is_live.desc,kind.asc,display_name.asc'),
+      get('countries?select=id,name,is_live&order=name.asc'),
+    ]);
+  } catch (e) { toast(explainError(e), true); return; }
+  refreshCounts(); route(); loadPending();
+}
+async function refreshCounts() {
+  const t = today();
+  const [renewals, pending, followups, overdue] = await Promise.all([
+    count(`renewals_due?select=id&days_left=lte.60&renewed=is.false&do_not_renew=is.false`),
+    count(`users?select=id&membership_state=eq.requested&deleted_at=is.null`),
+    count(`follow_ups_due?select=id&follow_up_date=lte.${t}`),
+    count(`invoices?select=id&xero_status=eq.AUTHORISED&xero_amount_due=gt.0&xero_due_date=lt.${t}`),
+  ]);
+  S.counts = { renewals, pending, followups, overdue };
+  renderNav();
+}
+function renderNav() {
+  const r = S.route || {};
+  const item = (hash, icon, label, cnt) => `<button class="item ${r.hash === hash ? 'active' : ''}" data-go="${hash}">${ICONS[icon]}<span>${label}</span>${cnt !== undefined && cnt !== null ? `<span class="count">${cnt}</span>` : ''}</button>`;
+  $('#nav').innerHTML = `
+    <div class="sec">Work</div>
+    ${item('#today', 'today', 'Today', (S.counts.renewals || 0) + (S.counts.pending || 0) + (S.counts.followups || 0))}
+    ${item('#renewals', 'sub', 'Renewals due', S.counts.renewals)}
+    ${item('#pending', 'user', 'Access requests', S.counts.pending)}
+    ${item('#followups', 'note', 'Follow-ups', S.counts.followups)}
+    ${item('#overdue', 'sub', 'Overdue invoices', S.counts.overdue)}
+    <div class="sec">Records</div>
+    ${item('#schools', 'school', 'Schools')}
+    ${item('#users', 'user', 'Teachers')}
+    ${item('#subscriptions', 'sub', 'Subscriptions')}
+    ${item('#packages', 'pkg', 'Packages')}`;
+  $$('[data-go]', $('#nav')).forEach(b => b.onclick = () => go(b.dataset.go));
+}
+async function route() {
+  if (!signedIn()) return;
+  const h = location.hash || '#today';
+  const [path, qs] = h.split('?');
+  const params = new URLSearchParams(qs || '');
+  const m = path.match(/^#(school|user|subscription|package)\/(\d+)$/);
+  S.route = { hash: m ? `#${m[1]}s` : path, params };
+  renderNav();
+  const page = $('#page'); page.scrollTop = 0;
+  try {
+    if (m && m[1] === 'school') await schoolPage(Number(m[2]));
+    else if (m && m[1] === 'user') await userPage(Number(m[2]));
+    else if (m && m[1] === 'package') await packagePage(Number(m[2]));
+    else if (path === '#schools') await schoolsPage(params);
+    else if (path === '#users') await usersPage(params);
+    else if (path === '#subscriptions') await subscriptionsPage(params);
+    else if (path === '#packages') await packagesPage();
+    else if (path === '#renewals') await renewalsPage();
+    else if (path === '#pending') await pendingPage();
+    else if (path === '#followups') await followupsPage();
+    else if (path === '#overdue') await overduePage();
+    else await todayPage();
+  } catch (e) { page.innerHTML = `<div class="empty" style="padding-top:80px">${esc(explainError(e))}</div>`; }
+}
+function shell(crumbs, head, body) {
+  $('#page').innerHTML = `<div class="crumbs">${crumbs.map((c, k) => (k ? '<span class="sep">›</span>' : '') + (c.hash ? `<button data-go="${c.hash}">${esc(c.label)}</button>` : `<span class="cur">${esc(c.label)}</span>`)).join('')}</div>${head ? `<div class="phead">${head}</div>` : ''}${body}`;
+  $$('[data-go]', $('#page')).forEach(b => b.onclick = () => go(b.dataset.go));
+}
+const pill = (cls, text) => `<span class="pill ${cls}"><span class="dot"></span>${esc(text)}</span>`;
+const statusPill = st => ({ live: pill('live', 'Live'), future: pill('info', 'Starts later'), expired: pill('hidden', 'Expired'), ended: pill('hidden', 'Ended'), void: pill('danger', 'Void') }[st] || pill('hidden', st));
+const statePill = st => ({ approved: pill('live', 'Approved'), requested: pill('pending', 'Requested'), invited: pill('info', 'Invited'), declined: pill('danger', 'Declined'), removed: pill('hidden', 'Removed'), none: pill('hidden', 'No school') }[st] || pill('hidden', st || 'None'));
+const entPill = e => ({ school: pill('live', 'School subscription'), individual: pill('live', 'Individual subscription'), override: pill('accent', 'Staff override'), free: pill('hidden', 'Free content only') }[e] || '');
+
+// ------------------------------------------------------------------------------------------
+// Header search
+// ------------------------------------------------------------------------------------------
+{
+  let t;
+  const box = $('#qres');
+  $('#q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(runSearch, 220); });
+  $('#q').addEventListener('keydown', e => { if (e.key === 'Escape') box.classList.remove('open'); if (e.key === 'Enter') { const f = $('button', box); if (f) f.click(); } });
+  document.addEventListener('click', e => { if (!e.target.closest('.search')) box.classList.remove('open'); });
+  async function runSearch() {
+    const q = $('#q').value.trim();
+    if (q.length < 2) { box.classList.remove('open'); return; }
+    const [schools, users] = await Promise.all([searchSchools(q, 6), searchUsers(q, 8)]);
+    if (!schools.length && !users.length) { box.innerHTML = '<div class="empty">No matches</div>'; box.classList.add('open'); return; }
+    box.innerHTML = (schools.length ? '<div class="hd">Schools</div>' : '') + schools.map(s => `<button data-go="#school/${s.id}"><span class="kind">School</span><span class="t">${esc(s.name || 'Unnamed school')} <span>${esc([s.town, s.postcode].filter(Boolean).join(', '))} · ${s.members_count} members</span></span>${s.live_until ? pill('live', 'Live') : ''}</button>`).join('')
+      + (users.length ? '<div class="hd">Teachers</div>' : '') + users.map(u => `<button data-go="#user/${u.id}"><span class="kind">Teacher</span><span class="t">${esc(name(u))} <span>${esc(u.email || '')}${u.school ? ' · ' + esc(u.school.name) : ''}</span></span>${u.is_admin ? pill('accent', 'Admin') : ''}</button>`).join('');
+    box.classList.add('open');
+    $$('button', box).forEach(b => b.onclick = () => { box.classList.remove('open'); $('#q').value = ''; go(b.dataset.go); });
+  }
+}
+async function searchSchools(q, limit = 50) {
+  if (/^\d+$/.test(q)) return get(`school_summary?select=*&id=eq.${q}`);
+  return get(`school_summary?select=*&or=(name.ilike.${enc(like(q))},postcode.ilike.${enc(like(q))})&order=members_count.desc,users_count.desc&limit=${limit}`);
+}
+async function searchUsers(q, limit = 50) {
+  const sel = 'id,first_name,last_name,email,school_id,is_admin,membership_state,entitlement,last_login_at,deleted_at,school:schools(id,name,postcode)';
+  if (/^\d+$/.test(q)) return get(`users?select=${sel}&id=eq.${q}`);
+  if (q.includes('@') || !q.includes(' ')) return get(`users?select=${sel}&or=(email.ilike.${enc(like(q))},last_name.ilike.${enc(like(q))},first_name.ilike.${enc(like(q))})&order=last_login_at.desc.nullslast&limit=${limit}`);
+  const [a, ...rest] = q.split(/\s+/); const b = rest.join(' ');
+  return get(`users?select=${sel}&first_name=ilike.${enc(like(a))}&last_name=ilike.${enc(like(b))}&order=last_login_at.desc.nullslast&limit=${limit}`);
+}
+
+// ------------------------------------------------------------------------------------------
+// Today
+// ------------------------------------------------------------------------------------------
+async function todayPage() {
+  const t = today();
+  const [renewals, pending, followups, overdue, signups, expired] = await Promise.all([
+    get(`renewals_due?select=*&days_left=lte.60&renewed=is.false&do_not_renew=is.false&order=end_date.asc&limit=12`),
+    get(`users?select=id,first_name,last_name,email,created_at,school:schools(id,name,postcode)&membership_state=eq.requested&deleted_at=is.null&order=created_at.desc&limit=12`),
+    get(`follow_ups_due?select=*&follow_up_date=lte.${t}&order=follow_up_date.asc&limit=12`),
+    get(`invoices?select=id,school_id,xero_invoice_number,xero_total,xero_amount_due,xero_due_date,contact_name,school:schools(name)&xero_status=eq.AUTHORISED&xero_amount_due=gt.0&xero_due_date=lt.${t}&order=xero_due_date.asc&limit=12`),
+    count(`users?select=id&created_at=gte.${addDays(t, -7)}`),
+    get(`subscriptions?select=id,school_id,end_date,package:packages(display_name),school:schools(name,postcode)&kind=eq.School&status=eq.expired&is_free=is.false&end_date=gte.${addDays(t, -30)}&order=end_date.desc&limit=8`),
+  ]);
+  const card = (hash, cls, n, l, d) => `<div class="card ${cls}" data-go="${hash}"><div class="n">${n ?? '–'}</div><div class="l">${l}</div><div class="d">${d}</div></div>`;
+  shell([{ label: 'Today' }], `<h1>Today</h1><span class="id">${fmtD(t)}</span>`, `
+    <div class="cards">
+      ${card('#renewals', S.counts.renewals ? 'warn' : 'good', S.counts.renewals, 'Renewals due', 'paid school subscriptions ending in the next 60 days, not yet renewed')}
+      ${card('#pending', S.counts.pending ? 'warn' : 'good', S.counts.pending, 'Access requests', 'teachers waiting for a school admin or staff to approve them')}
+      ${card('#followups', S.counts.followups ? 'warn' : 'good', S.counts.followups, 'Follow-ups due', 'diary notes due today or earlier')}
+      ${card('#overdue', S.counts.overdue ? 'bad' : 'good', S.counts.overdue, 'Overdue invoices', 'Xero invoices past their due date with an amount outstanding')}
+      ${card('#users?sort=new', '', signups, 'New sign-ups', 'teacher accounts created in the last 7 days')}
+    </div>
+    <div class="panel"><h3>Renewals due soonest <span class="spacer"></span><button class="btn sm" data-go="#renewals">All</button></h3><div class="body tight">${renewalsTable(renewals)}</div></div>
+    <div class="panel"><h3>Access requests <span class="spacer"></span><button class="btn sm" data-go="#pending">All</button></h3><div class="body tight">${pendingTable(pending)}</div></div>
+    <div class="panel"><h3>Follow-ups due <span class="spacer"></span><button class="btn sm" data-go="#followups">All</button></h3><div class="body tight">${followupsTable(followups)}</div></div>
+    <div class="panel"><h3>Overdue invoices <span class="spacer"></span><button class="btn sm" data-go="#overdue">All</button></h3><div class="body tight">${overdueTable(overdue)}</div></div>
+    <div class="panel"><h3>Recently expired without a renewal</h3><div class="body tight">${expired.length ? `<table class="list"><tr><th>School</th><th>Package</th><th>Ended</th></tr>${expired.map(x => `<tr class="click" data-go="#school/${x.school_id}"><td>${esc(x.school?.name || '')}<div class="sub">${esc(x.school?.postcode || '')}</div></td><td>${esc(x.package?.display_name || '')}</td><td>${fmtD(x.end_date)}</td></tr>`).join('')}</table>` : '<div class="empty">None in the last 30 days</div>'}</div></div>`);
+  wireRows();
+}
+function wireRows() { $$('[data-go]', $('#page')).forEach(b => { if (!b.onclick) b.onclick = e => { if (e.target.closest('button') && e.target.closest('button') !== b) return; go(b.dataset.go); }; }); }
+function renewalsTable(rows) {
+  if (!rows.length) return '<div class="empty">Nothing due</div>';
+  return `<table class="list"><tr><th>School</th><th>Package</th><th>Ends</th><th class="num">Price exc VAT</th><th>Progress</th><th></th></tr>${rows.map(r => `<tr class="click" data-go="#school/${r.school_id}">
+    <td>${esc(r.school_name || '')}<div class="sub">${esc(r.postcode || '')}</div></td><td>${esc(r.package || '')}</td>
+    <td>${fmtD(r.end_date)}<div class="sub">${r.days_left < 0 ? `${-r.days_left} days ago` : `in ${r.days_left} days`}</div></td>
+    <td class="num">${gbp(r.price_exc_vat)}</td><td class="small">${r.accounts_confirmed ? pill('live', 'Details confirmed') : ''} ${esc((r.progress_notes || '').slice(0, 80))}</td>
+    <td><div class="acts"><button class="btn sm" data-renew="${r.id}">Renew</button></div></td></tr>`).join('')}</table>`;
+}
+function pendingTable(rows) {
+  if (!rows.length) return '<div class="empty">No one waiting</div>';
+  return `<table class="list"><tr><th>Teacher</th><th>School</th><th>Requested</th><th></th></tr>${rows.map(u => `<tr class="click" data-go="#user/${u.id}">
+    <td>${esc(name(u))}<div class="sub">${esc(u.email || '')}</div></td><td>${esc(u.school?.name || '')}<div class="sub">${esc(u.school?.postcode || '')}</div></td><td>${ago(u.created_at)}</td>
+    <td><div class="acts"><button class="btn sm" data-approve="${u.id}" data-school="${u.school_id}">Approve</button><button class="btn sm" data-decline="${u.id}" data-school="${u.school_id}">Decline</button></div></td></tr>`).join('')}</table>`;
+}
+function followupsTable(rows) {
+  if (!rows.length) return '<div class="empty">Nothing due</div>';
+  return `<table class="list"><tr><th>Due</th><th>Who</th><th>Purpose</th><th>Note</th><th></th></tr>${rows.map(n => `<tr class="click" data-go="${n.school_id ? `#school/${n.school_id}` : `#user/${n.user_id}`}">
+    <td class="nowrap">${fmtD(n.follow_up_date)}<div class="sub">${esc(n.follow_up_time || '')}</div></td>
+    <td>${esc(n.school_name || '')}${n.first_name || n.last_name ? `<div class="sub">${esc([n.first_name, n.last_name].filter(Boolean).join(' '))}</div>` : ''}</td>
+    <td>${esc(n.follow_up_purpose || '')}<div class="sub">${esc(n.follow_up_by || '')}</div></td><td class="small">${esc((n.body || '').slice(0, 120))}</td>
+    <td><div class="acts"><button class="btn sm" data-done="${n.id}">Done</button></div></td></tr>`).join('')}</table>`;
+}
+function overdueTable(rows) {
+  if (!rows.length) return '<div class="empty">None</div>';
+  return `<table class="list"><tr><th>Invoice</th><th>School</th><th>Due</th><th class="num">Total</th><th class="num">Outstanding</th></tr>${rows.map(x => `<tr class="click" data-go="#school/${x.school_id}">
+    <td>${esc(x.xero_invoice_number || x.id)}</td><td>${esc(x.school?.name || x.contact_name || '')}</td><td>${fmtD(x.xero_due_date)}</td><td class="num">${gbp(x.xero_total)}</td><td class="num">${gbp(x.xero_amount_due)}</td></tr>`).join('')}</table>`;
+}
+async function renewalsPage() {
+  const rows = await get(`renewals_due?select=*&days_left=lte.90&renewed=is.false&order=end_date.asc&limit=500`);
+  shell([{ label: 'Today', hash: '#today' }, { label: 'Renewals due' }], `<h1>Renewals due</h1><span class="id">${rows.length} paid school subscriptions ending within 90 days without a renewal</span>`,
+    `<div class="panel"><div class="body tight">${renewalsTable(rows)}</div></div>`); wireRows();
+}
+async function pendingPage() {
+  const rows = await get(`users?select=id,first_name,last_name,email,created_at,school_id,school:schools(id,name,postcode)&membership_state=eq.requested&deleted_at=is.null&order=created_at.desc&limit=500`);
+  shell([{ label: 'Today', hash: '#today' }, { label: 'Access requests' }], `<h1>Access requests</h1><span class="id">${rows.length} waiting</span>`, `<div class="panel"><div class="body tight">${pendingTable(rows)}</div></div>`); wireRows();
+}
+async function followupsPage() {
+  const rows = await get(`follow_ups_due?select=*&order=follow_up_date.asc&limit=500`);
+  shell([{ label: 'Today', hash: '#today' }, { label: 'Follow-ups' }], `<h1>Follow-ups</h1><span class="id">${rows.length} open, soonest first</span>`, `<div class="panel"><div class="body tight">${followupsTable(rows)}</div></div>`); wireRows();
+}
+async function overduePage() {
+  const t = today();
+  const rows = await get(`invoices?select=id,school_id,xero_invoice_number,xero_total,xero_amount_due,xero_due_date,contact_name,school:schools(name)&xero_status=eq.AUTHORISED&xero_amount_due=gt.0&xero_due_date=lt.${t}&order=xero_due_date.asc&limit=500`);
+  shell([{ label: 'Today', hash: '#today' }, { label: 'Overdue invoices' }], `<h1>Overdue invoices</h1><span class="id">${rows.length} with an outstanding amount (Xero status at the last import)</span>`, `<div class="panel"><div class="body tight">${overdueTable(rows)}</div></div>`); wireRows();
+}
+
+// Row-level actions that appear on several pages.
+document.addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  try {
+    if (b.dataset.approve) { e.stopPropagation(); await setMembership(Number(b.dataset.approve), Number(b.dataset.school), 'approve'); toast('Approved'); route(); refreshCounts(); }
+    else if (b.dataset.decline) { e.stopPropagation(); await setMembership(Number(b.dataset.decline), Number(b.dataset.school), 'decline'); toast('Declined'); route(); refreshCounts(); }
+    else if (b.dataset.done) { e.stopPropagation(); await update('notes', Number(b.dataset.done), { follow_up_done_at: new Date().toISOString(), follow_up_done_by: actor() }); toast('Follow-up done'); route(); refreshCounts(); }
+    else if (b.dataset.renew) { e.stopPropagation(); const sub = (await get(`subscriptions?select=*&id=eq.${b.dataset.renew}`))[0]; if (await renewDialog(sub)) { route(); refreshCounts(); } }
+  } catch (err) { toast(explainError(err), true); }
+});
+
+// ------------------------------------------------------------------------------------------
+// Schools list and record
+// ------------------------------------------------------------------------------------------
+async function schoolsPage(params) {
+  const q = params.get('q') || '';
+  shell([{ label: 'Schools' }], `<h1>Schools</h1>`, `
+    <div class="listtools"><input type="search" id="lq" placeholder="School name, postcode or id" value="${esc(q)}"><select id="lf"><option value="">All schools</option><option value="live">With a live subscription</option><option value="members">With members</option></select><span class="spacer"></span><button class="btn primary" id="newSchool">New school</button></div>
+    <div class="panel"><div class="body tight" id="lres"><div class="empty">Type to search 36,000 schools, or choose a filter</div></div></div>`);
+  const run = async () => {
+    const qq = $('#lq').value.trim(), f = $('#lf').value;
+    let rows;
+    if (qq) rows = await searchSchools(qq, 100);
+    else if (f === 'live') rows = (await get('subscriptions?select=id,end_date,is_free,school_id,package:packages(display_name),school:schools(id,name,town,postcode,country,email_domain,is_test,is_dummy,last_login_date,qb_users_with_access,qb_admins)&kind=eq.School&status=eq.live&is_free=is.false&order=end_date.asc&limit=500')).filter(x => x.school).map(x => ({ ...x.school, members_count: x.school.qb_users_with_access ?? '', admins_count: x.school.qb_admins ?? '', pending_count: '', live_subscription_id: x.id, live_until: x.end_date, live_package: x.package?.display_name, live_is_free: x.is_free }));
+    else if (f === 'members') rows = await get('school_summary?select=*&members_count=gt.0&order=members_count.desc&limit=200');
+    else { $('#lres').innerHTML = '<div class="empty">Type to search, or choose a filter</div>'; return; }
+    $('#lres').innerHTML = rows.length ? `<table class="list"><tr><th>School</th><th>Where</th><th class="num">Members</th><th class="num">Admins</th><th class="num">Pending</th><th>Subscription</th><th>Last login</th></tr>${rows.map(s => `<tr class="click" data-go="#school/${s.id}">
+      <td>${esc(s.name || 'Unnamed')} ${s.is_test ? pill('pending', 'Test') : ''}${s.is_dummy ? pill('hidden', 'Dummy') : ''}<div class="sub">#${s.id}${s.email_domain ? ' · ' + esc(s.email_domain) : ''}</div></td>
+      <td>${esc([s.town, s.postcode].filter(Boolean).join(', '))}<div class="sub">${esc(s.country || '')}</div></td>
+      <td class="num">${s.members_count}</td><td class="num">${s.admins_count}</td><td class="num">${s.pending_count || ''}</td>
+      <td>${s.live_subscription_id ? `${pill(s.live_is_free ? 'info' : 'live', s.live_is_free ? 'Complimentary' : 'Live')} <span class="small">${esc(s.live_package || '')} to ${fmtD(s.live_until)}</span>` : '<span class="muted small">None</span>'}</td>
+      <td class="small">${s.last_login_date ? ago(s.last_login_date) : ''}</td></tr>`).join('')}</table>` : '<div class="empty">No schools match</div>';
+    wireRows();
+  };
+  let t; $('#lq').oninput = () => { clearTimeout(t); t = setTimeout(run, 250); }; $('#lf').onchange = run;
+  $('#newSchool').onclick = () => newSchoolDialog();
+  if (q || $('#lf').value) run();
+}
+async function newSchoolDialog() {
+  const v = await formDialog({ title: 'New school', okLabel: 'Create', fields: [
+    { name: 'name', label: 'School name', span: true }, { name: 'address_1', label: 'Address line 1' }, { name: 'address_2', label: 'Address line 2' },
+    { name: 'town', label: 'Town' }, { name: 'postcode', label: 'Postcode' },
+    { name: 'country_id', label: 'Country', type: 'select', options: S.countries.map(c => [c.id, c.name]), value: (S.countries.find(c => /united kingdom/i.test(c.name)) || {}).id },
+    { name: 'phone', label: 'Main phone' }, { name: 'email_domain', label: 'Email domain', help: 'Teachers signing up with this domain are matched to the school' },
+  ], onSave: async vals => {
+    if (!vals.name) throw new Error('A name is needed');
+    vals.country_id = Number(vals.country_id); vals.country = (S.countries.find(c => c.id === vals.country_id) || {}).name || null; vals.is_live = true;
+    return insert('schools', vals);
+  }});
+  if (v) { toast('School created'); go(`#school/${v.id}`); }
+}
+
+async function schoolPage(id) {
+  const [school, members, memberships, subs, invoices, notes, invites, requests, changes] = await Promise.all([
+    get(`schools?select=*&id=eq.${id}`).then(r => r[0]),
+    get(`users?select=id,first_name,last_name,email,roles,is_admin,membership_state,entitlement,last_login_at,logins_30d,logins_total,created_at,deleted_at,phone&school_id=eq.${id}&order=is_admin.desc,last_name.asc,first_name.asc`),
+    get(`memberships?select=*&school_id=eq.${id}&order=id.desc&limit=200`),
+    get(`subscriptions?select=*,package:packages(id,display_name,internal_name,kind,price_exc_vat)&school_id=eq.${id}&order=end_date.desc.nullslast,id.desc`),
+    get(`invoices?select=*&school_id=eq.${id}&order=invoice_date.desc.nullslast,id.desc`),
+    get(`notes?select=*,user:users(id,first_name,last_name)&school_id=eq.${id}&order=id.desc&limit=100`),
+    get(`invites?select=*&school_id=eq.${id}&is_live=is.true&order=id.desc`),
+    get(`invoice_requests?select=*&school_id=eq.${id}&order=id.desc&limit=20`),
+    get(`account_changes?select=*&table_name=eq.schools&record_id=eq.${id}&order=id.desc&limit=20`),
+  ]);
+  if (!school) throw new Error('School not found');
+  const live = subs.find(x => x.kind === 'School' && x.status === 'live');
+  const latest = subs.find(x => x.kind === 'School' && x.status !== 'void') || null;
+  const pills = [school.is_live ? '' : pill('hidden', 'Not live'), school.is_test ? pill('pending', 'Test school') : '', school.is_dummy ? pill('hidden', 'Dummy school') : '',
+    school.third_party_reseller ? pill('info', 'Third-party invoicing') : '', school.complimentary_no_invoices ? pill('info', 'Complimentary, no invoices') : '',
+    live ? pill(live.is_free ? 'info' : 'live', `${live.is_free ? 'Complimentary' : 'Live'} to ${fmtD(live.end_date)}`) : pill('hidden', 'No live subscription')].join(' ');
+  shell([{ label: 'Schools', hash: '#schools' }, { label: school.name || 'Unnamed school' }],
+    `<h1>${esc(school.name || 'Unnamed school')}<span class="id">#${school.id}</span></h1>${pills}<span class="spacer"></span>
+     <button class="btn" id="addNote">Add note</button><button class="btn" id="invite">Invite a teacher</button><button class="btn primary" id="addSub">Add subscription</button>`, `
+    <div class="panel"><div class="body"><div class="stats">
+      <div class="stat"><div class="v">${members.filter(u => u.membership_state === 'approved').length}</div><div class="k">approved members</div></div>
+      <div class="stat"><div class="v">${members.filter(u => u.is_admin).length}</div><div class="k">school admins</div></div>
+      <div class="stat"><div class="v">${members.filter(u => u.membership_state === 'requested').length}</div><div class="k">waiting for approval</div></div>
+      <div class="stat"><div class="v">${members.reduce((a, u) => a + (u.logins_30d || 0), 0)}</div><div class="k">logins last 30 days</div></div>
+      <div class="stat"><div class="v">${school.last_login_date ? ago(school.last_login_date) : 'never'}</div><div class="k">last login</div></div>
+      <div class="stat"><div class="v">${latest ? esc(latest.package?.display_name || latest.qb_package_display_name || latest.qb_package_name || 'Legacy import') : '–'}</div><div class="k">${latest ? `latest package, ${statusPill(latest.status)}` : 'no subscription yet'}</div></div>
+    </div></div></div>
+
+    <div class="panel"><h3>Subscriptions <span class="spacer"></span>${live && !live.is_free ? `<button class="btn sm" data-renew="${live.id}">Renew</button>` : ''}</h3><div class="body tight" id="subs">${subsTable(subs)}</div></div>
+
+    <div class="panel"><h3>People <span class="spacer"></span><span class="small muted">${members.length} accounts chose this school</span></h3><div class="body tight">
+      ${members.length ? `<table class="list"><tr><th>Teacher</th><th>Role</th><th>Access</th><th>Last login</th><th class="num">Logins 30d</th><th></th></tr>${members.map(u => `<tr class="click" data-go="#user/${u.id}">
+        <td>${esc(name(u))}${u.deleted_at ? ' ' + pill('danger', 'Deleted') : ''}<div class="sub">${esc(u.email || '')}</div></td><td class="small">${esc((u.roles || []).join(', '))}</td>
+        <td>${statePill(u.membership_state)} ${u.is_admin ? pill('accent', 'Admin') : ''}</td><td class="small">${ago(u.last_login_at)}</td><td class="num">${u.logins_30d || ''}</td>
+        <td><div class="acts">${memberActions(u, id)}</div></td></tr>`).join('')}</table>` : '<div class="empty">No teachers have chosen this school yet</div>'}
+      ${invites.length ? `<div style="padding:10px 10px 4px" class="small"><b>Open invitations:</b> ${invites.map(i => esc(i.email)).join(', ')}</div>` : ''}
+    </div></div>
+
+    <div class="panel"><h3>Details <span class="spacer"></span><button class="btn sm" id="editSchool">Edit</button></h3><div class="body"><div class="grid">
+      ${ro('Address', [school.address_1, school.address_2, school.town, school.region, school.postcode].filter(Boolean).join(', '))}
+      ${ro('Country', school.country)} ${ro('Phone', school.phone)} ${ro('Website', school.website)} ${ro('Email domain', school.email_domain)}
+      ${ro('Finance contact', [school.finance_contact_name, school.finance_contact_email, school.finance_contact_phone].filter(Boolean).join(' · '))}
+      ${ro('Invoice legal name', school.invoice_legal_name)} ${ro('Xero contact', school.xero_contact_id)} ${ro('DfE URN / roll', [school.urn, school.roll].filter(Boolean).join(' / '))}
+      ${ro('Head', school.head_name)} ${ro('Marketing source', school.marketing_source)} ${ro('Created', fmtD((school.created_at || '').slice(0, 10)))}
+      ${school.legacy_notes ? `<div class="field span"><label>Notes carried over from the school record</label><div class="ro small" style="white-space:pre-wrap">${esc(school.legacy_notes)}</div></div>` : ''}
+    </div></div></div>
+
+    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>
+
+    <div class="panel"><h3>Invoices <span class="small muted">(Xero, as last imported)</span></h3><div class="body tight">${invoicesTable(invoices)}</div></div>
+    ${requests.length ? `<div class="panel"><h3>Invoice requests from the website</h3><div class="body tight"><table class="list"><tr><th>When</th><th>Requested by</th><th>Package</th><th>Term</th><th class="num">Price shown</th><th>PO</th></tr>${requests.map(r => `<tr><td>${fmtD((r.created_at || '').slice(0, 10))}</td><td>${esc(r.lead_contact_name || '')}<div class="sub">${esc(r.user_email || r.lead_contact_email || '')}</div></td><td>${esc((S.packages.find(p => p.id === r.package_id) || {}).display_name || r.product_id || '')}</td><td>${r.term_years || ''}</td><td class="num">${gbp(r.displayed_price_exc_vat)}</td><td>${esc(r.invoice_po || r.optional_po || '')}</td></tr>`).join('')}</table></div></div>` : ''}
+    <div class="panel"><h3>Membership history <span class="small muted">(latest first)</span></h3><div class="body tight">${membershipsTable(memberships, members)}</div></div>
+    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}`);
+  wireRows();
+  $('#editSchool').onclick = () => editSchoolDialog(school);
+  $('#addNote').onclick = () => noteDialog({ school_id: id }).then(v => v && route());
+  $('#invite').onclick = () => inviteDialog(id).then(v => v && route());
+  $('#addSub').onclick = () => subscriptionDialog({ kind: 'School', school_id: id, school }).then(v => v && route());
+  wireSubActions(subs); wireMemberActions(id); wireNoteActions();
+}
+const ro = (label, v) => `<div class="field"><label>${esc(label)}</label><div class="ro">${esc(v || '') || '<span class="muted">–</span>'}</div></div>`;
+function memberActions(u, schoolId) {
+  const a = [];
+  if (u.membership_state === 'requested' || u.membership_state === 'invited' || u.membership_state === 'none') a.push(`<button class="btn sm" data-approve="${u.id}" data-school="${schoolId}">Approve</button>`);
+  if (u.membership_state === 'requested') a.push(`<button class="btn sm" data-decline="${u.id}" data-school="${schoolId}">Decline</button>`);
+  if (u.membership_state === 'approved' && !u.is_admin) a.push(`<button class="btn sm" data-admin="${u.id}" data-school="${schoolId}">Make admin</button>`);
+  if (u.is_admin) a.push(`<button class="btn sm" data-unadmin="${u.id}" data-school="${schoolId}">Remove admin</button>`);
+  if (u.membership_state === 'approved') a.push(`<button class="btn sm danger" data-remove="${u.id}" data-school="${schoolId}">Remove</button>`);
+  if (u.membership_state === 'removed' || u.membership_state === 'declined') a.push(`<button class="btn sm" data-approve="${u.id}" data-school="${schoolId}">Reactivate</button>`);
+  return a.join('');
+}
+function wireMemberActions(schoolId) {
+  $$('[data-admin],[data-unadmin],[data-remove]', $('#page')).forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    try {
+      if (b.dataset.admin) { await setMembership(Number(b.dataset.admin), Number(b.dataset.school), 'admin'); toast('Made admin'); }
+      else if (b.dataset.unadmin) { await setMembership(Number(b.dataset.unadmin), Number(b.dataset.school), 'unadmin'); toast('Admin removed'); }
+      else if (b.dataset.remove) { if (!await confirmDialog('Remove access?', 'The teacher keeps their account but loses the school subscription.', 'Remove')) return; await setMembership(Number(b.dataset.remove), Number(b.dataset.school), 'remove'); toast('Access removed'); }
+      route(); refreshCounts();
+    } catch (err) { toast(explainError(err), true); }
+  });
+}
+// One membership row per user and school; actions set the flags on the latest row (or
+// create one). The database derives state and is_admin, then the user's entitlement.
+async function setMembership(userId, schoolId, action) {
+  if (!schoolId) throw new Error('The teacher has not chosen a school yet');
+  const latest = (await get(`memberships?select=*&user_id=eq.${userId}&school_id=eq.${schoolId}&order=id.desc&limit=1`))[0];
+  if (action === 'request') { if (!latest) await insert('memberships', { user_id: userId, school_id: schoolId, requested: true }); else await rpc('recompute_user', { p_user_id: userId }); return; }
+  const patch = { changed_by_staff: true };
+  if (action === 'approve') Object.assign(patch, { approved: true, declined: false, removed: false, invite_declined: false });
+  if (action === 'decline') Object.assign(patch, { declined: true, approved: false });
+  if (action === 'remove') Object.assign(patch, { removed: true });
+  if (action === 'admin') Object.assign(patch, { approved: true, removed: false, declined: false, admin_granted: true, admin_removed: false });
+  if (action === 'unadmin') Object.assign(patch, { admin_removed: true });
+  if (latest) await update('memberships', latest.id, patch);
+  else await insert('memberships', { user_id: userId, school_id: schoolId, requested: action !== 'approve' && action !== 'admin', ...patch });
+  if (action === 'approve' || action === 'admin') await update('users', userId, { school_id: schoolId });  // approval also makes it the user's school
+  else await rpc('recompute_user', { p_user_id: userId });
+}
+function membershipsTable(rows, members) {
+  if (!rows.length) return '<div class="empty">No history</div>';
+  const who = id => { const u = members.find(m => m.id === id); return u ? name(u) : `User ${id}`; };
+  return `<table class="list"><tr><th>When</th><th>Teacher</th><th>State</th><th>How</th></tr>${rows.slice(0, 50).map(m => `<tr class="click" data-go="#user/${m.user_id}"><td class="nowrap">${fmtD((m.updated_at || m.created_at || '').slice(0, 10))}</td><td>${esc(who(m.user_id))}</td><td>${statePill(m.state)} ${m.is_admin ? pill('accent', 'Admin') : ''}</td><td class="small">${[m.requested ? 'requested' : '', m.invited ? 'invited' : '', m.invite_accepted ? 'invite accepted' : '', m.via_invoice_pipeline ? 'from invoice' : '', m.via_automation ? 'auto' : '', m.auto_by_email_domain ? 'by email domain' : '', m.changed_by_staff ? 'by staff' : ''].filter(Boolean).join(', ')}</td></tr>`).join('')}</table>`;
+}
+async function editSchoolDialog(school) {
+  const fields = [
+    { name: 'name', label: 'School name', span: true }, { name: 'address_1', label: 'Address line 1' }, { name: 'address_2', label: 'Address line 2' },
+    { name: 'town', label: 'Town' }, { name: 'region', label: 'Region' }, { name: 'postcode', label: 'Postcode' },
+    { name: 'country_id', label: 'Country', type: 'select', options: S.countries.map(c => [c.id, c.name]) },
+    { name: 'phone', label: 'Main phone' }, { name: 'website', label: 'Website' }, { name: 'email_domain', label: 'Email domain' },
+    { name: 'finance_contact_name', label: 'Finance contact name' }, { name: 'finance_contact_email', label: 'Finance contact email' }, { name: 'finance_contact_phone', label: 'Finance contact phone' },
+    { name: 'invoice_legal_name', label: 'Invoice legal entity name' }, { name: 'xero_contact_id', label: 'Xero contact id' }, { name: 'marketing_source', label: 'Marketing source' },
+    { name: 'is_live', label: 'Live', type: 'checkbox' }, { name: 'is_test', label: 'Test school', type: 'checkbox' }, { name: 'third_party_reseller', label: 'Invoiced via a third party', type: 'checkbox' }, { name: 'complimentary_no_invoices', label: 'Complimentary, never invoiced', type: 'checkbox' },
+  ];
+  const v = await formDialog({ title: 'Edit school', fields, values: school, onSave: async vals => {
+    vals.country_id = vals.country_id ? Number(vals.country_id) : null; vals.country = (S.countries.find(c => c.id === vals.country_id) || {}).name || null;
+    const patch = {}; for (const k of Object.keys(vals)) if (JSON.stringify(vals[k]) !== JSON.stringify(school[k])) patch[k] = vals[k];
+    if (Object.keys(patch).length) await update('schools', school.id, patch);
+    return patch;
+  }});
+  if (v) { toast(Object.keys(v).length ? 'Saved' : 'No changes'); route(); }
+}
+async function inviteDialog(schoolId) {
+  const v = await formDialog({ title: 'Invite a teacher', okLabel: 'Invite', intro: 'The invitation email is not sent from this proof of concept; the record is created so the sign-up can be matched.', fields: [{ name: 'email', label: 'Email address', type: 'email', span: true }],
+    onSave: async vals => { if (!vals.email || !vals.email.includes('@')) throw new Error('An email address is needed'); return insert('invites', { email: vals.email.trim().toLowerCase(), school_id: schoolId, is_live: true }); } });
+  if (v) toast('Invitation recorded'); return v;
+}
+
+// ------------------------------------------------------------------------------------------
+// Subscriptions
+// ------------------------------------------------------------------------------------------
+function subsTable(subs) {
+  if (!subs.length) return '<div class="empty">No subscriptions</div>';
+  return `<table class="list"><tr><th>Package</th><th>Type</th><th>From</th><th>To</th><th>Status</th><th class="num">Price exc VAT</th><th>Invoice</th><th></th></tr>${subs.map(x => `<tr>
+    <td>${esc(x.package?.display_name || x.qb_package_display_name || x.qb_package_name || (x.package_id ? '–' : 'Legacy import (pre-2020)'))}${x.is_renewal ? ' <span class="small muted">renewal</span>' : ''}<div class="sub">#${x.id}${x.po_number ? ' · PO ' + esc(x.po_number) : ''}</div></td>
+    <td class="small">${esc(x.kind)}</td><td class="nowrap">${fmtD(x.start_date)}</td><td class="nowrap">${fmtD(x.end_date)}${x.end_date_changed ? `<div class="sub">changed: ${esc(x.end_date_change_reason || '')}</div>` : ''}</td>
+    <td>${statusPill(x.status)} ${x.is_free && x.status !== 'void' ? pill('info', 'Complimentary') : ''} ${x.do_not_renew ? pill('pending', 'Do not renew') : ''}</td>
+    <td class="num">${x.is_free ? '<span class="muted">–</span>' : gbp(x.price_exc_vat ?? x.price_override_exc_vat ?? x.package?.price_exc_vat)}</td>
+    <td class="small">${x.voided ? `<span class="muted">void: ${esc(x.voided_reason || '')}</span>` : invoiceCell(x)}</td>
+    <td><div class="acts">${subActions(x)}</div></td></tr>`).join('')}</table>`;
+}
+function invoiceCell(x) {
+  if (x.is_free) return '';
+  const parts = [];
+  if (x.xero_invoice_number) parts.push(x.xero_invoice_pdf ? `<a href="${esc(x.xero_invoice_pdf)}" target="_blank" rel="noopener">${esc(x.xero_invoice_number)}</a>` : esc(x.xero_invoice_number));
+  if (x.xero_amount_due > 0) parts.push(`<span style="color:var(--pending)">${gbp(x.xero_amount_due)} due</span>`);
+  else if (x.xero_amount_paid > 0) parts.push(`<span style="color:var(--live)">paid</span>`);
+  if (x.invoice_received) parts.push(`received ${fmtD(x.invoice_received_date)}`);
+  if (!parts.length) parts.push(x.create_invoice ? '<span class="muted">to be raised</span>' : '<span class="muted">none</span>');
+  return parts.join(' · ');
+}
+function subActions(x) {
+  const a = [];
+  if (x.status === 'live' || x.status === 'future') { if (!x.is_free) a.push(`<button class="btn sm" data-renew="${x.id}">Renew</button>`); a.push(`<button class="btn sm" data-extend="${x.id}">Change end</button>`); }
+  if (!x.is_free && !x.voided && !x.invoice_received) a.push(`<button class="btn sm" data-received="${x.id}">Invoice received</button>`);
+  if (x.status !== 'void') a.push(`<button class="btn sm" data-editsub="${x.id}">Edit</button>`, `<button class="btn sm danger" data-void="${x.id}">Void</button>`);
+  return a.join('');
+}
+function wireSubActions(subs) {
+  const find = id => subs.find(x => x.id === Number(id));
+  $$('[data-extend],[data-received],[data-void],[data-editsub]', $('#page')).forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    try {
+      let r;
+      if (b.dataset.extend) r = await extendDialog(find(b.dataset.extend));
+      else if (b.dataset.received) r = await receivedDialog(find(b.dataset.received));
+      else if (b.dataset.void) r = await voidDialog(find(b.dataset.void));
+      else if (b.dataset.editsub) r = await subscriptionDialog({ existing: find(b.dataset.editsub) });
+      if (r) { route(); refreshCounts(); }
+    } catch (err) { toast(explainError(err), true); }
+  });
+}
+function packageOptions(kind) { return S.packages.filter(p => p.kind === kind && p.is_live && !p.is_legacy).sort((a, b) => (a.is_free - b.is_free) || String(a.display_name || '').localeCompare(String(b.display_name || ''))).map(p => [p.id, `${p.display_name || p.internal_name}${p.is_free ? ' (complimentary)' : p.price_exc_vat ? ` - ${gbp(p.price_exc_vat)} exc VAT` : ''}`]); }
+function endFor(pkg, start) {
+  if (!pkg || !start) return null;
+  const term = (pkg.term || pkg.payment_term || '').toLowerCase();
+  if (term.includes('28')) return addDays(start, 27);
+  if (term.includes('month')) return addDays(addMonths(start, 1), -1);
+  if (pkg.is_free) return addDays(start, 27);
+  return addDays(addMonths(start, 12), -1);
+}
+// Add or edit a subscription. For a school: the package, dates, agreed price, PO and the
+// accounts contact, and whether an invoice is to be raised. Complimentary packages carry no price.
+async function subscriptionDialog({ kind = 'School', school_id = null, user_id = null, existing = null, renewalOf = null, school = null }) {
+  const isEdit = !!existing; const k = existing ? existing.kind : kind;
+  const opts = packageOptions(k === 'Individual' ? 'Teacher' : 'School');
+  if (existing && existing.package_id && !opts.find(o => o[0] === existing.package_id)) { const p = S.packages.find(p => p.id === existing.package_id); if (p) opts.unshift([p.id, `${p.display_name || p.internal_name} (current)`]); }
+  const base = existing || {};
+  const start = base.start_date || (renewalOf ? addDays(renewalOf.end_date, 1) : today());
+  const pkg0 = S.packages.find(p => p.id === (base.package_id || (renewalOf && renewalOf.package_id) || (opts[0] && opts[0][0])));
+  const fields = [
+    { name: 'package_id', label: 'Package', type: 'select', options: opts, span: true },
+    { name: 'start_date', label: 'Start', type: 'date' }, { name: 'end_date', label: 'End', type: 'date', help: 'Set from the package term; change it if agreed otherwise' },
+    { name: 'price_exc_vat', label: 'Price exc VAT', type: 'number', step: '0.01', help: 'The package price, or the price agreed with the school' },
+    { name: 'price_inc_vat', label: 'Price inc VAT', type: 'number', step: '0.01' },
+    ...(k === 'School' ? [
+      { name: 'po_number', label: 'PO number' }, { name: 'po_required', label: 'PO', type: 'select', options: ['', 'YES - PO NUMBER IS REQUIRED', 'No Purchase Order'] },
+      { name: 'accounts_contact_name', label: 'Accounts contact' }, { name: 'accounts_contact_1_email', label: 'Accounts contact email' },
+      { name: 'invoice_extra_email', label: 'Copy invoice to' }, { name: 'price_override_reason', label: 'Reason for a bespoke price' },
+      { name: 'create_invoice', label: 'Raise an invoice in Xero', type: 'checkbox' },
+    ] : []),
+    { name: 'progress_notes', label: 'Notes', type: 'textarea', span: true },
+  ];
+  const values = { ...base, start_date: start, package_id: pkg0 ? pkg0.id : '', end_date: base.end_date || endFor(pkg0, start),
+    price_exc_vat: base.price_exc_vat ?? (renewalOf ? renewalOf.price_exc_vat : pkg0 && !pkg0.is_free ? pkg0.price_exc_vat : null),
+    price_inc_vat: base.price_inc_vat ?? (renewalOf ? renewalOf.price_inc_vat : pkg0 && !pkg0.is_free ? pkg0.price_inc_vat : null),
+    create_invoice: base.create_invoice ?? (k === 'School' && !(pkg0 && pkg0.is_free) && !(school && (school.complimentary_no_invoices))),
+    po_number: base.po_number || (renewalOf ? renewalOf.next_po : ''), accounts_contact_name: base.accounts_contact_name || (renewalOf ? renewalOf.accounts_contact_name : ''),
+    accounts_contact_1_email: base.accounts_contact_1_email || (renewalOf ? renewalOf.accounts_contact_1_email : '') };
+  const v = await formDialog({
+    title: isEdit ? `Edit subscription #${existing.id}` : renewalOf ? 'Renew subscription' : k === 'School' ? 'Add a school subscription' : 'Add an individual subscription', okLabel: isEdit ? 'Save' : 'Create', fields, values,
+    intro: renewalOf ? `Renewing #${renewalOf.id} (${esc(renewalOf.package?.display_name || renewalOf.qb_package_display_name || '')}, ending ${fmtD(renewalOf.end_date)}). The new subscription starts the day after.` : null,
+    onChange: (nm, vals, root) => {
+      if (nm === 'package_id' || nm === 'start_date') {
+        const p = S.packages.find(p => p.id === Number(vals.package_id));
+        if (nm === 'package_id' && p) { $('[name=price_exc_vat]', root).value = p.is_free ? '' : (p.price_exc_vat ?? ''); $('[name=price_inc_vat]', root).value = p.is_free ? '' : (p.price_inc_vat ?? ''); const ci = $('[name=create_invoice]', root); if (ci) ci.checked = !p.is_free; }
+        if (!isEdit && vals.start_date) $('[name=end_date]', root).value = endFor(p, vals.start_date) || '';
+      }
+      if (nm === 'price_exc_vat') $('[name=price_inc_vat]', root).value = vals.price_exc_vat === null ? '' : Math.round(vals.price_exc_vat * (1 + VAT) * 100) / 100;
+    },
+    onSave: async vals => {
+      vals.package_id = vals.package_id ? Number(vals.package_id) : null;
+      if (!vals.package_id) throw new Error('Choose a package');
+      if (!vals.start_date || !vals.end_date) throw new Error('Start and end dates are needed');
+      if (vals.end_date < vals.start_date) throw new Error('The end date is before the start');
+      if (isEdit) { const patch = {}; for (const key of Object.keys(vals)) if (JSON.stringify(vals[key]) !== JSON.stringify(existing[key])) patch[key] = vals[key]; if (Object.keys(patch).length) await update('subscriptions', existing.id, patch); return patch; }
+      const row = { ...vals, kind: k, school_id, user_id };
+      if (renewalOf) Object.assign(row, { is_renewal: true, renewal_of_id: renewalOf.id, school_id: renewalOf.school_id, user_id: renewalOf.user_id });
+      return insert('subscriptions', row);
+    },
+  });
+  if (v) toast(isEdit ? 'Saved' : 'Subscription created'); return v;
+}
+async function renewDialog(sub) {
+  const r = await subscriptionDialog({ kind: sub.kind, renewalOf: sub });
+  return r;
+}
+async function extendDialog(sub) {
+  const v = await formDialog({ title: `Change the end date of #${sub.id}`, okLabel: 'Change', intro: `Currently ends ${fmtD(sub.end_date)}. Use this to extend a complimentary period or correct an agreed date; a renewal is a new subscription.`, fields: [
+    { name: 'quick', label: 'Extend by', type: 'select', options: ['', '1 week', '2 weeks', '3 weeks', '4 weeks', '3 months', '12 months'] },
+    { name: 'end_date', label: 'New end date', type: 'date', value: sub.end_date },
+    { name: 'end_date_change_reason', label: 'Reason', span: true },
+  ], onChange: (nm, vals, root) => { if (nm === 'quick' && vals.quick) { const [n, u] = vals.quick.split(' '); $('[name=end_date]', root).value = u.startsWith('week') ? addDays(sub.end_date, 7 * Number(n)) : addMonths(sub.end_date, Number(n)); } },
+    onSave: async vals => { if (!vals.end_date) throw new Error('A date is needed'); if (!vals.end_date_change_reason) throw new Error('A reason is needed'); return update('subscriptions', sub.id, { end_date: vals.end_date, end_date_changed: true, end_date_change_reason: vals.end_date_change_reason }); } });
+  if (v) toast('End date changed'); return v;
+}
+async function receivedDialog(sub) {
+  const v = await formDialog({ title: 'Invoice received by the school', okLabel: 'Record', fields: [{ name: 'invoice_received_date', label: 'Confirmed on', type: 'date', value: today() }, { name: 'invoice_received_by', label: 'Confirmed by', value: actor() }],
+    onSave: vals => update('subscriptions', sub.id, { invoice_received: true, invoice_received_date: vals.invoice_received_date, invoice_received_by: vals.invoice_received_by }) });
+  if (v) toast('Recorded'); return v;
+}
+async function voidDialog(sub) {
+  const v = await formDialog({ title: `Void subscription #${sub.id}`, okLabel: 'Void', intro: 'A void subscription never counts: the school or teacher loses access from it straight away and it is left out of renewals and reporting. Type VOID to confirm.', fields: [
+    { name: 'voided_reason', label: 'Reason', span: true }, { name: 'confirm', label: 'Type VOID', placeholder: 'VOID' },
+  ], onSave: vals => { if (vals.confirm !== 'VOID') throw new Error('Type VOID to confirm'); if (!vals.voided_reason) throw new Error('A reason is needed'); return update('subscriptions', sub.id, { voided: true, voided_at: new Date().toISOString(), voided_by: actor(), voided_reason: vals.voided_reason, voided_confirmation: 'VOID' }); } });
+  if (v) toast('Voided'); return v;
+}
+async function subscriptionsPage(params) {
+  const f = params.get('f') || 'live';
+  shell([{ label: 'Subscriptions' }], `<h1>Subscriptions</h1>`, `
+    <div class="listtools"><select id="sf"><option value="live" ${f === 'live' ? 'selected' : ''}>Live, paid</option><option value="comp" ${f === 'comp' ? 'selected' : ''}>Live, complimentary and trial</option><option value="future" ${f === 'future' ? 'selected' : ''}>Starting later</option><option value="recent" ${f === 'recent' ? 'selected' : ''}>Created in the last 30 days</option><option value="expired" ${f === 'expired' ? 'selected' : ''}>Expired in the last 90 days</option><option value="void" ${f === 'void' ? 'selected' : ''}>Void</option></select><span class="small muted" id="sn"></span></div>
+    <div class="panel"><div class="body tight" id="sres"><div class="empty">Loading</div></div></div>`);
+  const run = async () => {
+    const v = $('#sf').value; const t = today();
+    const q = { live: 'status=eq.live&is_free=is.false&order=end_date.asc', comp: 'status=eq.live&is_free=is.true&order=end_date.asc', future: 'status=eq.future&order=start_date.asc',
+      recent: `created_at=gte.${addDays(t, -30)}&order=id.desc`, expired: `status=eq.expired&end_date=gte.${addDays(t, -90)}&order=end_date.desc`, void: 'status=eq.void&order=voided_at.desc.nullslast' }[v];
+    const rows = await get(`subscriptions?select=id,kind,start_date,end_date,status,is_free,price_exc_vat,is_renewal,do_not_renew,xero_amount_due,xero_amount_paid,xero_invoice_number,school_id,user_id,package:packages(display_name),school:schools(name,postcode),user:users(first_name,last_name,email)&${q}&limit=500`);
+    $('#sn').textContent = `${rows.length}${rows.length === 500 ? '+' : ''} shown`;
+    $('#sres').innerHTML = rows.length ? `<table class="list"><tr><th>Who</th><th>Package</th><th>From</th><th>To</th><th>Status</th><th class="num">Price exc VAT</th><th>Invoice</th></tr>${rows.map(x => `<tr class="click" data-go="${x.school_id ? `#school/${x.school_id}` : `#user/${x.user_id}`}">
+      <td>${x.school ? esc(x.school.name) : x.user ? esc(name(x.user)) : '–'}<div class="sub">${x.school ? esc(x.school.postcode || '') : esc(x.user?.email || '')}</div></td><td>${esc(x.package?.display_name || '')}${x.is_renewal ? ' <span class="small muted">renewal</span>' : ''}</td>
+      <td class="nowrap">${fmtD(x.start_date)}</td><td class="nowrap">${fmtD(x.end_date)}</td><td>${statusPill(x.status)} ${x.do_not_renew ? pill('pending', 'Do not renew') : ''}</td><td class="num">${x.is_free ? '–' : gbp(x.price_exc_vat)}</td><td class="small">${invoiceCell(x)}</td></tr>`).join('')}</table>` : '<div class="empty">None</div>';
+    wireRows();
+  };
+  $('#sf').onchange = run; run();
+}
+
+// ------------------------------------------------------------------------------------------
+// Invoices, notes
+// ------------------------------------------------------------------------------------------
+function invoicesTable(rows) {
+  if (!rows.length) return '<div class="empty">No invoices</div>';
+  return `<table class="list"><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Description</th><th class="num">Total</th><th class="num">Due</th><th>Status</th></tr>${rows.map(x => `<tr>
+    <td>${x.xero_pdf ? `<a href="${esc(x.xero_pdf)}" target="_blank" rel="noopener">${esc(x.xero_invoice_number || x.id)}</a>` : esc(x.xero_invoice_number || x.id)}<div class="sub">${esc(x.reference_po || '')}</div></td>
+    <td class="nowrap">${fmtD(x.xero_date || x.invoice_date)}</td><td class="nowrap">${fmtD(x.xero_due_date || x.due_date)}</td><td class="small">${esc(x.line_description || '')}</td>
+    <td class="num">${gbp(x.xero_total ?? x.line_amount)}</td><td class="num">${x.xero_amount_due > 0 ? `<span style="color:var(--pending)">${gbp(x.xero_amount_due)}</span>` : ''}</td>
+    <td>${x.xero_status === 'PAID' ? pill('live', 'Paid') : x.xero_status === 'VOIDED' ? pill('danger', 'Voided') : x.xero_status ? pill('pending', x.xero_status) : ''}</td></tr>`).join('')}</table>`;
+}
+function notesList(notes) {
+  return `<div style="margin-bottom:8px"><button class="btn sm" id="noteAdd">Add note</button></div>` + (notes.length ? notes.map(n => `<div class="note">
+    <div class="top"><b>${fmtDT(n.created_at)}</b>${n.created_by ? `<span>${esc(n.created_by)}</span>` : ''}${n.user ? `<span>about ${esc([n.user.first_name, n.user.last_name].filter(Boolean).join(' '))}</span>` : n.non_user_name ? `<span>about ${esc(n.non_user_name)}${n.non_user_role ? ', ' + esc(n.non_user_role) : ''}</span>` : ''}</div>
+    <div class="body">${esc(n.body || '')}</div>
+    ${n.follow_up ? `<div class="fu">${n.follow_up_done_at ? pill('live', `Done ${fmtD(n.follow_up_done_at.slice(0, 10))}`) : pill(n.follow_up_date && n.follow_up_date < today() ? 'danger' : 'pending', `Follow up ${fmtD(n.follow_up_date)}${n.follow_up_time ? ', ' + n.follow_up_time.replace(/^\d\.\s*/, '') : ''}`)} <span class="muted">${esc(n.follow_up_purpose || '')}${n.follow_up_by ? ' · ' + esc(n.follow_up_by) : ''}</span>${!n.follow_up_done_at ? `<button class="btn sm" data-done="${n.id}">Done</button>` : ''}</div>` : ''}
+  </div>`).join('') : '<div class="empty">No notes yet</div>');
+}
+function wireNoteActions() { const b = $('#noteAdd'); if (b) b.onclick = () => { const r = S.route; const m = location.hash.match(/^#(school|user)\/(\d+)/); noteDialog(m[1] === 'school' ? { school_id: Number(m[2]) } : { user_id: Number(m[2]) }).then(v => v && route()); }; }
+async function noteDialog(ctx) {
+  const v = await formDialog({ title: 'Add a note', okLabel: 'Add', fields: [
+    { name: 'body', label: 'Note', type: 'textarea', span: true },
+    { name: 'follow_up', label: 'Follow-up needed', type: 'checkbox' },
+    { name: 'quick', label: 'When', type: 'select', options: ['', 'Today', 'Tomorrow', 'This Friday', 'Next Monday', 'Next week', 'Next month'] },
+    { name: 'follow_up_date', label: 'Follow-up date', type: 'date' },
+    { name: 'follow_up_time', label: 'Time of day', type: 'select', options: ['', '1. Mid Morning', '2. Lunchtime', '3. Mid Afternoon'] },
+    { name: 'follow_up_purpose', label: 'Purpose', type: 'select', options: ['', ...PURPOSES] },
+    { name: 'follow_up_by', label: 'Follow up by', value: actor() },
+  ], onChange: (nm, vals, root) => {
+    if (nm === 'quick' && vals.quick) {
+      const t = today(), d = new Date(t + 'T00:00:00'), dow = d.getDay();
+      const map = { Today: t, Tomorrow: addDays(t, 1), 'This Friday': addDays(t, (5 - dow + 7) % 7 || 7), 'Next Monday': addDays(t, (1 - dow + 7) % 7 || 7), 'Next week': addDays(t, 7), 'Next month': addMonths(t, 1) };
+      $('[name=follow_up_date]', root).value = map[vals.quick]; $('[name=follow_up]', root).checked = true;
+    }
+  }, onSave: async vals => {
+    if (!vals.body) throw new Error('Write the note first');
+    if (vals.follow_up && !vals.follow_up_date) throw new Error('A follow-up needs a date');
+    delete vals.quick;
+    return insert('notes', { ...vals, ...ctx, created_by: actor(), contact_kind: ctx.user_id ? 'User' : 'No Contact' });
+  } });
+  if (v) toast('Note added'); return v;
+}
+
+// ------------------------------------------------------------------------------------------
+// Teachers list and record
+// ------------------------------------------------------------------------------------------
+async function usersPage(params) {
+  const q = params.get('q') || '', sort = params.get('sort') || '';
+  shell([{ label: 'Teachers' }], `<h1>Teachers</h1>`, `
+    <div class="listtools"><input type="search" id="lq" placeholder="Name, email or id" value="${esc(q)}"><select id="lf"><option value="">Search</option><option value="new" ${sort === 'new' ? 'selected' : ''}>Newest sign-ups</option><option value="active">Most active, last 30 days</option><option value="pending">Waiting for approval</option><option value="individual">With an individual subscription</option></select><span class="spacer"></span><button class="btn primary" id="newUser">New teacher</button></div>
+    <div class="panel"><div class="body tight" id="lres"><div class="empty">Type to search 125,000 accounts, or choose a list</div></div></div>`);
+  const sel = 'id,first_name,last_name,email,school_id,is_admin,membership_state,entitlement,last_login_at,logins_30d,created_at,deleted_at,roles,school:schools(id,name,postcode)';
+  const run = async () => {
+    const qq = $('#lq').value.trim(), f = $('#lf').value;
+    let rows;
+    if (qq) rows = await searchUsers(qq, 100);
+    else if (f === 'new') rows = await get(`users?select=${sel}&order=created_at.desc&limit=100`);
+    else if (f === 'active') rows = await get(`users?select=${sel}&order=logins_30d.desc&limit=100`);
+    else if (f === 'pending') rows = await get(`users?select=${sel}&membership_state=eq.requested&deleted_at=is.null&order=created_at.desc&limit=200`);
+    else if (f === 'individual') rows = await get(`users?select=${sel}&entitlement=eq.individual&order=last_login_at.desc.nullslast&limit=200`);
+    else { $('#lres').innerHTML = '<div class="empty">Type to search, or choose a list</div>'; return; }
+    $('#lres').innerHTML = rows.length ? `<table class="list"><tr><th>Teacher</th><th>School</th><th>Access</th><th>Joined</th><th>Last login</th><th class="num">Logins 30d</th></tr>${rows.map(u => `<tr class="click" data-go="#user/${u.id}">
+      <td>${esc(name(u))}${u.deleted_at ? ' ' + pill('danger', 'Deleted') : ''}<div class="sub">${esc(u.email || '')}</div></td><td>${esc(u.school?.name || '')}<div class="sub">${esc(u.school?.postcode || '')}</div></td>
+      <td>${entPill(u.entitlement)} ${u.is_admin ? pill('accent', 'Admin') : ''} ${u.membership_state === 'requested' ? statePill('requested') : ''}</td>
+      <td class="small">${ago(u.created_at)}</td><td class="small">${ago(u.last_login_at)}</td><td class="num">${u.logins_30d || ''}</td></tr>`).join('')}</table>` : '<div class="empty">No teachers match</div>';
+    wireRows();
+  };
+  let t; $('#lq').oninput = () => { clearTimeout(t); t = setTimeout(run, 250); }; $('#lf').onchange = run;
+  $('#newUser').onclick = () => newUserDialog();
+  if (q || $('#lf').value) run();
+}
+async function pickSchool() {
+  return pickDialog({ title: 'Choose a school', search: q => q.length >= 2 ? searchSchools(q, 20) : Promise.resolve([]), render: s => `<div class="meta"><b>${esc(s.name || 'Unnamed')}</b><span>${esc([s.town, s.postcode].filter(Boolean).join(', '))} · ${s.members_count} members${s.live_until ? ' · live to ' + fmtD(s.live_until) : ''}</span></div>` });
+}
+async function newUserDialog() {
+  let school = null;
+  const dlg = formDialog({ title: 'New teacher account', okLabel: 'Create', intro: 'Creates the account approved at the school straight away (what staff do today with the Quickbase form). No email is sent from this proof of concept.', fields: [
+    { name: 'first_name', label: 'First name' }, { name: 'last_name', label: 'Last name' }, { name: 'email', label: 'Email', type: 'email' }, { name: 'phone', label: 'Phone' },
+    { name: 'roles', label: 'Roles', type: 'checks', options: ROLES, span: true },
+    { name: 'school_pick', label: 'School', type: 'static', html: '<button class="btn sm" id="pickSchoolBtn">Choose a school</button> <span id="pickedSchool" class="small muted">none</span>' },
+    { name: 'make_admin', label: 'Make them a school admin', type: 'checkbox' },
+  ], onSave: async vals => {
+    if (!vals.email || !vals.email.includes('@')) throw new Error('An email address is needed');
+    const dup = await get(`users?select=id&email=ilike.${enc(vals.email.trim())}&limit=1`); if (dup.length) throw new Error(`That email already has an account (#${dup[0].id})`);
+    const makeAdmin = vals.make_admin; delete vals.make_admin;
+    const u = await insert('users', { ...vals, email: vals.email.trim().toLowerCase(), school_id: school ? school.id : null, is_live: true, accepted_terms: true, system_created: false, joined_at: new Date().toISOString() });
+    if (school) await setMembership(u.id, school.id, makeAdmin ? 'admin' : 'approve');
+    return u;
+  }});
+  const pb = $('#pickSchoolBtn'); if (pb) pb.onclick = async () => { const s = await pickSchool(); if (s) { school = s; $('#pickedSchool').textContent = `${s.name} (${s.postcode || ''})`; } };
+  const v = await dlg;
+  if (v) { toast('Account created'); go(`#user/${v.id}`); }
+}
+async function userPage(id) {
+  const [user, memberships, subs, notes, changes] = await Promise.all([
+    get(`users?select=*,school:schools(id,name,postcode,town)&id=eq.${id}`).then(r => r[0]),
+    get(`memberships?select=*,school:schools(id,name,postcode)&user_id=eq.${id}&order=id.desc`),
+    get(`subscriptions?select=*,package:packages(id,display_name,internal_name,kind,price_exc_vat)&user_id=eq.${id}&order=end_date.desc.nullslast,id.desc`),
+    get(`notes?select=*&user_id=eq.${id}&order=id.desc&limit=50`),
+    get(`account_changes?select=*&table_name=eq.users&record_id=eq.${id}&order=id.desc&limit=20`),
+  ]);
+  if (!user) throw new Error('Teacher not found');
+  let schoolLive = null;
+  if (user.school_id) schoolLive = (await get(`subscriptions?select=id,end_date,is_free,package:packages(display_name)&school_id=eq.${user.school_id}&kind=eq.School&status=eq.live&order=end_date.desc&limit=1`))[0] || null;
+  const overrides = Object.keys(user.content_overrides || {});
+  const qbView = user.qb_has_access === null ? '' : `Quickbase at export: ${user.qb_user_type || ''}${user.qb_has_access ? ', has access' : ', no access'}${user.qb_has_admin ? ', admin' : ''}`;
+  shell([{ label: 'Teachers', hash: '#users' }, { label: name(user) }],
+    `<h1>${esc(name(user))}<span class="id">#${user.id}</span></h1>${entPill(user.entitlement)} ${user.is_admin ? pill('accent', 'School admin') : ''} ${user.deleted_at ? pill('danger', 'Deleted') : user.is_live ? '' : pill('hidden', 'Not live')} ${user.membership_state === 'requested' ? statePill('requested') : ''}<span class="spacer"></span>
+     <button class="btn" id="addNote">Add note</button><button class="btn" id="addSub">Add individual subscription</button><button class="btn primary" id="editUser">Edit</button>`, `
+    <div class="panel"><h3>Access <span class="spacer"></span>${user.school_id ? `<span class="small muted">at ${esc(user.school?.name || '')}</span>` : ''}</h3><div class="body"><div class="grid">
+      <div class="field"><label>School</label><div class="ro">${user.school ? `<a href="#school/${user.school.id}">${esc(user.school.name)}</a> <span class="muted small">${esc(user.school.postcode || '')}</span>` : '<span class="muted">none chosen</span>'} <button class="btn sm" id="changeSchool" style="margin-left:8px">Change</button></div></div>
+      <div class="field"><label>Membership</label><div class="ro">${statePill(user.membership_state)} ${user.is_admin ? pill('accent', 'Admin') : ''}<div class="acts" style="display:inline-flex;gap:4px;margin-left:8px">${memberActions(user, user.school_id)}</div></div></div>
+      <div class="field"><label>School subscription</label><div class="ro">${schoolLive ? `${pill(schoolLive.is_free ? 'info' : 'live', (schoolLive.is_free ? 'Complimentary' : 'Live') + ' to ' + fmtD(schoolLive.end_date))} <span class="small">${esc(schoolLive.package?.display_name || '')}</span>` : '<span class="muted">none live</span>'}</div></div>
+      <div class="field"><label>Staff override</label><div class="ro">${user.access_override_until ? pill('accent', `Full access to ${fmtD(user.access_override_until)}`) : '<span class="muted">none</span>'} <button class="btn sm" id="override" style="margin-left:8px">Set</button></div></div>
+      <div class="field span"><div class="help">Entitlement rule: an approved member of a school with a live school subscription, or a live individual subscription, or a staff override, otherwise free content only. ${esc(qbView)}${overrides.length ? ` · Quickbase per-user content overrides carried as data: ${esc(overrides.join(', '))}` : ''}</div></div>
+    </div></div></div>
+
+    <div class="panel"><h3>Details <span class="spacer"></span></h3><div class="body"><div class="grid">
+      ${ro('Email', user.email)} ${ro('Phone', user.phone)} ${ro('Roles', (user.roles || []).join(', '))} ${ro('Class', [user.class_name, user.class_pupils ? user.class_pupils + ' pupils' : ''].filter(Boolean).join(', '))}
+      ${ro('Age filter', (user.ages || []).join(', '))} ${ro('Marketing', user.marketing_ok ? 'Yes' : 'No')} ${ro('Title', user.title)}
+      ${user.pending_email ? ro('Email change pending', user.pending_email) : ''} ${user.deleted_at ? ro('Deleted', fmtDT(user.deleted_at) + (user.deleted_name ? ' (was ' + user.deleted_name + ')' : '')) : ''}
+      ${user.staff_notes || user.staff_notes_new ? `<div class="field span"><label>Notes carried over from the user record</label><div class="ro small" style="white-space:pre-wrap">${esc([user.staff_notes, user.staff_notes_new].filter(Boolean).join('\n'))}</div></div>` : ''}
+    </div></div></div>
+
+    <div class="panel"><h3>Activity <span class="small muted">(as at the last export; the rebuild reads its own activity tables)</span></h3><div class="body"><div class="stats">
+      <div class="stat"><div class="v">${fmtD((user.joined_at || user.created_at || '').slice(0, 10))}</div><div class="k">joined</div></div>
+      <div class="stat"><div class="v">${user.first_login_at ? fmtD(user.first_login_at.slice(0, 10)) : 'never'}</div><div class="k">first login</div></div>
+      <div class="stat"><div class="v">${ago(user.last_login_at)}</div><div class="k">last login</div></div>
+      <div class="stat"><div class="v">${user.logins_30d}</div><div class="k">logins, last 30 days</div></div>
+      <div class="stat"><div class="v">${user.logins_90d}</div><div class="k">last 90 days</div></div>
+      <div class="stat"><div class="v">${user.logins_365d}</div><div class="k">last 12 months</div></div>
+      <div class="stat"><div class="v">${user.logins_total}</div><div class="k">all time</div></div>
+      ${user.segment_2 ? `<div class="stat"><div class="v small">${esc(user.segment_2)}</div><div class="k">segment</div></div>` : ''}
+    </div></div></div>
+
+    <div class="panel"><h3>Individual subscriptions</h3><div class="body tight" id="subs">${subsTable(subs)}</div></div>
+    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>
+    <div class="panel"><h3>Membership history</h3><div class="body tight">${memberships.length ? `<table class="list"><tr><th>When</th><th>School</th><th>State</th><th>How</th></tr>${memberships.map(m => `<tr class="click" data-go="#school/${m.school_id}"><td class="nowrap">${fmtD((m.updated_at || m.created_at || '').slice(0, 10))}</td><td>${esc(m.school?.name || '')}<div class="sub">${esc(m.school?.postcode || '')}</div></td><td>${statePill(m.state)} ${m.is_admin ? pill('accent', 'Admin') : ''}</td><td class="small">${[m.requested ? 'requested' : '', m.invited ? 'invited' : '', m.invite_accepted ? 'invite accepted' : '', m.via_invoice_pipeline ? 'from invoice' : '', m.via_automation ? 'auto' : '', m.auto_by_email_domain ? 'by email domain' : '', m.changed_by_staff ? 'by staff' : ''].filter(Boolean).join(', ')}</td></tr>`).join('')}</table>` : '<div class="empty">No school access history</div>'}</div></div>
+    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}`);
+  wireRows();
+  $('#editUser').onclick = () => editUserDialog(user);
+  $('#addNote').onclick = () => noteDialog({ user_id: id, school_id: user.school_id }).then(v => v && route());
+  $('#addSub').onclick = () => subscriptionDialog({ kind: 'Individual', user_id: id }).then(v => v && route());
+  $('#changeSchool').onclick = async () => { const s = await pickSchool(); if (!s) return; try { await update('users', id, { school_id: s.id }); await setMembership(id, s.id, 'request'); toast(`School set to ${s.name}; approval needed`); route(); } catch (e) { toast(explainError(e), true); } };
+  $('#override').onclick = async () => {
+    const v = await formDialog({ title: 'Staff access override', okLabel: 'Set', intro: 'Gives full access regardless of school or subscription until the date, for example while an invoice is sorted out. Clear the date to remove it.', fields: [{ name: 'access_override_until', label: 'Full access until', type: 'date', value: user.access_override_until || '' }],
+      onSave: vals => update('users', id, { access_override_until: vals.access_override_until }) });
+    if (v) { toast('Override saved'); route(); }
+  };
+  wireSubActions(subs); wireMemberActions(user.school_id); wireNoteActions();
+}
+async function editUserDialog(user) {
+  const fields = [
+    { name: 'first_name', label: 'First name' }, { name: 'last_name', label: 'Last name' }, { name: 'email', label: 'Email', type: 'email' }, { name: 'phone', label: 'Phone' },
+    { name: 'class_name', label: 'Class' }, { name: 'class_pupils', label: 'Pupils in class', type: 'number' },
+    { name: 'roles', label: 'Roles', type: 'checks', options: ROLES, span: true },
+    { name: 'is_live', label: 'Live', type: 'checkbox' }, { name: 'marketing_ok', label: 'Marketing allowed', type: 'checkbox' }, { name: 'block_nps', label: 'Block NPS requests', type: 'checkbox' },
+  ];
+  const v = await formDialog({ title: 'Edit teacher', fields, values: user, onSave: async vals => {
+    if (vals.email) vals.email = vals.email.trim().toLowerCase();
+    const patch = {}; for (const k of Object.keys(vals)) if (JSON.stringify(vals[k]) !== JSON.stringify(user[k])) patch[k] = vals[k];
+    if (Object.keys(patch).length) await update('users', user.id, patch);
+    return patch;
+  }});
+  if (v) { toast(Object.keys(v).length ? 'Saved' : 'No changes'); route(); }
+}
+
+// ------------------------------------------------------------------------------------------
+// Packages
+// ------------------------------------------------------------------------------------------
+async function packagesPage() {
+  const rows = S.packages;
+  const table = list => `<table class="list"><tr><th>Package</th><th>Plan</th><th>Term</th><th class="num">Exc VAT</th><th class="num">Inc VAT</th><th>Subjects</th><th>Ages</th><th class="num">Max users</th><th class="num">Live subs</th></tr>${list.map(p => `<tr class="click" data-go="#package/${p.id}">
+    <td>${esc(p.display_name || p.internal_name || '')} ${p.is_free ? pill('info', 'Complimentary') : ''} ${!p.is_live ? pill('hidden', 'Not live') : ''} ${p.is_legacy ? pill('hidden', 'Legacy') : ''}<div class="sub">#${p.id} · ${esc(p.internal_name || '')}</div></td>
+    <td class="small">${esc(p.plan || p.product || '')}</td><td class="small">${esc(p.term || p.payment_term || '')}</td><td class="num">${gbp(p.price_exc_vat)}</td><td class="num">${gbp(p.price_inc_vat)}</td>
+    <td class="small">${p.all_content || p.all_subjects ? 'All' : esc((p.subjects || []).join(', '))}</td><td class="small">${p.all_ages ? 'All' : esc((p.ages || []).join(', '))}</td><td class="num">${p.max_users ?? ''}</td><td class="num">${p.qb_live_subscriptions ?? ''}</td></tr>`).join('')}</table>`;
+  shell([{ label: 'Packages' }], `<h1>Packages</h1><span class="id">${rows.length} defined, ${rows.filter(p => p.is_live).length} live</span><span class="spacer"></span><button class="btn primary" id="newPkg">New package</button>`, `
+    <div class="panel"><h3>School packages</h3><div class="body tight">${table(rows.filter(p => p.kind === 'School' && p.is_live && !p.is_legacy))}</div></div>
+    <div class="panel"><h3>Teacher packages</h3><div class="body tight">${table(rows.filter(p => p.kind === 'Teacher' && p.is_live && !p.is_legacy))}</div></div>
+    <div class="panel"><h3>Not live or legacy <span class="small muted">(${rows.filter(p => !p.is_live || p.is_legacy).length})</span></h3><div class="body tight">${table(rows.filter(p => !p.is_live || p.is_legacy))}</div></div>`);
+  wireRows();
+  $('#newPkg').onclick = () => packageDialog(null).then(v => { if (v) { toast('Package created'); refreshPackages().then(() => go(`#package/${v.id}`)); } });
+}
+async function refreshPackages() { S.packages = await get('packages?select=*&order=is_live.desc,kind.asc,display_name.asc'); }
+async function packagePage(id) {
+  await refreshPackages();
+  const p = S.packages.find(x => x.id === id); if (!p) throw new Error('Package not found');
+  const [subsCount, liveCount, recent] = await Promise.all([count(`subscriptions?select=id&package_id=eq.${id}`), count(`subscriptions?select=id&package_id=eq.${id}&status=eq.live`),
+    get(`subscriptions?select=id,kind,start_date,end_date,status,price_exc_vat,school_id,user_id,school:schools(name,postcode),user:users(first_name,last_name)&package_id=eq.${id}&order=id.desc&limit=20`)]);
+  shell([{ label: 'Packages', hash: '#packages' }, { label: p.display_name || p.internal_name || `Package ${id}` }],
+    `<h1>${esc(p.display_name || p.internal_name || '')}<span class="id">#${p.id}</span></h1>${p.is_live ? pill('live', 'Live') : pill('hidden', 'Not live')} ${p.is_free ? pill('info', 'Complimentary') : ''} ${pill('accent', p.kind + ' package')}<span class="spacer"></span><button class="btn primary" id="editPkg">Edit</button>`, `
+    <div class="panel"><div class="body"><div class="stats">
+      <div class="stat"><div class="v">${gbp(p.price_exc_vat) || '–'}</div><div class="k">exc VAT</div></div><div class="stat"><div class="v">${gbp(p.price_inc_vat) || '–'}</div><div class="k">inc VAT</div></div>
+      <div class="stat"><div class="v">${esc(p.term || p.payment_term || '–')}</div><div class="k">term</div></div><div class="stat"><div class="v">${p.max_users ?? '–'}</div><div class="k">max users</div></div>
+      <div class="stat"><div class="v">${liveCount ?? '–'}</div><div class="k">live subscriptions</div></div><div class="stat"><div class="v">${subsCount ?? '–'}</div><div class="k">ever</div></div>
+    </div></div></div>
+    <div class="panel"><h3>What it grants</h3><div class="body"><div class="grid">
+      ${ro('Subjects', p.all_content ? 'All content' : p.all_subjects ? 'All subjects' : (p.subjects || []).join(', '))} ${ro('Ages', p.all_ages ? 'All age groups' : (p.ages || []).join(', '))} ${ro('Plan', p.plan)} ${ro('Product', p.product)}
+      ${ro('Max pupils', p.max_pupils)} ${ro('Home Learning', p.home_learning ? 'Yes' : 'No')} ${ro('Stripe payment link', p.stripe_payment_link)} ${ro('Description', p.description)}
+    </div></div></div>
+    <div class="panel"><h3>Recent subscriptions on this package</h3><div class="body tight">${recent.length ? `<table class="list"><tr><th>Who</th><th>From</th><th>To</th><th>Status</th><th class="num">Price exc VAT</th></tr>${recent.map(x => `<tr class="click" data-go="${x.school_id ? `#school/${x.school_id}` : `#user/${x.user_id}`}"><td>${x.school ? esc(x.school.name) : x.user ? esc(name(x.user)) : '–'}</td><td>${fmtD(x.start_date)}</td><td>${fmtD(x.end_date)}</td><td>${statusPill(x.status)}</td><td class="num">${gbp(x.price_exc_vat)}</td></tr>`).join('')}</table>` : '<div class="empty">None</div>'}</div></div>`);
+  wireRows();
+  $('#editPkg').onclick = () => packageDialog(p).then(v => { if (v) { toast('Saved'); route(); } });
+}
+async function packageDialog(p) {
+  const fields = [
+    { name: 'display_name', label: 'Display name' }, { name: 'internal_name', label: 'Internal name' },
+    { name: 'kind', label: 'For', type: 'select', options: ['School', 'Teacher'] }, { name: 'plan', label: 'Plan', type: 'select', options: ['', 'KS1 - Infant School', 'KS2 - Junior School', 'PRS - Primary School'] },
+    { name: 'term', label: 'Term', type: 'select', options: ['Annual', 'Monthly', '28 Days'] }, { name: 'payment_term', label: 'Payment', type: 'select', options: ['', 'Annual', 'Monthly', 'One Off'] },
+    { name: 'price_exc_vat', label: 'Price exc VAT', type: 'number', step: '0.01' }, { name: 'price_inc_vat', label: 'Price inc VAT', type: 'number', step: '0.01' },
+    { name: 'max_users', label: 'Max users', type: 'number' }, { name: 'max_pupils', label: 'Max pupils', type: 'number' },
+    { name: 'all_content', label: 'All content', type: 'checkbox' }, { name: 'all_subjects', label: 'All subjects', type: 'checkbox' }, { name: 'all_ages', label: 'All age groups', type: 'checkbox' },
+    { name: 'ages', label: 'Age groups', type: 'checks', options: AGES, span: true },
+    { name: 'subjects', label: 'Subjects (names, comma separated)', span: true, help: 'Subject links by id come with the content PoC; names for now' },
+    { name: 'is_free', label: 'Complimentary / trial (no charge)', type: 'checkbox' }, { name: 'is_live', label: 'Live', type: 'checkbox' }, { name: 'home_learning', label: 'Home Learning', type: 'checkbox' },
+    { name: 'description', label: 'Description', type: 'textarea', span: true },
+  ];
+  const values = p ? { ...p, subjects: (p.subjects || []).join(', ') } : { kind: 'School', term: 'Annual', is_live: true, all_ages: true };
+  return formDialog({ title: p ? 'Edit package' : 'New package', okLabel: p ? 'Save' : 'Create', fields, values,
+    onChange: (nm, vals, root) => { if (nm === 'price_exc_vat') $('[name=price_inc_vat]', root).value = vals.price_exc_vat === null ? '' : Math.round(vals.price_exc_vat * (1 + VAT) * 100) / 100; },
+    onSave: async vals => {
+      vals.subjects = (vals.subjects || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (!vals.display_name && !vals.internal_name) throw new Error('A name is needed');
+      if (p) { const patch = {}; for (const k of Object.keys(vals)) if (JSON.stringify(vals[k]) !== JSON.stringify(p[k])) patch[k] = vals[k]; if (Object.keys(patch).length) await update('packages', p.id, patch); await refreshPackages(); return patch; }
+      return insert('packages', vals);
+    } });
+}
+
+// ------------------------------------------------------------------------------------------
+// Changes drawer
+// ------------------------------------------------------------------------------------------
+function changeHtml(c) {
+  const diff = c.action === 'update' ? Object.entries(c.changes).map(([k, v]) => `<div><span class="k">${esc(k)}</span><span class="o">${esc(fmtVal(v.old))}</span><span class="n">${esc(fmtVal(v.new))}</span></div>`).join('')
+    : c.action === 'insert' ? `<div><span class="k">created</span><span class="n">${esc(Object.entries(c.changes).filter(([k, v]) => v !== null && v !== false && !/^(id|qb_|created_at|updated_at|status|state|is_admin|entitlement|membership_state)/.test(k) && !(Array.isArray(v) && !v.length) && !(typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length)).map(([k, v]) => `${k}: ${fmtVal(v)}`).join(' · ').slice(0, 300))}</span></div>` : '<div><span class="k">deleted</span></div>';
+  return `<div class="change"><div class="top"><b>${esc(c.table_name)} #${c.record_id}</b><span class="muted">${esc(c.action)}</span>${c.synced_at ? pill('live', 'synced') : pill('pending', 'to sync')}<span class="when">${fmtDT(c.changed_at)}</span></div><div class="what">${esc(c.changed_by || '')}</div><div class="diff">${diff}</div></div>`;
+}
+const fmtVal = v => v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+async function loadPending() {
+  try {
+    const n = await count('account_changes?select=id&synced_at=is.null');
+    $('#pendingCount').textContent = n || 0; $('#pendingCount').hidden = !n;
+  } catch (e) {}
+}
+$('#changesBtn').onclick = async () => {
+  $('#drawer').classList.add('open');
+  try {
+    const rows = await get('account_changes?select=*&order=id.desc&limit=100');
+    $('#changes').innerHTML = rows.length ? rows.map(changeHtml).join('') : '<div class="empty">No changes recorded yet</div>';
+    $('#drawerNote').textContent = rows.length ? `${rows.filter(r => !r.synced_at).length} waiting for a Quickbase sync` : '';
+  } catch (e) { $('#changes').innerHTML = `<div class="empty">${esc(explainError(e))}</div>`; }
+};
+$('#drawerClose').onclick = () => $('#drawer').classList.remove('open');
+document.addEventListener('visibilitychange', () => { if (!document.hidden) loadPending(); });
+
+// ------------------------------------------------------------------------------------------
+(async () => { await restoreSession(); renderWho(); start(); })();
+</script>
+</body>
+</html>

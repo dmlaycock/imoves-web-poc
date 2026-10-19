@@ -13,3 +13,9 @@ repository. The embedded Supabase key is the project's public, read-only key.
 `cms-poc/site/index.html` in the `imoves` repository). Browsing is open; editing needs a
 Supabase Auth login. Its database changes are applied by the "CMS PoC database" workflow in
 that repository.
+
+`accounts/index.html` is the staff schools, teachers and subscriptions manager proof of
+concept (source: `accounts-poc/site/index.html` in the `imoves` repository). Everything on it
+is personal data, so nothing is shown without a Supabase Auth login; the database allows the
+signed-in staff role only. Its tables are loaded by the "Accounts PoC database" workflow in
+that repository.
