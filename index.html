@@ -122,7 +122,7 @@ main { padding-block: 1.5rem 3rem; }
 @media (max-width: 640px) { .lrow .meta span:not(:first-child) { display: none; } .lrow .meta { gap: 0; } }
 .lrow a.cover { position: absolute; inset: 0; }
 /* expandable lesson (category page) */
-.lx { background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); border: 2px solid transparent; transition: border-color .2s, box-shadow .2s; }
+.lx { scroll-margin-top: 120px; background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); border: 2px solid transparent; transition: border-color .2s, box-shadow .2s; }
 .lx.open { border-color: var(--light-purple); box-shadow: var(--shadow); }
 .lx .lrow { box-shadow: none; border-radius: var(--radius-sm); background: none; cursor: pointer; width: 100%; border: 0; text-align: left; font: inherit; }
 .lx .lrow::after { border-color: var(--mid-purple); transform: rotate(135deg); margin-top: -4px; transition: transform .25s var(--ease), margin .25s; }
@@ -208,7 +208,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.5</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.6</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -465,7 +465,8 @@ async function fillLessonBody(el, lessonId, sc, single) {
   let h = '';
   if (!single) h += `<div class="lmeta">${lessonMeta(l)}<a class="btn small outline" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
   const body = schemeBody(l);
-  if (body) h += `<div class="ltext">${l.heading_2 && !single ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
+  const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
+  if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
   h += `<div class="parts">` + parts.map((p, i) => renderPart(p, i === 0)).join('') + (parts.length ? '' : '<div class="notice">This lesson has no live parts at the moment.</div>') + `</div>`;
   el.innerHTML = h; el.dataset.loaded = '1';
   el.querySelectorAll('.part .ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
