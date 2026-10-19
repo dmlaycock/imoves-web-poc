@@ -8,3 +8,8 @@ The page is built from `web-poc/site/index.html` in the private `imoves` reposit
 (`node web-poc/site/build-page.js`) and committed here for GitHub Pages to publish.
 Content is refreshed from Quickbase by the "Web PoC content refresh" workflow in that
 repository. The embedded Supabase key is the project's public, read-only key.
+
+`cms/index.html` is the staff content manager proof of concept (source:
+`cms-poc/site/index.html` in the `imoves` repository). Browsing is open; editing needs a
+Supabase Auth login. Its database changes are applied by the "CMS PoC database" workflow in
+that repository.
