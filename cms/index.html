@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>imoves content manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js"></script>
+<style>
+:root {
+  --bg: #f5f4fa; --surface: #ffffff; --surface-2: #eeedf5; --ink: #1f1b2e; --ink-2: #5a5670; --ink-3: #8c88a0;
+  --line: #dcd9e8; --line-2: #ebe9f3; --accent: #5b3fd1; --accent-ink: #ffffff; --accent-soft: #ece7fb;
+  --live: #1e8e5a; --live-soft: #e3f4ea; --hidden: #8c88a0; --hidden-soft: #ededf1; --pending: #c47a12; --pending-soft: #fbefd9;
+  --danger: #b42a3a; --danger-soft: #fbe5e8; --radius: 8px; --nav-w: 340px;
+  font-family: 'Figtree', system-ui, sans-serif; font-size: 14px; line-height: 1.45; color: var(--ink);
+  font-feature-settings: 'tnum' 1;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #16141f; --surface: #1f1c2b; --surface-2: #272336; --ink: #ecebf3; --ink-2: #b7b3c8; --ink-3: #847f9a;
+  --line: #342f48; --line-2: #2a2639; --accent: #9c86f0; --accent-ink: #16141f; --accent-soft: #2d2747;
+  --live: #4dc48a; --live-soft: #173426; --hidden: #847f9a; --hidden-soft: #2a2639; --pending: #e4a43c; --pending-soft: #3d2d14;
+  --danger: #e8707d; --danger-soft: #3b1b21;
+}}
+:root[data-theme="dark"] {
+  --bg: #16141f; --surface: #1f1c2b; --surface-2: #272336; --ink: #ecebf3; --ink-2: #b7b3c8; --ink-3: #847f9a;
+  --line: #342f48; --line-2: #2a2639; --accent: #9c86f0; --accent-ink: #16141f; --accent-soft: #2d2747;
+  --live: #4dc48a; --live-soft: #173426; --hidden: #847f9a; --hidden-soft: #2a2639; --pending: #e4a43c; --pending-soft: #3d2d14;
+  --danger: #e8707d; --danger-soft: #3b1b21;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
+body { display: grid; grid-template-rows: 52px 1fr; height: 100vh; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+.muted { color: var(--ink-3); }
+.small { font-size: 12.5px; }
+
+/* header */
+header { display: flex; align-items: center; gap: 16px; padding: 0 16px; background: var(--surface); border-bottom: 1px solid var(--line); }
+header .brand { font-weight: 700; font-size: 16px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+header .brand span { color: var(--accent); }
+header .search { flex: 1; max-width: 520px; position: relative; }
+header .search input { width: 100%; padding: 8px 12px 8px 36px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); }
+header .search svg { position: absolute; left: 12px; top: 9px; width: 18px; height: 18px; color: var(--ink-3); }
+header .search .results { position: absolute; top: 40px; left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(20,10,60,.15); max-height: 420px; overflow: auto; z-index: 30; display: none; }
+header .search .results.open { display: block; }
+header .search .results button { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; }
+header .search .results button:hover, header .search .results button:focus { background: var(--accent-soft); outline: none; }
+header .search .results .kind { font-size: 11px; color: var(--ink-3); width: 56px; flex: none; }
+header .spacer { flex: 1; }
+header .who { font-size: 13px; color: var(--ink-2); }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 500; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.primary:disabled { opacity: .45; cursor: default; filter: none; }
+.btn.danger { color: var(--danger); }
+.btn.quiet { border-color: transparent; background: none; }
+.btn.quiet:hover { background: var(--surface-2); }
+.btn.sm { padding: 4px 9px; font-size: 12.5px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.live { background: var(--live-soft); color: var(--live); }
+.pill.hidden { background: var(--hidden-soft); color: var(--hidden); }
+.pill.pending { background: var(--pending-soft); color: var(--pending); }
+.pill.new { background: var(--accent-soft); color: var(--accent); }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+/* layout */
+main { display: grid; grid-template-columns: var(--nav-w) 1fr; min-height: 0; }
+nav { background: var(--surface); border-right: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+nav .tree { overflow: auto; padding: 8px 8px 16px; border-bottom: 1px solid var(--line); max-height: 46%; }
+nav .list { overflow: auto; padding: 8px; }
+.tree details { margin: 0; }
+.tree summary { list-style: none; cursor: pointer; padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; gap: 6px; user-select: none; }
+.tree summary::-webkit-details-marker { display: none; }
+.tree summary:hover { background: var(--surface-2); }
+.tree summary .chev { width: 14px; height: 14px; flex: none; transition: transform .15s; color: var(--ink-3); }
+.tree details[open] > summary .chev { transform: rotate(90deg); }
+.tree .subject > summary { font-weight: 600; }
+.tree .group { margin-left: 14px; }
+.tree .group > summary { font-weight: 500; }
+.tree .cat { margin-left: 34px; }
+.tree .cat button { width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+.tree .cat button:hover { background: var(--surface-2); }
+.tree .cat button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree .count { margin-left: auto; color: var(--ink-3); font-size: 12px; font-weight: 400; }
+.tree .off { color: var(--ink-3); }
+.tree .off::after { content: ' (hidden)'; font-size: 11px; }
+
+.listhead { display: flex; align-items: baseline; gap: 10px; padding: 8px 8px 6px; }
+.listhead h2 { font-size: 14px; }
+.listhead .btn { margin-left: auto; }
+.rows { display: flex; flex-direction: column; gap: 3px; }
+.row { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 4px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; background: var(--surface); }
+.row:hover { background: var(--surface-2); }
+.row.active { border-color: var(--accent); background: var(--accent-soft); }
+.row.sortable-ghost { opacity: .35; }
+.row.sortable-chosen { box-shadow: 0 6px 18px rgba(20,10,60,.18); }
+.row .handle { width: 16px; height: 22px; flex: none; color: var(--ink-3); cursor: grab; display: grid; place-items: center; }
+.row .handle svg { width: 12px; height: 12px; }
+.row .thumb { width: 42px; height: 30px; flex: none; border-radius: 4px; object-fit: cover; background: var(--surface-2); }
+.row .title { flex: 1; min-width: 0; }
+.row .title .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .title .sub { font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .pill { flex: none; }
+.row .num { width: 26px; flex: none; text-align: right; color: var(--ink-3); font-size: 12px; }
+.empty { padding: 24px 12px; color: var(--ink-3); text-align: center; }
+
+/* editor */
+section.editor { overflow: auto; padding: 0 0 80px; }
+.crumbs { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 24px 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+.crumbs button { border: 0; background: none; padding: 2px 4px; cursor: pointer; color: var(--accent); font-weight: 500; }
+.crumbs .sep { color: var(--ink-3); }
+.crumbs .cur { font-weight: 600; color: var(--ink); }
+.edhead { position: sticky; top: 38px; z-index: 5; background: var(--bg); padding: 4px 24px 12px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+.edhead h1 { font-size: 20px; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edhead .id { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-left: 8px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 16px 24px 0; }
+.panel > h3 { padding: 12px 16px 0; font-size: 14px; }
+.panel .body { padding: 12px 16px 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; }
+.grid .span { grid-column: 1 / -1; }
+.field label { display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px; }
+.field input[type=text], .field input[type=number], .field select, .field textarea { width: 100%; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.field textarea { min-height: 72px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.field.dirty label::after { content: ' • unsaved'; color: var(--pending); }
+.check { display: inline-flex; align-items: center; gap: 6px; margin: 4px 14px 4px 0; cursor: pointer; }
+.check input { width: 15px; height: 15px; accent-color: var(--accent); }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
+.switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--hidden); position: relative; transition: background .15s; margin: 0; }
+.switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.switch input:checked { background: var(--live); }
+.switch input:checked::after { left: 18px; }
+.switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.help { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+/* child lists inside the editor */
+.childlist .row { border: 1px solid var(--line-2); padding: 8px 10px 8px 4px; }
+.childlist .row:hover { background: var(--surface-2); }
+.childlist .row .pill { margin-left: 4px; }
+.childlist .row .open { margin-left: auto; }
+.part { border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); }
+.part .row { border: 0; cursor: default; }
+.part .row .handle { cursor: grab; }
+.part .media { width: 72px; flex: none; font-size: 12px; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 5px; }
+.part .media svg { width: 15px; height: 15px; }
+.part .detail { display: none; padding: 4px 14px 14px 42px; border-top: 1px solid var(--line-2); }
+.part.open .detail { display: block; }
+.part .thumb { width: 64px; height: 40px; }
+.part.sortable-ghost { opacity: .35; }
+.resource { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--bg); }
+.resource img { width: 96px; height: 54px; object-fit: cover; border-radius: 4px; background: var(--surface-2); }
+.resource .meta { flex: 1; min-width: 0; font-size: 12.5px; }
+.resource .meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resource .meta a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+
+/* changes drawer */
+.drawer { position: fixed; top: 52px; right: 0; bottom: 0; width: 420px; max-width: 100%; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(20,10,60,.12); transform: translateX(100%); transition: transform .2s; z-index: 20; display: grid; grid-template-rows: auto 1fr; }
+.drawer.open { transform: none; }
+@media (prefers-reduced-motion: reduce) { .drawer, .tree .chev, .switch input, .switch input::after { transition: none; } }
+.drawer .head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.drawer .head h2 { font-size: 15px; flex: 1; }
+.drawer .items { overflow: auto; padding: 8px 16px 24px; }
+.change { padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 13px; }
+.change .top { display: flex; gap: 8px; align-items: baseline; }
+.change .top .when { color: var(--ink-3); font-size: 12px; margin-left: auto; white-space: nowrap; }
+.change .what { color: var(--ink-2); margin-top: 2px; }
+.change .diff { margin-top: 4px; font-size: 12.5px; }
+.change .diff div { display: flex; gap: 6px; }
+.change .diff .k { color: var(--ink-3); min-width: 110px; }
+.change .diff .o { color: var(--danger); text-decoration: line-through; }
+.change .diff .n { color: var(--live); }
+
+/* modals */
+.modal { position: fixed; inset: 0; background: rgba(20,10,60,.4); display: none; place-items: center; z-index: 40; padding: 16px; }
+.modal.open { display: grid; }
+.modal .box { background: var(--surface); border-radius: 12px; width: min(720px, 100%); max-height: 90vh; display: grid; grid-template-rows: auto auto 1fr auto; overflow: hidden; box-shadow: 0 20px 60px rgba(20,10,60,.3); }
+.modal .box.narrow { width: min(420px, 100%); grid-template-rows: auto 1fr auto; }
+.modal .mhead { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+.modal .mhead h2 { font-size: 16px; flex: 1; }
+.modal .mtools { padding: 10px 18px; display: flex; gap: 8px; border-bottom: 1px solid var(--line-2); }
+.modal .mtools input, .modal .mtools select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.modal .mtools input { flex: 1; }
+.modal .mbody { overflow: auto; padding: 8px 18px; }
+.modal .mfoot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+.pick { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 8px; border: 0; background: none; border-radius: 8px; cursor: pointer; }
+.pick:hover, .pick:focus { background: var(--accent-soft); outline: none; }
+.pick img { width: 88px; height: 50px; object-fit: cover; border-radius: 4px; background: var(--surface-2); flex: none; }
+.pick .meta { min-width: 0; flex: 1; }
+.pick .meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick .meta span { font-size: 12px; color: var(--ink-3); }
+.pick .ext { font-size: 12px; font-weight: 600; color: var(--ink-2); width: 48px; text-align: center; background: var(--surface-2); border-radius: 4px; padding: 10px 0; flex: none; }
+
+/* toast */
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .15s, transform .15s; z-index: 50; pointer-events: none; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+#toast.err { background: var(--danger); color: #fff; }
+
+/* login */
+#login .box { padding: 24px; display: block; }
+#login h2 { font-size: 18px; margin-bottom: 4px; }
+#login p { color: var(--ink-2); margin: 0 0 16px; }
+#login .field { margin-bottom: 12px; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 45vh; }
+  :root { --nav-w: 100%; }
+  .edhead { top: 0; }
+  .crumbs { position: static; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span>imoves</span> content manager</div>
+  <div class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="Find a scheme, lesson or id" autocomplete="off" aria-label="Find a scheme or lesson">
+    <div class="results" id="qres" role="listbox"></div>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="changesBtn">Changes <span class="pill pending" id="pendingCount" hidden>0</span></button>
+  <span class="who" id="who"></span>
+  <button class="btn quiet sm" id="signout" hidden>Sign out</button>
+</header>
+
+<main>
+  <nav>
+    <div class="tree" id="tree"></div>
+    <div class="list" id="list"><div class="empty">Choose a category to see its schemes.</div></div>
+  </nav>
+  <section class="editor" id="editor">
+    <div class="empty" style="padding-top:120px">
+      <h2 style="font-weight:600;font-size:18px;margin-bottom:8px">Nothing open yet</h2>
+      Pick a category on the left, or search for a scheme or lesson above.
+    </div>
+  </section>
+</main>
+
+<aside class="drawer" id="drawer" aria-label="Recent changes">
+  <div class="head"><h2>Recent changes</h2><span class="small muted" id="drawerNote"></span><button class="btn quiet sm" id="drawerClose">Close</button></div>
+  <div class="items" id="changes"></div>
+</aside>
+
+<div class="modal" id="picker" role="dialog" aria-modal="true">
+  <div class="box">
+    <div class="mhead"><h2 id="pickerTitle">Choose a video</h2><button class="btn quiet sm" data-close>Close</button></div>
+    <div class="mtools"><input id="pickerQ" type="search" placeholder="Search" autocomplete="off"><select id="pickerFilter"></select></div>
+    <div class="mbody" id="pickerBody"></div>
+    <div class="mfoot"><span class="small muted" id="pickerCount" style="margin-right:auto"></span></div>
+  </div>
+</div>
+
+<div class="modal" id="confirm" role="dialog" aria-modal="true">
+  <div class="box narrow">
+    <div class="mhead"><h2 id="confirmTitle">Are you sure?</h2></div>
+    <div class="mbody" id="confirmBody" style="padding:16px 18px"></div>
+    <div class="mfoot"><button class="btn" data-close>Cancel</button><button class="btn primary" id="confirmOk">Continue</button></div>
+  </div>
+</div>
+
+<div class="modal" id="login" role="dialog" aria-modal="true">
+  <div class="box narrow">
+    <h2>Sign in to edit</h2>
+    <p>Browsing is open; changes need a staff login.</p>
+    <div class="field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)"></div>
+    <div class="help" id="loginErr" style="color:var(--danger);min-height:18px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn" data-close>Not now</button><button class="btn primary" id="loginGo">Sign in</button></div>
+  </div>
+</div>
+
+<div id="toast" role="status"></div>
+
+<script>
+// ------------------------------------------------------------------------------------------
+// Configuration. The imoves-poc Supabase project and its publishable key (safe to embed:
+// RLS makes every table read-only for it). For local development pass ?api=<postgrest url>
+// and ?token=<jwt> and the page runs against PostgREST instead.
+// ------------------------------------------------------------------------------------------
+const CONFIG = {
+  url: 'https://oscnzixjjganyzjppqqb.supabase.co',
+  anonKey: 'sb_publishable_5XkVClKKeE1nbm1lRAqB5w_TAgaRNVE',
+  restPath: '/rest/v1',
+  authPath: '/auth/v1',
+};
+{
+  const p = new URLSearchParams(location.search);
+  let dev = null; try { dev = p.get('api') || localStorage.getItem('cms.devApi'); } catch (e) {}
+  if (dev) {
+    CONFIG.url = dev; CONFIG.anonKey = ''; CONFIG.restPath = '';
+    try { localStorage.setItem('cms.devApi', dev); CONFIG.devToken = p.get('token') || localStorage.getItem('cms.devToken') || ''; if (p.get('token')) localStorage.setItem('cms.devToken', p.get('token')); } catch (e) { CONFIG.devToken = p.get('token') || ''; }
+  }
+}
+
+const CDN = 'https://d1i2jq09uv1ah.cloudfront.net/';
+const CHOICES = {
+  duration: ['5', '15', '30', '45'], preparation: ['0', '5', '10', '15'], intensity: ['Low', 'Moderate', 'Vigorous'],
+  focus: ['Calming', 'Energising'], location: ['Classroom', 'Home', 'Hall', 'Outdoors', 'Corridors'],
+  ages: ['4-5', '5-6', '6-7', '7-8', '8-9', '9-10', '10-11'], flags: ['Freemium', 'Featured', 'Supporting Resources', 'CPD'],
+  media: ['Video', 'Audio', 'Download', 'Slides', 'Image', 'Text only'],
+  group: ['Active Blasts', 'Science', 'PE', 'Gymnastics', 'Dance', 'Pilates', 'Maths', 'Mental Health', 'Standing in a Line', 'Lunchtime Games', 'Literacy & Phonics', 'Humanities', 'Teacher Resources', 'Active Adventures', 'Active Advent'],
+  subheadings: ['Personal Learning Objective', 'Personal Learning Objectives', 'Primary Objective', 'Primary Objectives', 'Learning Outcomes', 'Skill Outcome', 'Equipment', 'Activities we will do:'],
+};
+const ICON = {
+  Video: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h11a2 2 0 0 1 2 2v2.5l4-2.5v10l-4-2.5V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>',
+  Audio: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12.5a3.5 3.5 0 1 1-2-3.16V7l8-2v7.5a3.5 3.5 0 1 1-2-3.16V3.5z"/></svg>',
+  Download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 4v11m0 0 4-4m-4 4-4-4M5 19h14"/></svg>',
+  Slides: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v12H3zM10 17h4v3h-4z"/></svg>',
+  Image: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v16H3zm3 13 4-5 3 4 2-2 4 3z"/></svg>',
+  'Text only': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>',
+  grip: '<svg viewBox="0 0 12 12" fill="currentColor"><circle cx="4" cy="3" r="1.3"/><circle cx="8" cy="3" r="1.3"/><circle cx="4" cy="6" r="1.3"/><circle cx="8" cy="6" r="1.3"/><circle cx="4" cy="9" r="1.3"/><circle cx="8" cy="9" r="1.3"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 6 6 6-6 6"/></svg>',
+};
+
+// ------------------------------------------------------------------------------------------
+// Data access: a thin PostgREST client. Reads use the anon key; writes carry the user token.
+// ------------------------------------------------------------------------------------------
+const session = { token: null, email: null };
+function headers() {
+  // Publishable keys (sb_publishable_...) go in the apikey header only; a signed-in user's
+  // JWT (or the local dev token) goes in Authorization so PostgREST runs as "authenticated".
+  const h = { 'Content-Type': 'application/json' };
+  if (CONFIG.anonKey) h.apikey = CONFIG.anonKey;
+  const t = session.token || CONFIG.devToken || (CONFIG.anonKey && !CONFIG.anonKey.startsWith('sb_') ? CONFIG.anonKey : '');
+  if (t) h.Authorization = `Bearer ${t}`;
+  return h;
+}
+async function api(method, path, body, prefer) {
+  const h = headers();
+  if (prefer) h.Prefer = prefer;
+  const r = await fetch(`${CONFIG.url}${CONFIG.restPath}/${path}`, { method, headers: h, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!r.ok) {
+    let msg = `${r.status}`;
+    try { const j = await r.json(); msg = j.message || j.hint || j.error_description || JSON.stringify(j); } catch (e) {}
+    throw new Error(msg);
+  }
+  if (r.status === 204) return null;
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+const get = (path) => api('GET', path);
+const insert = (table, row) => api('POST', table, row, 'return=representation').then(r => r[0]);
+const update = (table, id, patch) => api('PATCH', `${table}?id=eq.${id}`, patch, 'return=representation').then(r => r[0]);
+const remove = (table, id) => api('DELETE', `${table}?id=eq.${id}`);
+const rpc = (fn, args) => api('POST', `rpc/${fn}`, args);
+
+// ------------------------------------------------------------------------------------------
+// State
+// ------------------------------------------------------------------------------------------
+const S = {
+  subjects: [], groups: [], cats: [], schemes: [], schemeCats: [], schemeSubjects: [],
+  catId: null, schemeId: null, lessonId: null,
+  lessons: [], parts: [], dirty: {}, editing: null, // editing: {kind, id, orig}
+  wistia: null, s3: null, backgrounds: [],
+};
+const byId = (arr, id) => arr.find(x => x.id === id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const sortBy = (arr, key) => [...arr].sort((a, b) => ((a[key] ?? 1e12) - (b[key] ?? 1e12)) || (a.id - b.id));
+
+let toastTimer;
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', err ? 5000 : 2200);
+}
+function confirmDialog(title, body, okLabel = 'Continue') {
+  return new Promise(res => {
+    $('#confirmTitle').textContent = title; $('#confirmBody').innerHTML = body; $('#confirmOk').textContent = okLabel;
+    const m = $('#confirm'); m.classList.add('open');
+    const done = v => { m.classList.remove('open'); $('#confirmOk').onclick = null; res(v); };
+    $('#confirmOk').onclick = () => done(true);
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(false));
+  });
+}
+
+// ------------------------------------------------------------------------------------------
+// Auth (Supabase email + password; a dev token takes its place locally)
+// ------------------------------------------------------------------------------------------
+function decodeJwt(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return null; } }
+function canWrite() { return !!(session.token || CONFIG.devToken); }
+function renderWho() {
+  const who = $('#who');
+  if (session.token) { who.textContent = session.email; $('#signout').hidden = false; }
+  else if (CONFIG.devToken) { const c = decodeJwt(CONFIG.devToken); who.textContent = (c && c.email ? c.email : 'local') + ' (dev)'; $('#signout').hidden = true; }
+  else { who.innerHTML = '<button class="btn sm" id="signinBtn">Sign in to edit</button>'; $('#signout').hidden = true; $('#signinBtn').onclick = () => $('#login').classList.add('open'); }
+}
+async function restoreSession() {
+  try {
+    const raw = localStorage.getItem('cms.session'); if (!raw) return;
+    const s = JSON.parse(raw); const c = decodeJwt(s.token);
+    if (c && c.exp * 1000 > Date.now() + 60000) { session.token = s.token; session.email = s.email; }
+    else if (s.refresh) await refreshSession(s.refresh);
+  } catch (e) {}
+}
+async function refreshSession(refresh) {
+  const r = await fetch(`${CONFIG.url}${CONFIG.authPath}/token?grant_type=refresh_token`, { method: 'POST', headers: { apikey: CONFIG.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refresh }) });
+  if (!r.ok) return;
+  const j = await r.json(); session.token = j.access_token; session.email = j.user.email;
+  localStorage.setItem('cms.session', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email }));
+}
+$('#loginGo').onclick = async () => {
+  $('#loginErr').textContent = '';
+  try {
+    const r = await fetch(`${CONFIG.url}${CONFIG.authPath}/token?grant_type=password`, { method: 'POST', headers: { apikey: CONFIG.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('#loginEmail').value.trim(), password: $('#loginPass').value }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.msg || j.message || 'Sign-in failed');
+    session.token = j.access_token; session.email = j.user.email;
+    localStorage.setItem('cms.session', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email }));
+    $('#login').classList.remove('open'); renderWho(); toast(`Signed in as ${session.email}`);
+  } catch (e) { $('#loginErr').textContent = e.message; }
+};
+$('#loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginGo').click(); });
+$('#signout').onclick = () => { session.token = null; session.email = null; localStorage.removeItem('cms.session'); renderWho(); toast('Signed out'); };
+$$('.modal [data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.remove('open'));
+function requireWrite() { if (canWrite()) return true; $('#login').classList.add('open'); return false; }
+function explainError(e) {
+  const m = e.message || String(e);
+  if (/JWT|jwt|permission denied|row-level security|401|403/.test(m)) return 'Your sign-in has expired. Sign in again and retry.';
+  return m;
+}
+
+// ------------------------------------------------------------------------------------------
+// Loading the tree
+// ------------------------------------------------------------------------------------------
+async function loadAll() {
+  const [subjects, groups, cats, schemes, schemeCats, schemeSubjects, backgrounds] = await Promise.all([
+    get('subjects?select=id,name,is_live,order&order=order.asc.nullslast,id.asc'),
+    get('subgroups?select=id,name,subject_id,order,is_live&order=order.asc.nullslast,id.asc'),
+    get('subcategories?select=id,name,subject_id,subgroup_id,order,is_live,image&order=order.asc.nullslast,id.asc'),
+    get('schemes?select=id,name,internal_name,live_flag,is_live,order,total_lessons,image,management_group,qb_record_id&order=order.asc.nullslast,id.asc'),
+    get('scheme_subcategories?select=scheme_id,subcategory_id,position&limit=10000'),
+    get('scheme_subjects?select=scheme_id,subject_id,position&limit=10000'),
+    get('backgrounds?select=id,name,s3_filename&order=sort_order.asc'),
+  ]);
+  Object.assign(S, { subjects, groups, cats, schemes, schemeCats, schemeSubjects, backgrounds });
+  renderTree();
+  refreshPending();
+}
+
+function renderTree() {
+  const t = $('#tree');
+  const catCount = {};
+  for (const l of S.schemeCats) catCount[l.subcategory_id] = (catCount[l.subcategory_id] || 0) + 1;
+  const html = [];
+  for (const sub of S.subjects) {
+    const groups = S.groups.filter(g => g.subject_id === sub.id);
+    const loose = S.cats.filter(c => c.subject_id === sub.id && !groups.some(g => g.id === c.subgroup_id));
+    if (!groups.length && !loose.length) continue;
+    const open = S.catId && S.cats.some(c => c.id === S.catId && c.subject_id === sub.id);
+    html.push(`<details class="subject" ${open ? 'open' : ''}><summary>${ICON.chev}<span class="${sub.is_live ? '' : 'off'}">${esc(sub.name)}</span></summary>`);
+    const catHtml = c => `<div class="cat"><button data-cat="${c.id}" class="${c.id === S.catId ? 'active' : ''}"><span class="${c.is_live ? '' : 'off'}">${esc(c.name)}</span><span class="count">${catCount[c.id] || ''}</span></button></div>`;
+    for (const g of groups) {
+      const cs = S.cats.filter(c => c.subgroup_id === g.id);
+      const gopen = S.catId && cs.some(c => c.id === S.catId);
+      html.push(`<details class="group" ${gopen ? 'open' : ''}><summary>${ICON.chev}<span class="${g.is_live ? '' : 'off'}">${esc(g.name)}</span><span class="count">${cs.length}</span></summary>${cs.map(catHtml).join('')}</details>`);
+    }
+    if (loose.length) html.push(`<details class="group" ${loose.some(c => c.id === S.catId) ? 'open' : ''}><summary>${ICON.chev}<span class="muted">No group</span><span class="count">${loose.length}</span></summary>${loose.map(catHtml).join('')}</details>`);
+    html.push('</details>');
+  }
+  t.innerHTML = html.join('');
+  $$('[data-cat]', t).forEach(b => b.onclick = () => openCategory(+b.dataset.cat));
+}
+
+// ------------------------------------------------------------------------------------------
+// Category -> list of schemes (drag to reorder)
+// ------------------------------------------------------------------------------------------
+function schemesInCat(catId) {
+  const ids = S.schemeCats.filter(l => l.subcategory_id === catId).map(l => l.scheme_id);
+  return sortBy(S.schemes.filter(s => ids.includes(s.id)), 'order');
+}
+function openCategory(id) {
+  S.catId = id;
+  $$('#tree [data-cat]').forEach(b => b.classList.toggle('active', +b.dataset.cat === id));
+  renderList();
+}
+function renderList() {
+  const cat = byId(S.cats, S.catId); const list = $('#list');
+  if (!cat) { list.innerHTML = '<div class="empty">Choose a category to see its schemes.</div>'; return; }
+  const schemes = schemesInCat(cat.id);
+  list.innerHTML = `<div class="listhead"><h2>${esc(cat.name)}</h2><span class="small muted">${schemes.length} scheme${schemes.length === 1 ? '' : 's'}</span><button class="btn sm" id="newScheme">+ New scheme</button></div>
+    <div class="rows" id="schemeRows">${schemes.map((s, i) => schemeRow(s, i)).join('') || '<div class="empty">No schemes in this category yet.</div>'}</div>`;
+  $('#newScheme').onclick = () => newScheme(cat);
+  $$('#schemeRows .row').forEach(r => r.onclick = e => { if (!e.target.closest('.handle')) openScheme(+r.dataset.id); });
+  if (schemes.length > 1) Sortable.create($('#schemeRows'), { handle: '.handle', animation: 150, onEnd: async () => {
+    if (!requireWrite()) { renderList(); return; }
+    const ids = $$('#schemeRows .row').map(r => +r.dataset.id);
+    try { await rpc('resequence_schemes', { p_ids: ids }); ids.forEach((id, i) => byId(S.schemes, id).order = (i + 1) * 10); toast('Scheme order saved'); refreshPending(); renderList(); }
+    catch (e) { toast(explainError(e), true); renderList(); }
+  }});
+}
+function schemeRow(s, i) {
+  return `<div class="row ${s.id === S.schemeId ? 'active' : ''}" data-id="${s.id}">
+    <span class="handle" title="Drag to reorder">${ICON.grip}</span>
+    <span class="num">${i + 1}</span>
+    <img class="thumb" src="${esc(s.image)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+    <div class="title"><div class="name">${esc(s.name)}</div><div class="sub">${esc(s.internal_name || '')}${s.total_lessons ? ` · ${s.total_lessons} live lesson${s.total_lessons === 1 ? '' : 's'}` : ''}</div></div>
+    ${statusPill(s.live_flag, s.is_live, s.qb_record_id)}</div>`;
+}
+function statusPill(flag, effective, qbId) {
+  const p = flag ? (effective ? '<span class="pill live"><span class="dot"></span>Live</span>' : '<span class="pill hidden" title="Marked live, but nothing live inside it">Live, empty</span>') : '<span class="pill hidden">Hidden</span>';
+  return p + (qbId ? '' : ' <span class="pill new" title="Created here; not in Quickbase yet">New</span>');
+}
+
+// ------------------------------------------------------------------------------------------
+// Editor plumbing: forms, dirty tracking, save
+// ------------------------------------------------------------------------------------------
+function field(label, name, value, opts = {}) {
+  const v = value ?? '';
+  let input;
+  if (opts.type === 'textarea') input = `<textarea name="${name}" ${opts.rows ? `rows="${opts.rows}"` : ''}>${esc(v)}</textarea>`;
+  else if (opts.type === 'select') input = `<select name="${name}"><option value="">${esc(opts.blank || '')}</option>${opts.choices.map(c => `<option ${String(v) === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
+  else if (opts.type === 'number') input = `<input type="number" name="${name}" value="${esc(v)}">`;
+  else input = `<input type="text" name="${name}" value="${esc(v)}" ${opts.list ? `list="${opts.list}"` : ''}>`;
+  return `<div class="field ${opts.span ? 'span' : ''}" data-field="${name}"><label>${label}</label>${input}${opts.help ? `<div class="help">${opts.help}</div>` : ''}</div>`;
+}
+function checks(label, name, values, choices) {
+  return `<div class="field span" data-field="${name}"><label>${label}</label>${choices.map(c => `<label class="check"><input type="checkbox" name="${name}" value="${esc(c)}" ${values.includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div>`;
+}
+function readForm(root, orig) {
+  const out = {};
+  for (const el of $$('[name]', root)) {
+    if (!(el.name in orig)) continue;
+    if (el.type === 'checkbox') {
+      const group = $$(`[name="${el.name}"]`, root);
+      if (group.length > 1 || Array.isArray(orig[el.name])) out[el.name] = group.filter(x => x.checked).map(x => x.value);
+      else out[el.name] = el.checked;
+    } else if (el.type === 'number' || typeof orig[el.name] === 'number') out[el.name] = el.value === '' ? null : Number(el.value);
+    else if (el.dataset.raw) out[el.name] = el.value;
+    else out[el.name] = el.value === '' ? null : el.value;
+  }
+  return out;
+}
+function diff(orig, cur) {
+  const d = {};
+  for (const k of Object.keys(cur)) {
+    const norm = v => typeof v === 'string' ? v.replace(/\r\n/g, '\n') : v;
+    const a = norm(orig[k]), b = norm(cur[k]);
+    const same = Array.isArray(b) ? JSON.stringify(a || []) === JSON.stringify(b) : (a ?? null) === (b ?? null) || (a === '' && b === null);
+    if (!same) d[k] = b;
+  }
+  return d;
+}
+function wireForm(root, orig, onSave) {
+  const mark = () => {
+    const d = diff(orig, readForm(root, orig));
+    $$('.field', root).forEach(f => f.classList.toggle('dirty', f.dataset.field in d));
+    const n = Object.keys(d).length;
+    const btn = $('#saveBtn'); if (btn) { btn.disabled = !n; btn.textContent = n ? `Save ${n} change${n === 1 ? '' : 's'}` : 'Saved'; }
+    S.dirtyCount = n;
+  };
+  root.addEventListener('input', mark); root.addEventListener('change', mark);
+  const btn = $('#saveBtn');
+  if (btn) btn.onclick = async () => {
+    if (!requireWrite()) return;
+    const d = diff(orig, readForm(root, orig)); if (!Object.keys(d).length) return;
+    btn.disabled = true; btn.textContent = 'Saving';
+    try { await onSave(d); Object.assign(orig, d); mark(); toast('Saved'); refreshPending(); }
+    catch (e) { toast(explainError(e), true); mark(); }
+  };
+  mark();
+}
+window.addEventListener('beforeunload', e => { if (S.dirtyCount) { e.preventDefault(); e.returnValue = ''; } });
+async function guardDirty() {
+  if (!S.dirtyCount) return true;
+  const ok = await confirmDialog('Leave without saving?', 'You have unsaved changes on this record. Leaving discards them.', 'Discard changes');
+  if (ok) S.dirtyCount = 0;
+  return ok;
+}
+function crumbs(parts) {
+  return `<div class="crumbs">${parts.map((p, i) => (i ? '<span class="sep">/</span>' : '') + (p.onclick ? `<button data-crumb="${i}">${esc(p.label)}</button>` : `<span class="cur">${esc(p.label)}</span>`)).join('')}</div>`;
+}
+
+// ------------------------------------------------------------------------------------------
+// Scheme editor
+// ------------------------------------------------------------------------------------------
+async function openScheme(id) {
+  if (!await guardDirty()) return;
+  const s = byId(S.schemes, id); if (!s) return;
+  S.schemeId = id; S.lessonId = null;
+  $$('#schemeRows .row').forEach(r => r.classList.toggle('active', +r.dataset.id === id));
+  const ed = $('#editor'); ed.innerHTML = '<div class="empty">Loading…</div>';
+  const [full, lessons] = await Promise.all([
+    get(`schemes?id=eq.${id}&select=*`).then(r => r[0]),
+    get(`lessons?scheme_id=eq.${id}&select=id,name,internal_name,live_status,is_live,lesson_order,order,age_min,age_max,qb_record_id&order=order.asc.nullslast,id.asc`),
+  ]);
+  S.lessons = lessons;
+  const cat = byId(S.cats, S.catId);
+  const catIds = S.schemeCats.filter(l => l.scheme_id === id).sort((a, b) => a.position - b.position).map(l => l.subcategory_id);
+  const subjIds = S.schemeSubjects.filter(l => l.scheme_id === id).sort((a, b) => a.position - b.position).map(l => l.subject_id);
+  const orig = {
+    name: full.name, internal_name: full.internal_name, management_group: full.management_group, subheading: full.subheading,
+    description: full.description, body_opening_text: full.body_opening_text, body_closing_text: full.body_closing_text,
+    body_subheading_1: full.body_subheading_1, body_subheading_1_text: full.body_subheading_1_text,
+    body_subheading_2: full.body_subheading_2, body_subheading_2_text: full.body_subheading_2_text,
+    body_subheading_3: full.body_subheading_3, body_subheading_3_text: full.body_subheading_3_text,
+    duration_label: full.duration_label, length_label: full.length_label, search_terms_additional: full.search_terms_additional,
+  };
+  ed.innerHTML = `
+    ${crumbs([cat ? { label: cat.name, onclick: true } : { label: 'Scheme' }, { label: full.name }])}
+    <div class="edhead"><h1>${esc(full.name)}<span class="id">SID ${full.id}</span></h1>
+      <label class="switch" title="Live schemes with at least one live lesson appear on the platform"><input type="checkbox" id="schemeLive" ${full.live_flag ? 'checked' : ''}> ${full.live_flag ? 'Live' : 'Hidden'}</label>
+      ${full.qb_record_id ? '' : '<button class="btn danger sm" id="deleteScheme">Delete</button>'}
+      <button class="btn primary" id="saveBtn" disabled>Saved</button></div>
+    <div class="panel"><h3>Lessons <span class="small muted">${lessons.length} · drag to reorder, click to open</span></h3><div class="body childlist">
+      <div class="rows" id="lessonRows">${sortBy(lessons, 'order').map((l, i) => lessonRow(l, i)).join('') || '<div class="empty">No lessons yet.</div>'}</div>
+      <div style="margin-top:10px"><button class="btn sm" id="newLesson">+ New lesson</button></div></div></div>
+    <div class="panel" id="schemeForm"><h3>Scheme details</h3><div class="body"><div class="grid">
+      ${field('Display name', 'name', full.name)}
+      ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only; shown in lists and Quickbase' })}
+      ${field('Management group', 'management_group', full.management_group, { type: 'select', choices: CHOICES.group, blank: 'Not set' })}
+      ${field('Sub heading', 'subheading', full.subheading)}
+      ${field('Duration label', 'duration_label', full.duration_label, { help: 'e.g. 40 minutes' })}
+      ${field('Length label', 'length_label', full.length_label, { help: 'e.g. 3 sessions' })}
+      ${field('Description', 'description', full.description, { type: 'textarea', span: true })}
+      ${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true })}
+      ${field('Sub heading 1', 'body_subheading_1', full.body_subheading_1, { list: 'subheads' })}
+      ${field('Sub heading 1 text', 'body_subheading_1_text', full.body_subheading_1_text, { type: 'textarea' })}
+      ${field('Sub heading 2', 'body_subheading_2', full.body_subheading_2, { list: 'subheads' })}
+      ${field('Sub heading 2 text', 'body_subheading_2_text', full.body_subheading_2_text, { type: 'textarea' })}
+      ${field('Sub heading 3', 'body_subheading_3', full.body_subheading_3, { list: 'subheads' })}
+      ${field('Sub heading 3 text', 'body_subheading_3_text', full.body_subheading_3_text, { type: 'textarea' })}
+      ${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
+      ${field('Extra search terms', 'search_terms_additional', full.search_terms_additional, { span: true, help: 'Comma separated' })}
+    </div></div></div>
+    <div class="panel"><h3>Where it appears</h3><div class="body">
+      <div class="grid"><div class="field"><label>Categories (in position order)</label><div id="schemeCats">${catIds.map(c => catChip(c)).join('')}</div>
+        <div style="margin-top:8px"><select id="addCat"><option value="">Add to a category…</option>${S.cats.filter(c => !catIds.includes(c.id)).map(c => `<option value="${c.id}">${esc(catPath(c))}</option>`).join('')}</select></div>
+        <div class="help">A scheme can sit in up to six categories. Its order number is shared across all of them.</div></div>
+      <div class="field"><label>Subjects</label><div>${subjIds.map(i => `<span class="pill hidden">${esc((byId(S.subjects, i) || { name: i }).name)}</span> `).join('') || '<span class="muted">None</span>'}</div>
+        <div class="help">Subject links follow the categories; editing them directly is a later step.</div></div></div>
+      <div style="margin-top:12px" class="small muted">Images: <a href="${esc(full.image)}" target="_blank">standard</a> · <a href="${esc(full.image_featured)}" target="_blank">featured</a> · <a href="${esc(full.image_tall)}" target="_blank">tall</a> (uploads are not part of this proof of concept)</div>
+    </div></div>
+    <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
+
+  $$('[data-crumb]', ed).forEach(b => b.onclick = () => { S.schemeId = null; renderList(); closeEditor(); });
+  wireForm($('#schemeForm'), orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; renderList(); });
+  $('#schemeLive').onchange = async e => {
+    if (!requireWrite()) { e.target.checked = !e.target.checked; return; }
+    try { const row = await update('schemes', id, { live_flag: e.target.checked }); Object.assign(s, { live_flag: row.live_flag, is_live: row.is_live }); e.target.parentElement.lastChild.textContent = row.live_flag ? ' Live' : ' Hidden'; toast(row.live_flag ? 'Scheme is live' : 'Scheme hidden'); renderList(); refreshPending(); openScheme(id); }
+    catch (err) { e.target.checked = !e.target.checked; toast(explainError(err), true); }
+  };
+  if ($('#deleteScheme')) $('#deleteScheme').onclick = async () => {
+    if (!requireWrite()) return;
+    if (!await confirmDialog('Delete this scheme?', `<p>“${esc(full.name)}” was created here and is not in Quickbase. Its ${lessons.length} lesson${lessons.length === 1 ? '' : 's'} and their parts go with it.</p>`, 'Delete scheme')) return;
+    try { await api('DELETE', `lesson_parts?lesson_id=in.(${lessons.map(l => l.id).join(',') || 0})`); await api('DELETE', `lessons?scheme_id=eq.${id}`); await remove('schemes', id);
+      S.schemes = S.schemes.filter(x => x.id !== id); S.schemeCats = S.schemeCats.filter(x => x.scheme_id !== id); S.schemeId = null; renderTree(); renderList(); closeEditor(); toast('Scheme deleted'); refreshPending(); }
+    catch (e) { toast(explainError(e), true); }
+  };
+  $('#newLesson').onclick = () => newLesson(full);
+  $$('#lessonRows .row').forEach(r => r.onclick = e => { if (!e.target.closest('.handle')) openLesson(+r.dataset.id); });
+  if (lessons.length > 1) Sortable.create($('#lessonRows'), { handle: '.handle', animation: 150, onEnd: async () => {
+    if (!requireWrite()) { openScheme(id); return; }
+    const ids = $$('#lessonRows .row').map(r => +r.dataset.id);
+    try { await rpc('resequence_lessons', { p_ids: ids }); toast('Lesson order saved'); refreshPending(); openScheme(id); }
+    catch (e) { toast(explainError(e), true); openScheme(id); }
+  }});
+  $('#addCat').onchange = async e => {
+    const cid = +e.target.value; if (!cid || !requireWrite()) { e.target.value = ''; return; }
+    try { await insert('scheme_subcategories', { scheme_id: id, subcategory_id: cid, position: catIds.length + 1 }); S.schemeCats.push({ scheme_id: id, subcategory_id: cid, position: catIds.length + 1 }); toast('Added to category'); renderTree(); refreshPending(); openScheme(id); }
+    catch (err) { toast(explainError(err), true); e.target.value = ''; }
+  };
+  $$('[data-uncat]', ed).forEach(b => b.onclick = async () => {
+    const cid = +b.dataset.uncat; if (!requireWrite()) return;
+    if (catIds.length === 1 && !await confirmDialog('Remove the last category?', 'A scheme with no category is not reachable on the platform.', 'Remove')) return;
+    try { await api('DELETE', `scheme_subcategories?scheme_id=eq.${id}&subcategory_id=eq.${cid}`); S.schemeCats = S.schemeCats.filter(l => !(l.scheme_id === id && l.subcategory_id === cid)); toast('Removed from category'); renderTree(); renderList(); refreshPending(); openScheme(id); }
+    catch (err) { toast(explainError(err), true); }
+  });
+}
+function catPath(c) { const g = byId(S.groups, c.subgroup_id), sub = byId(S.subjects, c.subject_id); return [sub && sub.name, g && g.name, c.name].filter(Boolean).join(' / '); }
+function catChip(cid) { const c = byId(S.cats, cid); return `<span class="pill hidden" style="margin:0 6px 6px 0">${esc(c ? catPath(c) : `Category ${cid}`)} <button class="btn quiet sm" data-uncat="${cid}" title="Remove from this category" style="padding:0 4px;margin-left:2px">×</button></span>`; }
+function lessonRow(l, i) {
+  const ages = l.age_min ? `ages ${l.age_min}-${l.age_max}` : '';
+  return `<div class="row" data-id="${l.id}"><span class="handle" title="Drag to reorder">${ICON.grip}</span><span class="num">${i + 1}</span>
+    <div class="title"><div class="name">${esc(l.name)}</div><div class="sub">${esc(l.internal_name || '')}${ages ? ` · ${ages}` : ''}</div></div>
+    ${l.live_status === 'Live' ? (l.is_live ? '<span class="pill live"><span class="dot"></span>Live</span>' : '<span class="pill hidden" title="Marked live, but its scheme is hidden">Live, scheme hidden</span>') : '<span class="pill hidden">Hidden</span>'}${l.qb_record_id ? '' : ' <span class="pill new">New</span>'}
+    <span class="btn quiet sm open">Open</span></div>`;
+}
+function closeEditor() { $('#editor').innerHTML = '<div class="empty" style="padding-top:120px">Pick a scheme from the list.</div>'; }
+
+async function newScheme(cat) {
+  if (!requireWrite()) return;
+  const name = prompt(`Name for the new scheme in “${cat.name}”`); if (!name) return;
+  try {
+    const maxOrder = Math.max(0, ...schemesInCat(cat.id).map(s => s.order || 0));
+    const row = await insert('schemes', { name, internal_name: name, live_flag: false, order: maxOrder + 10 });
+    await insert('scheme_subcategories', { scheme_id: row.id, subcategory_id: cat.id, position: 1 });
+    if (cat.subject_id) await insert('scheme_subjects', { scheme_id: row.id, subject_id: cat.subject_id, position: 1 }).catch(() => {});
+    S.schemes.push(row); S.schemeCats.push({ scheme_id: row.id, subcategory_id: cat.id, position: 1 });
+    toast('Scheme created'); renderTree(); renderList(); refreshPending(); openScheme(row.id);
+  } catch (e) { toast(explainError(e), true); }
+}
+
+// ------------------------------------------------------------------------------------------
+// Lesson editor
+// ------------------------------------------------------------------------------------------
+async function openLesson(id) {
+  if (!await guardDirty()) return;
+  const ed = $('#editor'); ed.innerHTML = '<div class="empty">Loading…</div>';
+  const [full, parts] = await Promise.all([
+    get(`lessons?id=eq.${id}&select=*`).then(r => r[0]),
+    get(`lesson_parts?lesson_id=eq.${id}&select=*&order=index.asc.nullslast,id.asc`),
+  ]);
+  if (!full) { ed.innerHTML = '<div class="empty">Lesson not found.</div>'; return; }
+  S.lessonId = id; S.schemeId = full.scheme_id; S.parts = parts;
+  const scheme = byId(S.schemes, full.scheme_id);
+  if (scheme && !S.catId) { const l = S.schemeCats.find(x => x.scheme_id === scheme.id); if (l) openCategory(l.subcategory_id); }
+  const cat = byId(S.cats, S.catId);
+  const orig = {
+    name: full.name, internal_name: full.internal_name, sub_title: full.sub_title, short_title: full.short_title,
+    description: full.description, description_long: full.description_long, age_ranges: full.age_ranges || [], flags: full.flags || [],
+    location: full.location || [], duration_choice: full.duration_choice, preparation_choice: full.preparation_choice,
+    intensity_choice: full.intensity_choice, focus_choice: full.focus_choice, body_opening_text: full.body_opening_text,
+    body_closing_text: full.body_closing_text, body_subheading_1: full.body_subheading_1, body_subheading_1_text: full.body_subheading_1_text,
+    body_subheading_2: full.body_subheading_2, body_subheading_2_text: full.body_subheading_2_text, body_subheading_3: full.body_subheading_3,
+    body_subheading_3_text: full.body_subheading_3_text, has_video: full.has_video, has_audio: full.has_audio, has_slides: full.has_slides,
+    has_downloads: full.has_downloads, has_lesson_plan: full.has_lesson_plan, has_assessment_template: full.has_assessment_template,
+    search_additional: full.search_additional, background_image_id: full.background_image_id,
+  };
+  const live = sortBy(parts.filter(p => p.is_live && !p.is_archived), 'index');
+  const archived = parts.filter(p => p.is_archived);
+  ed.innerHTML = `
+    ${crumbs([cat ? { label: cat.name, onclick: 'cat' } : null, { label: scheme ? scheme.name : 'Scheme', onclick: 'scheme' }, { label: full.name }].filter(Boolean))}
+    <div class="edhead"><h1>${esc(full.name)}<span class="id">LID ${full.id}</span></h1>
+      <label class="switch" title="Live lessons in a live scheme appear on the platform"><input type="checkbox" id="lessonLive" ${full.live_status === 'Live' ? 'checked' : ''}> ${full.live_status === 'Live' ? 'Live' : 'Hidden'}</label>
+      ${scheme && !scheme.live_flag ? '<span class="pill hidden" title="This lesson cannot show until its scheme is live">Scheme hidden</span>' : ''}
+      ${full.qb_record_id ? '' : '<button class="btn danger sm" id="deleteLesson">Delete</button>'}
+      <button class="btn primary" id="saveBtn" disabled>Saved</button></div>
+    <div class="panel"><h3>Parts <span class="small muted">${parts.length - archived.length} · drag to reorder, click a row to edit</span></h3><div class="body childlist">
+      <div class="rows" id="partRows">${sortBy(parts.filter(p => !p.is_archived), 'index').map(p => partCard(p)).join('') || '<div class="empty">No parts yet. Add a video, audio file, slideshow, download, image or text block.</div>'}</div>
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${CHOICES.media.map(m => `<button class="btn sm" data-addpart="${esc(m)}">+ ${esc(m)}</button>`).join('')}</div>
+      ${archived.length ? `<details style="margin-top:12px"><summary class="small muted" style="cursor:pointer">${archived.length} archived part${archived.length === 1 ? '' : 's'}</summary><div class="rows" style="margin-top:6px">${archived.map(p => partCard(p, true)).join('')}</div></details>` : ''}
+    </div></div>
+    <div class="panel" id="lessonForm"><h3>Lesson details</h3><div class="body"><div class="grid">
+      ${field('Title', 'name', full.name)}
+      ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only' })}
+      ${field('Sub title', 'sub_title', full.sub_title, { help: 'Shown under the title; falls back to the short description' })}
+      ${field('Short title', 'short_title', full.short_title)}
+      ${field('Short description', 'description', full.description, { type: 'textarea', span: true })}
+      ${checks('Age ranges', 'age_ranges', orig.age_ranges, CHOICES.ages)}
+      ${checks('Flags', 'flags', orig.flags, CHOICES.flags)}
+      ${checks('Suitable locations', 'location', orig.location, CHOICES.location)}
+      ${field('Duration (mins)', 'duration_choice', full.duration_choice, { type: 'select', choices: CHOICES.duration, blank: 'Not set' })}
+      ${field('Preparation (mins)', 'preparation_choice', full.preparation_choice, { type: 'select', choices: CHOICES.preparation, blank: 'Not set' })}
+      ${field('Intensity', 'intensity_choice', full.intensity_choice, { type: 'select', choices: CHOICES.intensity, blank: 'Not set' })}
+      ${field('Focus', 'focus_choice', full.focus_choice, { type: 'select', choices: CHOICES.focus, blank: 'Not set' })}
+      ${field('Background image', 'background_image_id', full.background_image_id, { type: 'select', choices: [], blank: 'Not set' }).replace('</select>', S.backgrounds.map(b => `<option value="${b.id}" ${b.id === full.background_image_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('') + '</select>')}
+      <div class="field span" data-field="has"><label>Content icons shown on the lesson list</label>
+        ${[['has_video', 'Video'], ['has_audio', 'Audio'], ['has_slides', 'Slides'], ['has_downloads', 'Downloads'], ['has_lesson_plan', 'Lesson plan'], ['has_assessment_template', 'Assessment template']].map(([k, l]) => `<label class="check"><input type="checkbox" name="${k}" ${full[k] ? 'checked' : ''}>${l}</label>`).join('')}
+        <div class="help">These are set by hand in Quickbase today; a later version can derive them from the parts.</div></div>
+    </div></div></div>
+    <div class="panel" id="lessonBody"><h3>Lesson page text</h3><div class="body"><div class="grid">
+      ${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}
+      ${field('Sub heading 1', 'body_subheading_1', full.body_subheading_1, { list: 'subheads' })}
+      ${field('Sub heading 1 text', 'body_subheading_1_text', full.body_subheading_1_text, { type: 'textarea' })}
+      ${field('Sub heading 2', 'body_subheading_2', full.body_subheading_2, { list: 'subheads' })}
+      ${field('Sub heading 2 text', 'body_subheading_2_text', full.body_subheading_2_text, { type: 'textarea' })}
+      ${field('Sub heading 3', 'body_subheading_3', full.body_subheading_3, { list: 'subheads' })}
+      ${field('Sub heading 3 text', 'body_subheading_3_text', full.body_subheading_3_text, { type: 'textarea' })}
+      ${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
+      ${field('Long description (legacy)', 'description_long', full.description_long, { type: 'textarea', span: true, help: 'Used by the old lesson page only' })}
+      ${field('Extra search terms', 'search_additional', full.search_additional, { span: true, help: 'Comma separated' })}
+    </div></div></div>
+    <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
+
+  const crumbParts = [cat ? 'cat' : null, 'scheme'].filter(Boolean);
+  $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; if (crumbParts[+b.dataset.crumb] === 'cat') { S.schemeId = null; S.lessonId = null; renderList(); closeEditor(); } else openScheme(full.scheme_id); });
+  const formRoot = ed; // both panels share one save button
+  wireForm(formRoot, orig, async d => { if ('has' in d) delete d.has; const row = await update('lessons', id, d); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">LID ${row.id}</span>`; const li = byId(S.lessons, id); if (li) Object.assign(li, { name: row.name, internal_name: row.internal_name }); });
+  $('#lessonLive').onchange = async e => {
+    if (!requireWrite()) { e.target.checked = !e.target.checked; return; }
+    try { const row = await update('lessons', id, { live_status: e.target.checked ? 'Live' : 'Hidden' }); e.target.parentElement.lastChild.textContent = row.live_status === 'Live' ? ' Live' : ' Hidden'; toast(row.live_status === 'Live' ? 'Lesson is live' : 'Lesson hidden'); if (scheme) { const s = await get(`schemes?id=eq.${scheme.id}&select=is_live,total_lessons`); Object.assign(scheme, s[0]); renderList(); } refreshPending(); }
+    catch (err) { e.target.checked = !e.target.checked; toast(explainError(err), true); }
+  };
+  if ($('#deleteLesson')) $('#deleteLesson').onclick = async () => {
+    if (!requireWrite()) return;
+    if (!await confirmDialog('Delete this lesson?', `<p>“${esc(full.name)}” was created here and is not in Quickbase. Its ${parts.length} part${parts.length === 1 ? '' : 's'} go with it.</p>`, 'Delete lesson')) return;
+    try { await api('DELETE', `lesson_parts?lesson_id=eq.${id}`); await remove('lessons', id); toast('Lesson deleted'); refreshPending(); openScheme(full.scheme_id); }
+    catch (e) { toast(explainError(e), true); }
+  };
+  $$('[data-addpart]', ed).forEach(b => b.onclick = () => newPart(full, b.dataset.addpart));
+  wireParts(full);
+}
+function partCard(p, archived) {
+  const dur = p.duration ? ` · ${p.duration}` : '';
+  const what = p.media_type === 'Video' ? (p.wistia_id || 'No video chosen') : p.media_type === 'Slides' ? (p.google_slide_id ? 'Google Slides' : 'No slideshow URL') : ['Audio', 'Download', 'Image'].includes(p.media_type) ? (p.s3_url ? p.s3_url.replace(CDN, '') : 'No file chosen') : '';
+  return `<div class="part" data-id="${p.id}"><div class="row">
+    ${archived ? '<span class="handle" style="visibility:hidden">' + ICON.grip + '</span>' : `<span class="handle" title="Drag to reorder">${ICON.grip}</span>`}
+    <span class="num">${p.order || ''}</span>
+    <span class="media">${ICON[p.media_type] || ''}${esc(p.media_type || '?')}</span>
+    <div class="title"><div class="name">${esc(p.heading || '(no heading)')}</div><div class="sub">${esc(what)}${dur}</div></div>
+    ${archived ? '<span class="pill hidden">Archived</span>' : p.is_live ? '<span class="pill live"><span class="dot"></span>Live</span>' : '<span class="pill hidden">Hidden</span>'}${p.qb_record_id ? '' : ' <span class="pill new">New</span>'}
+    <span class="btn quiet sm open">Edit</span></div><div class="detail"></div></div>`;
+}
+function wireParts(lesson) {
+  $$('#partRows .part, #editor details .part').forEach(card => {
+    $('.row', card).onclick = e => { if (e.target.closest('.handle')) return; togglePart(card, lesson); };
+  });
+  if ($$('#partRows .part').length > 1) Sortable.create($('#partRows'), { handle: '.handle', animation: 150, onEnd: async () => {
+    if (!requireWrite()) { openLesson(lesson.id); return; }
+    const ids = $$('#partRows .part').map(r => +r.dataset.id);
+    try { await rpc('resequence_lesson_parts', { p_ids: ids }); toast('Part order saved'); refreshPending(); openLesson(lesson.id); }
+    catch (e) { toast(explainError(e), true); openLesson(lesson.id); }
+  }});
+}
+function togglePart(card, lesson) {
+  const id = +card.dataset.id; const p = byId(S.parts, id);
+  if (card.classList.contains('open')) { card.classList.remove('open'); $('.detail', card).innerHTML = ''; return; }
+  $$('.part.open').forEach(c => { c.classList.remove('open'); $('.detail', c).innerHTML = ''; });
+  card.classList.add('open');
+  renderPartDetail(card, p, lesson);
+}
+function renderPartDetail(card, p, lesson) {
+  const d = $('.detail', card);
+  const m = p.media_type;
+  const resourceBlock = () => {
+    if (m === 'Video') {
+      const v = S.wistiaById && p.wistia_id ? S.wistiaById[p.wistia_id] : null;
+      return `<div class="field span"><label>Video (Wistia)</label><div class="resource">${v && v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" alt="">` : '<img alt="">'}<div class="meta"><b>${esc(v ? v.name : (p.wistia_id || 'No video chosen'))}</b><span class="muted">${esc(v ? `${v.project || ''} · ${fmtDur(v.duration)} · ${p.wistia_id}` : (p.wistia_id ? 'Not in the Wistia list' : ''))}</span></div><button class="btn sm" data-pick="wistia">Choose video</button></div><input type="hidden" name="wistia_id" value="${esc(p.wistia_id || '')}" data-raw="1"></div>`;
+    }
+    if (['Audio', 'Download', 'Image'].includes(m)) {
+      const file = p.s3_filename_new || p.s3_filename_legacy || (p.manual_s3_filename ? 'files/' + p.manual_s3_filename.trim() : '');
+      return `<div class="field span"><label>File (S3)</label><div class="resource">${m === 'Image' && p.s3_url ? `<img src="${esc(p.s3_url)}" alt="">` : `<span class="ext" style="padding:10px 12px;font-weight:600;color:var(--ink-2)">${esc((file.split('.').pop() || '').toUpperCase().slice(0, 4))}</span>`}<div class="meta"><b>${esc(file || 'No file chosen')}</b>${p.s3_url ? `<a href="${esc(p.s3_url)}" target="_blank" rel="noopener">${esc(p.s3_url)}</a>` : ''}</div><button class="btn sm" data-pick="s3">Choose file</button></div><input type="hidden" name="s3_filename_new" value="${esc(p.s3_filename_new || '')}" data-raw="1"></div>
+        ${field('Link override', 'download_url_override', p.download_url_override, { span: true, help: 'A full URL (e.g. Google Drive) used instead of the S3 file' })}`;
+    }
+    if (m === 'Slides') return field('Google Slides URL', 'google_url', p.google_url, { span: true, help: 'The published link (File → Share → Publish to web)' }) + (p.google_slide_id ? `<div class="help span" style="margin-top:-6px">Slide id recognised: ${esc(p.google_slide_id)}</div>` : '');
+    return '';
+  };
+  d.innerHTML = `<div class="grid" style="margin-top:12px">
+    ${field('Heading', 'heading', p.heading)}
+    ${field('Type', 'media_type', m, { type: 'select', choices: CHOICES.media })}
+    ${resourceBlock()}
+    ${m === 'Audio' ? field('Duration mins', 'audio_duration_mins', p.audio_duration_mins, { type: 'select', choices: Array.from({ length: 59 }, (_, i) => String(i + 1).padStart(2, '0')), blank: '00' }) + field('Duration secs', 'audio_duration_secs', p.audio_duration_secs, { type: 'select', choices: Array.from({ length: 59 }, (_, i) => String(i + 1).padStart(2, '0')), blank: '00' }) : ''}
+    ${m === 'Download' ? field('Button text', 'download_button_input', p.download_button_input, { help: 'Blank = “Click to Download”' }) + field('Text beside the button', 'download_side_text_input', p.download_side_text_input, { help: 'Blank = “View or download the file to print”' }) : ''}
+    ${['Image', 'Slides', 'Video'].includes(m) ? field('Text shown with this part', 'additional_info_short', p.additional_info_short, { type: 'textarea', span: true }) : field('Text shown with this part', 'additional_info_long', p.additional_info_long, { type: 'textarea', span: true, rows: 5 })}
+    <div class="field span" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <label class="check"><input type="checkbox" name="is_live" ${p.is_live ? 'checked' : ''}>Live</label>
+      <span style="flex:1"></span>
+      ${p.is_archived ? '<button class="btn sm" data-part="restore">Restore</button>' : '<button class="btn sm" data-part="archive">Archive</button>'}
+      ${p.qb_record_id ? '' : '<button class="btn danger sm" data-part="delete">Delete</button>'}
+      <button class="btn primary sm" data-part="save">Save part</button>
+    </div></div>`;
+  const orig = { heading: p.heading, media_type: p.media_type, wistia_id: p.wistia_id || '', s3_filename_new: p.s3_filename_new || '', download_url_override: p.download_url_override, google_url: p.google_url, audio_duration_mins: p.audio_duration_mins, audio_duration_secs: p.audio_duration_secs, download_button_input: p.download_button_input, download_side_text_input: p.download_side_text_input, additional_info_short: p.additional_info_short, additional_info_long: p.additional_info_long, is_live: p.is_live };
+  const savePart = async extra => {
+    if (!requireWrite()) return;
+    const cur = readForm(d, orig); const patch = { ...diff(orig, cur), ...extra };
+    if (!Object.keys(patch).length) { toast('Nothing to save'); return; }
+    try { await update('lesson_parts', p.id, patch); toast('Part saved'); refreshPending(); openLesson(lesson.id); }
+    catch (e) { toast(explainError(e), true); }
+  };
+  $('[data-part="save"]', d).onclick = () => savePart({});
+  const arch = $('[data-part="archive"]', d); if (arch) arch.onclick = () => savePart({ is_archived: true });
+  const rest = $('[data-part="restore"]', d); if (rest) rest.onclick = () => savePart({ is_archived: false });
+  const del = $('[data-part="delete"]', d); if (del) del.onclick = async () => { if (!requireWrite()) return; if (!await confirmDialog('Delete this part?', 'It was created here and is not in Quickbase.', 'Delete part')) return; try { await remove('lesson_parts', p.id); toast('Part deleted'); refreshPending(); openLesson(lesson.id); } catch (e) { toast(explainError(e), true); } };
+  $('[name="media_type"]', d).onchange = e => { p.media_type = e.target.value; renderPartDetail(card, p, lesson); };
+  const pick = $('[data-pick]', d);
+  if (pick) pick.onclick = async () => {
+    if (pick.dataset.pick === 'wistia') { const v = await pickWistia(); if (v) { $('[name="wistia_id"]', d).value = v.hashed_id; p.wistia_id = v.hashed_id; renderPartDetail(card, p, lesson); } }
+    else { const f = await pickS3(m); if (f) { $('[name="s3_filename_new"]', d).value = f.name; p.s3_filename_new = f.name; p.s3_url = CDN + f.name; renderPartDetail(card, p, lesson); } }
+  };
+}
+function fmtDur(s) { if (!s) return ''; const m = Math.floor(s / 60), x = Math.floor(s % 60); return `${m}:${String(x).padStart(2, '0')}`; }
+
+async function newLesson(scheme) {
+  if (!requireWrite()) return;
+  const name = prompt(`Title for the new lesson in “${scheme.name}”`); if (!name) return;
+  try {
+    const maxOrder = Math.max(0, ...S.lessons.map(l => l.lesson_order || 0));
+    const row = await insert('lessons', { name, internal_name: name, scheme_id: scheme.id, live_status: 'Hidden', lesson_order: maxOrder + 1, age_ranges: [], flags: [], location: [] });
+    toast('Lesson created'); refreshPending(); openLesson(row.id);
+  } catch (e) { toast(explainError(e), true); }
+}
+async function newPart(lesson, media) {
+  if (!requireWrite()) return;
+  try {
+    const maxIndex = Math.max(0, ...S.parts.map(p => p.index || 0));
+    const row = await insert('lesson_parts', { lesson_id: lesson.id, media_type: media, heading: media === 'Text only' ? 'Text' : `New ${media.toLowerCase()}`, index: maxIndex + 10, is_live: true, is_archived: false, s3_bucket: ['Audio', 'Download', 'Image'].includes(media) ? 'imovesnew' : null });
+    toast(`${media} part added`); refreshPending();
+    await openLesson(lesson.id);
+    const card = $(`#partRows .part[data-id="${row.id}"]`); if (card) { togglePart(card, lesson); card.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  } catch (e) { toast(explainError(e), true); }
+}
+
+// ------------------------------------------------------------------------------------------
+// Pickers: Wistia videos and S3 files
+// ------------------------------------------------------------------------------------------
+async function ensureWistia() {
+  if (S.wistia) return;
+  S.wistia = await get('wistia_videos?select=id,hashed_id,name,project,duration,thumbnail_url,deleted_at&order=name.asc&limit=5000');
+  S.wistiaById = Object.fromEntries(S.wistia.map(v => [v.hashed_id, v]));
+}
+async function ensureS3() {
+  if (S.s3) return;
+  const all = [];
+  for (let from = 0; ; from += 5000) { const page = await get(`s3_files?select=id,name,path,filename,extension,size&order=name.asc&limit=5000&offset=${from}`); all.push(...page); if (page.length < 5000) break; }
+  S.s3 = all;
+}
+function openPicker(title, filters, renderItems) {
+  return new Promise(res => {
+    const m = $('#picker'); $('#pickerTitle').textContent = title;
+    const q = $('#pickerQ'), f = $('#pickerFilter'), body = $('#pickerBody');
+    f.innerHTML = filters.map(x => `<option value="${esc(x.value)}">${esc(x.label)}</option>`).join('');
+    const draw = () => { const items = renderItems(q.value.trim().toLowerCase(), f.value); body.innerHTML = items.html; $('#pickerCount').textContent = items.count; $$('[data-pickid]', body).forEach(b => b.onclick = () => done(items.lookup(b.dataset.pickid))); };
+    const done = v => { m.classList.remove('open'); q.oninput = null; f.onchange = null; res(v); };
+    q.value = ''; q.oninput = draw; f.onchange = draw; draw();
+    m.classList.add('open'); q.focus();
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(null));
+  });
+}
+async function pickWistia() {
+  await ensureWistia();
+  const projects = [...new Set(S.wistia.map(v => v.project).filter(Boolean))].sort();
+  return openPicker('Choose a video', [{ value: '', label: 'All projects' }, ...projects.map(p => ({ value: p, label: p }))], (q, proj) => {
+    const list = S.wistia.filter(v => !v.deleted_at && (!proj || v.project === proj) && (!q || (v.name || '').toLowerCase().includes(q) || (v.hashed_id || '').includes(q))).slice(0, 150);
+    return { count: `${list.length} shown`, lookup: id => S.wistia.find(v => v.hashed_id === id),
+      html: list.map(v => `<button class="pick" data-pickid="${esc(v.hashed_id)}"><img src="${esc(v.thumbnail_url || '')}" alt="" loading="lazy"><div class="meta"><b>${esc(v.name)}</b><span>${esc(v.project || '')} · ${fmtDur(v.duration)} · ${esc(v.hashed_id)}</span></div></button>`).join('') || '<div class="empty">No videos match.</div>' };
+  });
+}
+async function pickS3(media) {
+  await ensureS3();
+  const exts = [...new Set(S.s3.map(f => f.extension).filter(Boolean))].sort();
+  const def = media === 'Audio' ? '.mp3' : media === 'Download' ? '.pdf' : media === 'Image' ? '.jpg' : '';
+  const p = openPicker('Choose a file', [{ value: '', label: 'All types' }, ...exts.map(e => ({ value: e, label: e }))], (q, ext) => {
+    const list = S.s3.filter(f => (!ext || f.extension === ext) && (!q || (f.name || '').toLowerCase().includes(q))).slice(0, 200);
+    return { count: `${list.length} shown of ${S.s3.length}`, lookup: id => S.s3.find(f => String(f.id) === id),
+      html: list.map(f => `<button class="pick" data-pickid="${f.id}"><span class="ext">${esc((f.extension || '').replace('.', '').toUpperCase())}</span><div class="meta"><b>${esc(f.name)}</b><span>${f.size ? (f.size / 1024).toFixed(0) + ' KB' : ''}</span></div></button>`).join('') || '<div class="empty">No files match.</div>' };
+  });
+  if (def) { $('#pickerFilter').value = def; $('#pickerFilter').dispatchEvent(new Event('change')); }
+  return p;
+}
+
+// ------------------------------------------------------------------------------------------
+// Search
+// ------------------------------------------------------------------------------------------
+let qTimer;
+$('#q').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(runSearch, 200); });
+$('#q').addEventListener('keydown', e => { if (e.key === 'Escape') { $('#qres').classList.remove('open'); } });
+document.addEventListener('click', e => { if (!e.target.closest('.search')) $('#qres').classList.remove('open'); });
+async function runSearch() {
+  const q = $('#q').value.trim(); const box = $('#qres');
+  if (q.length < 2) { box.classList.remove('open'); return; }
+  const num = /^\d+$/.test(q);
+  const schemes = S.schemes.filter(s => num ? String(s.id) === q : ((s.name || '').toLowerCase().includes(q.toLowerCase()) || (s.internal_name || '').toLowerCase().includes(q.toLowerCase()))).slice(0, 8);
+  let lessons = [];
+  try { lessons = await get(num ? `lessons?id=eq.${q}&select=id,name,internal_name,scheme_id,is_live` : `lessons?or=(name.ilike.*${encodeURIComponent(q)}*,internal_name.ilike.*${encodeURIComponent(q)}*)&select=id,name,internal_name,scheme_id,is_live&limit=10`); } catch (e) {}
+  box.innerHTML = [...schemes.map(s => `<button data-s="${s.id}"><span class="kind">Scheme</span><span>${esc(s.name)} <span class="muted small">${esc(s.internal_name || '')} · SID ${s.id}</span></span></button>`),
+    ...lessons.map(l => { const s = byId(S.schemes, l.scheme_id); return `<button data-l="${l.id}"><span class="kind">Lesson</span><span>${esc(l.name)} <span class="muted small">${esc(s ? s.name : '')} · LID ${l.id}</span></span></button>`; })].join('') || '<div class="empty">Nothing found.</div>';
+  box.classList.add('open');
+  $$('[data-s]', box).forEach(b => b.onclick = () => { box.classList.remove('open'); jumpToScheme(+b.dataset.s); });
+  $$('[data-l]', box).forEach(b => b.onclick = () => { box.classList.remove('open'); openLesson(+b.dataset.l); });
+}
+function jumpToScheme(id) {
+  const link = S.schemeCats.find(l => l.scheme_id === id);
+  if (link) { S.catId = link.subcategory_id; renderTree(); renderList(); }
+  openScheme(id);
+}
+
+// ------------------------------------------------------------------------------------------
+// Changes drawer (the log a Quickbase sync would read)
+// ------------------------------------------------------------------------------------------
+async function refreshPending() {
+  try {
+    const r = await fetch(`${CONFIG.url}${CONFIG.restPath}/content_changes?select=id&synced_at=is.null&limit=1`, { headers: { ...headers(), Prefer: 'count=exact' } });
+    const n = +(r.headers.get('content-range') || '').split('/')[1] || 0;
+    const el = $('#pendingCount'); el.textContent = n; el.hidden = !n;
+  } catch (e) {}
+}
+$('#changesBtn').onclick = async () => {
+  const dr = $('#drawer'); dr.classList.add('open');
+  const items = $('#changes'); items.innerHTML = '<div class="empty">Loading…</div>';
+  const rows = await get('content_changes?select=*&order=id.desc&limit=100');
+  $('#drawerNote').textContent = rows.length ? `${rows.filter(r => !r.synced_at).length} waiting for the Quickbase sync` : '';
+  const label = (t, id) => t === 'schemes' ? `Scheme SID ${id}` : t === 'lessons' ? `Lesson LID ${id}` : t === 'lesson_parts' ? `Part ${id}` : t === 'scheme_subcategories' ? `Scheme SID ${id} categories` : `${t} ${id}`;
+  items.innerHTML = rows.map(r => `<div class="change"><div class="top"><b>${esc(label(r.table_name, r.record_id))}</b><span class="pill ${r.synced_at ? 'live' : 'pending'}">${r.synced_at ? 'Synced' : 'Pending'}</span><span class="when">${new Date(r.changed_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span></div>
+    <div class="what">${esc(r.action === 'insert' ? 'Created' : r.action === 'delete' ? 'Deleted' : 'Edited')} by ${esc(r.changed_by || 'unknown')}</div>
+    ${r.action === 'update' ? `<div class="diff">${Object.entries(r.changes).map(([k, v]) => `<div><span class="k">${esc(k)}</span><span class="o">${esc(short(v.old))}</span><span class="n">${esc(short(v.new))}</span></div>`).join('')}</div>` : ''}</div>`).join('') || '<div class="empty">No changes yet.</div>';
+};
+function short(v) { if (v === null || v === undefined) return '—'; const s = typeof v === 'object' ? JSON.stringify(v) : String(v); return s.length > 60 ? s.slice(0, 57) + '…' : s; }
+$('#drawerClose').onclick = () => $('#drawer').classList.remove('open');
+
+// ------------------------------------------------------------------------------------------
+// Start
+// ------------------------------------------------------------------------------------------
+(async () => {
+  await restoreSession();
+  renderWho();
+  try { await loadAll(); } catch (e) { $('#tree').innerHTML = `<div class="empty">Could not load content: ${esc(e.message)}</div>`; }
+  ensureWistia().catch(() => {});
+})();
+</script>
+</body>
+</html>
