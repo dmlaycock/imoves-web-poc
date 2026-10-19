@@ -132,18 +132,18 @@ main { padding-block: 1.5rem 3rem; }
 .lx .lb { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .36s var(--ease), opacity .25s ease; }
 .lx.open .lb { grid-template-rows: 1fr; opacity: 1; }
 .lx .lb > .lbi { min-height: 0; overflow: hidden; }
-.lx .lbc { border-top: 1px solid var(--light-purple); padding: 1rem 1rem 1.1rem; }
-.lx .lbc .ltext { font-weight: 400; color: var(--text); margin-bottom: .9rem; }
-.lx .lbc .ltext p { white-space: pre-line; }
-.lx .lbc .ltext h4 { color: var(--purple); margin: .6rem 0 .2rem; }
+.lbc { border-top: 1px solid var(--light-purple); padding: 1rem 1rem 1.1rem; }
+.lbc .ltext { font-weight: 400; color: var(--text); margin-bottom: .9rem; }
+.lbc .ltext p { white-space: pre-line; }
+.lbc .ltext h4 { color: var(--purple); margin: .6rem 0 .2rem; }
 .lx .lbc .lmeta { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; font-size: .88rem; color: var(--mid-purple); margin-bottom: .9rem; align-items: center; }
 .lx .lbc .lmeta i { color: var(--purple); margin-right: .25rem; }
 .lx .lbc .lmeta a { margin-left: auto; }
-.lx .parts { padding: 0; }
+.lbc .parts { padding: 0; }
 .lx .part { background: #fbf9fc; }
 .btn.small { padding: .35rem .9rem; min-height: 36px; font-size: .9rem; }
 .scheme.single .intro { padding-bottom: .25rem; }
-.scheme.single .lbc { border-top: 0; padding-top: .25rem; }
+.scheme.single .lbc { border-top: 0; padding: .25rem 1rem 1.1rem; }
 .lmini { padding: .4rem 1rem 0; font-size: .95rem; color: var(--mid-purple); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
 .lmini i { color: var(--purple); margin-right: .25rem; }
 .lmini a { margin-left: auto; }
@@ -208,7 +208,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.6</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.7</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
