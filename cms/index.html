@@ -72,9 +72,8 @@ header .who { font-size: 13px; color: var(--ink-2); }
 
 /* layout */
 main { display: grid; grid-template-columns: var(--nav-w) 1fr; min-height: 0; }
-nav { background: var(--surface); border-right: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr; min-height: 0; }
-nav .tree { overflow: auto; padding: 8px 8px 16px; border-bottom: 1px solid var(--line); max-height: 46%; }
-nav .list { overflow: auto; padding: 8px; }
+nav { background: var(--surface); border-right: 1px solid var(--line); min-height: 0; overflow: auto; }
+nav .tree { padding: 8px 8px 24px; }
 .tree details { margin: 0; }
 .tree summary { list-style: none; cursor: pointer; padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; gap: 6px; user-select: none; }
 .tree summary::-webkit-details-marker { display: none; }
@@ -88,14 +87,16 @@ nav .list { overflow: auto; padding: 8px; }
 .tree .cat button { width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
 .tree .cat button:hover { background: var(--surface-2); }
 .tree .cat button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree summary .count, .tree .cat .count { min-width: 18px; text-align: right; }
+.tree .hint { padding: 10px 8px 4px; font-size: 12px; color: var(--ink-3); }
 .tree .count { margin-left: auto; color: var(--ink-3); font-size: 12px; font-weight: 400; }
 .tree .off { color: var(--ink-3); }
 .tree .off::after { content: ' (hidden)'; font-size: 11px; }
 
-.listhead { display: flex; align-items: baseline; gap: 10px; padding: 8px 8px 6px; }
-.listhead h2 { font-size: 14px; }
-.listhead .btn { margin-left: auto; }
 .rows { display: flex; flex-direction: column; gap: 3px; }
+.catpage .row { border: 1px solid var(--line-2); padding: 8px 10px 8px 4px; }
+.catpage .row .thumb { width: 56px; height: 38px; }
+.catpage .row .open { margin-left: 4px; }
 .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 4px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; background: var(--surface); }
 .row:hover { background: var(--surface-2); }
 .row.active { border-color: var(--accent); background: var(--accent-soft); }
@@ -234,12 +235,11 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 <main>
   <nav>
     <div class="tree" id="tree"></div>
-    <div class="list" id="list"><div class="empty">Choose a category to see its schemes.</div></div>
   </nav>
   <section class="editor" id="editor">
     <div class="empty" style="padding-top:120px">
       <h2 style="font-weight:600;font-size:18px;margin-bottom:8px">Nothing open yet</h2>
-      Pick a category on the left, or search for a scheme or lesson above.
+      Open a subject on the left, then a group, then a category. Or search for a scheme or lesson above.
     </div>
   </section>
 </main>
@@ -462,7 +462,7 @@ function renderTree() {
   const t = $('#tree');
   const catCount = {};
   for (const l of S.schemeCats) catCount[l.subcategory_id] = (catCount[l.subcategory_id] || 0) + 1;
-  const html = [];
+  const html = ['<div class="hint">Subjects, then groups, then categories. Numbers are how many sit inside.</div>'];
   for (const sub of S.subjects) {
     const groups = S.groups.filter(g => g.subject_id === sub.id);
     const loose = S.cats.filter(c => c.subject_id === sub.id && !groups.some(g => g.id === c.subgroup_id));
@@ -480,6 +480,7 @@ function renderTree() {
   }
   t.innerHTML = html.join('');
   $$('[data-cat]', t).forEach(b => b.onclick = () => openCategory(+b.dataset.cat));
+  $$('details', t).forEach(d => d.addEventListener('toggle', () => { if (d.open) d.scrollIntoView({ block: 'nearest' }); }));
 }
 
 // ------------------------------------------------------------------------------------------
@@ -489,17 +490,25 @@ function schemesInCat(catId) {
   const ids = S.schemeCats.filter(l => l.subcategory_id === catId).map(l => l.scheme_id);
   return sortBy(S.schemes.filter(s => ids.includes(s.id)), 'order');
 }
-function openCategory(id) {
-  S.catId = id;
+async function openCategory(id) {
+  if (!await guardDirty()) return;
+  S.catId = id; S.schemeId = null; S.lessonId = null;
   $$('#tree [data-cat]').forEach(b => b.classList.toggle('active', +b.dataset.cat === id));
   renderList();
 }
+// The category page: its schemes in order, in the main area.
 function renderList() {
-  const cat = byId(S.cats, S.catId); const list = $('#list');
-  if (!cat) { list.innerHTML = '<div class="empty">Choose a category to see its schemes.</div>'; return; }
+  const cat = byId(S.cats, S.catId); const ed = $('#editor');
+  if (!cat) { closeEditor(); return; }
   const schemes = schemesInCat(cat.id);
-  list.innerHTML = `<div class="listhead"><h2>${esc(cat.name)}</h2><span class="small muted">${schemes.length} scheme${schemes.length === 1 ? '' : 's'}</span><button class="btn sm" id="newScheme">+ New scheme</button></div>
-    <div class="rows" id="schemeRows">${schemes.map((s, i) => schemeRow(s, i)).join('') || '<div class="empty">No schemes in this category yet.</div>'}</div>`;
+  const g = byId(S.groups, cat.subgroup_id), sub = byId(S.subjects, cat.subject_id);
+  ed.innerHTML = `
+    ${crumbs([sub ? { label: sub.name } : null, g ? { label: g.name } : null, { label: cat.name }].filter(Boolean))}
+    <div class="edhead"><h1>${esc(cat.name)}<span class="id">${schemes.length} scheme${schemes.length === 1 ? '' : 's'}${cat.is_live ? '' : ' · category hidden'}</span></h1>
+      <button class="btn primary" id="newScheme">+ New scheme</button></div>
+    <div class="panel catpage"><h3>Schemes <span class="small muted">drag to reorder, click to open</span></h3><div class="body">
+      <div class="rows" id="schemeRows">${schemes.map((s, i) => schemeRow(s, i)).join('') || '<div class="empty">No schemes in this category yet. Create one, or add an existing scheme to this category from its own page.</div>'}</div>
+    </div></div>`;
   $('#newScheme').onclick = () => newScheme(cat);
   $$('#schemeRows .row').forEach(r => r.onclick = e => { if (!e.target.closest('.handle')) openScheme(+r.dataset.id); });
   if (schemes.length > 1) Sortable.create($('#schemeRows'), { handle: '.handle', animation: 150, onEnd: async () => {
@@ -515,7 +524,7 @@ function schemeRow(s, i) {
     <span class="num">${i + 1}</span>
     <img class="thumb" src="${esc(s.image)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
     <div class="title"><div class="name">${esc(s.name)}</div><div class="sub">${esc(s.internal_name || '')}${s.total_lessons ? ` · ${s.total_lessons} live lesson${s.total_lessons === 1 ? '' : 's'}` : ''}</div></div>
-    ${statusPill(s.live_flag, s.is_live, s.qb_record_id)}</div>`;
+    ${statusPill(s.live_flag, s.is_live, s.qb_record_id)}<span class="btn quiet sm open">Open</span></div>`;
 }
 function statusPill(flag, effective, qbId) {
   const p = flag ? (effective ? '<span class="pill live"><span class="dot"></span>Live</span>' : '<span class="pill hidden" title="Marked live, but nothing live inside it">Live, empty</span>') : '<span class="pill hidden">Hidden</span>';
@@ -598,7 +607,6 @@ async function openScheme(id) {
   if (!await guardDirty()) return;
   const s = byId(S.schemes, id); if (!s) return;
   S.schemeId = id; S.lessonId = null;
-  $$('#schemeRows .row').forEach(r => r.classList.toggle('active', +r.dataset.id === id));
   const ed = $('#editor'); ed.innerHTML = '<div class="empty">Loading…</div>';
   const [full, lessons] = await Promise.all([
     get(`schemes?id=eq.${id}&select=*`).then(r => r[0]),
@@ -653,18 +661,18 @@ async function openScheme(id) {
     </div></div>
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
-  $$('[data-crumb]', ed).forEach(b => b.onclick = () => { S.schemeId = null; renderList(); closeEditor(); });
-  wireForm($('#schemeForm'), orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; renderList(); });
+  $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; S.schemeId = null; renderList(); });
+  wireForm($('#schemeForm'), orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; });
   $('#schemeLive').onchange = async e => {
     if (!requireWrite()) { e.target.checked = !e.target.checked; return; }
-    try { const row = await update('schemes', id, { live_flag: e.target.checked }); Object.assign(s, { live_flag: row.live_flag, is_live: row.is_live }); e.target.parentElement.lastChild.textContent = row.live_flag ? ' Live' : ' Hidden'; toast(row.live_flag ? 'Scheme is live' : 'Scheme hidden'); renderList(); refreshPending(); openScheme(id); }
+    try { const row = await update('schemes', id, { live_flag: e.target.checked }); Object.assign(s, { live_flag: row.live_flag, is_live: row.is_live }); e.target.parentElement.lastChild.textContent = row.live_flag ? ' Live' : ' Hidden'; toast(row.live_flag ? 'Scheme is live' : 'Scheme hidden'); refreshPending(); openScheme(id); }
     catch (err) { e.target.checked = !e.target.checked; toast(explainError(err), true); }
   };
   if ($('#deleteScheme')) $('#deleteScheme').onclick = async () => {
     if (!requireWrite()) return;
     if (!await confirmDialog('Delete this scheme?', `<p>“${esc(full.name)}” was created here and is not in Quickbase. Its ${lessons.length} lesson${lessons.length === 1 ? '' : 's'} and their parts go with it.</p>`, 'Delete scheme')) return;
     try { await api('DELETE', `lesson_parts?lesson_id=in.(${lessons.map(l => l.id).join(',') || 0})`); await api('DELETE', `lessons?scheme_id=eq.${id}`); await remove('schemes', id);
-      S.schemes = S.schemes.filter(x => x.id !== id); S.schemeCats = S.schemeCats.filter(x => x.scheme_id !== id); S.schemeId = null; renderTree(); renderList(); closeEditor(); toast('Scheme deleted'); refreshPending(); }
+      S.schemes = S.schemes.filter(x => x.id !== id); S.schemeCats = S.schemeCats.filter(x => x.scheme_id !== id); S.schemeId = null; renderTree(); renderList(); toast('Scheme deleted'); refreshPending(); }
     catch (e) { toast(explainError(e), true); }
   };
   $('#newLesson').onclick = () => newLesson(full);
@@ -683,7 +691,7 @@ async function openScheme(id) {
   $$('[data-uncat]', ed).forEach(b => b.onclick = async () => {
     const cid = +b.dataset.uncat; if (!requireWrite()) return;
     if (catIds.length === 1 && !await confirmDialog('Remove the last category?', 'A scheme with no category is not reachable on the platform.', 'Remove')) return;
-    try { await api('DELETE', `scheme_subcategories?scheme_id=eq.${id}&subcategory_id=eq.${cid}`); S.schemeCats = S.schemeCats.filter(l => !(l.scheme_id === id && l.subcategory_id === cid)); toast('Removed from category'); renderTree(); renderList(); refreshPending(); openScheme(id); }
+    try { await api('DELETE', `scheme_subcategories?scheme_id=eq.${id}&subcategory_id=eq.${cid}`); S.schemeCats = S.schemeCats.filter(l => !(l.scheme_id === id && l.subcategory_id === cid)); toast('Removed from category'); renderTree(); refreshPending(); openScheme(id); }
     catch (err) { toast(explainError(err), true); }
   });
 }
@@ -696,7 +704,7 @@ function lessonRow(l, i) {
     ${l.live_status === 'Live' ? (l.is_live ? '<span class="pill live"><span class="dot"></span>Live</span>' : '<span class="pill hidden" title="Marked live, but its scheme is hidden">Live, scheme hidden</span>') : '<span class="pill hidden">Hidden</span>'}${l.qb_record_id ? '' : ' <span class="pill new">New</span>'}
     <span class="btn quiet sm open">Open</span></div>`;
 }
-function closeEditor() { $('#editor').innerHTML = '<div class="empty" style="padding-top:120px">Pick a scheme from the list.</div>'; }
+function closeEditor() { $('#editor').innerHTML = '<div class="empty" style="padding-top:120px"><h2 style="font-weight:600;font-size:18px;margin-bottom:8px">Nothing open yet</h2>Open a subject on the left, then a group, then a category. Or search for a scheme or lesson above.</div>'; }
 
 async function newScheme(cat) {
   if (!requireWrite()) return;
@@ -707,7 +715,7 @@ async function newScheme(cat) {
     await insert('scheme_subcategories', { scheme_id: row.id, subcategory_id: cat.id, position: 1 });
     if (cat.subject_id) await insert('scheme_subjects', { scheme_id: row.id, subject_id: cat.subject_id, position: 1 }).catch(() => {});
     S.schemes.push(row); S.schemeCats.push({ scheme_id: row.id, subcategory_id: cat.id, position: 1 });
-    toast('Scheme created'); renderTree(); renderList(); refreshPending(); openScheme(row.id);
+    toast('Scheme created'); renderTree(); refreshPending(); openScheme(row.id);
   } catch (e) { toast(explainError(e), true); }
 }
 
@@ -724,7 +732,7 @@ async function openLesson(id) {
   if (!full) { ed.innerHTML = '<div class="empty">Lesson not found.</div>'; return; }
   S.lessonId = id; S.schemeId = full.scheme_id; S.parts = parts;
   const scheme = byId(S.schemes, full.scheme_id);
-  if (scheme && !S.catId) { const l = S.schemeCats.find(x => x.scheme_id === scheme.id); if (l) openCategory(l.subcategory_id); }
+  if (scheme && !S.catId) { const l = S.schemeCats.find(x => x.scheme_id === scheme.id); if (l) { S.catId = l.subcategory_id; renderTree(); } }
   const cat = byId(S.cats, S.catId);
   const orig = {
     name: full.name, internal_name: full.internal_name, sub_title: full.sub_title, short_title: full.short_title,
@@ -784,12 +792,12 @@ async function openLesson(id) {
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
   const crumbParts = [cat ? 'cat' : null, 'scheme'].filter(Boolean);
-  $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; if (crumbParts[+b.dataset.crumb] === 'cat') { S.schemeId = null; S.lessonId = null; renderList(); closeEditor(); } else openScheme(full.scheme_id); });
+  $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; if (crumbParts[+b.dataset.crumb] === 'cat') { S.schemeId = null; S.lessonId = null; renderList(); } else openScheme(full.scheme_id); });
   const formRoot = ed; // both panels share one save button
   wireForm(formRoot, orig, async d => { if ('has' in d) delete d.has; const row = await update('lessons', id, d); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">LID ${row.id}</span>`; const li = byId(S.lessons, id); if (li) Object.assign(li, { name: row.name, internal_name: row.internal_name }); });
   $('#lessonLive').onchange = async e => {
     if (!requireWrite()) { e.target.checked = !e.target.checked; return; }
-    try { const row = await update('lessons', id, { live_status: e.target.checked ? 'Live' : 'Hidden' }); e.target.parentElement.lastChild.textContent = row.live_status === 'Live' ? ' Live' : ' Hidden'; toast(row.live_status === 'Live' ? 'Lesson is live' : 'Lesson hidden'); if (scheme) { const s = await get(`schemes?id=eq.${scheme.id}&select=is_live,total_lessons`); Object.assign(scheme, s[0]); renderList(); } refreshPending(); }
+    try { const row = await update('lessons', id, { live_status: e.target.checked ? 'Live' : 'Hidden' }); e.target.parentElement.lastChild.textContent = row.live_status === 'Live' ? ' Live' : ' Hidden'; toast(row.live_status === 'Live' ? 'Lesson is live' : 'Lesson hidden'); if (scheme) { const s = await get(`schemes?id=eq.${scheme.id}&select=is_live,total_lessons`); Object.assign(scheme, s[0]); } refreshPending(); }
     catch (err) { e.target.checked = !e.target.checked; toast(explainError(err), true); }
   };
   if ($('#deleteLesson')) $('#deleteLesson').onclick = async () => {
@@ -969,7 +977,7 @@ async function runSearch() {
 }
 function jumpToScheme(id) {
   const link = S.schemeCats.find(l => l.scheme_id === id);
-  if (link) { S.catId = link.subcategory_id; renderTree(); renderList(); }
+  if (link) { S.catId = link.subcategory_id; renderTree(); }
   openScheme(id);
 }
 
