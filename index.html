@@ -182,7 +182,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.3</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.4</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -373,7 +373,18 @@ function pageSubcategory(subjectId, id) {
   setBg(sc.background_image_url || subject?.background_image_url);
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, { name: sc.name }].filter(Boolean));
   if (sc.is_redirect_to_url && sc.url_redirect) {
-    html += `<div class="notice">This section links to an external page: <a href="${esc(sc.url_redirect)}" target="_blank" rel="noopener">${esc(sc.url_redirect)}</a></div>`;
+    // Many "link to a URL" sections point back into the platform itself: follow those internally.
+    const m = sc.url_redirect.match(/platform\.imoves\.com\/subjects\/(\d+)(?:\/subcategories\/(\d+))?/);
+    if (m && m[2] && D.subcatById[+m[2]]) { location.replace(subcatHref(D.subcatById[+m[2]])); return; }
+    if (m && !m[2] && D.subjectById[+m[1]]) { location.replace(`#/subject/${m[1]}`); return; }
+    if (/platform\.imoves\.com\/subscribe/.test(sc.url_redirect)) {
+      html += `<div class="notice">This section opens the subscription options page, which is not part of this prototype.</div>`;
+    } else {
+      const host = sc.url_redirect.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      const isFile = /\.(pdf|jpg|jpeg|png)(\?|$)/i.test(sc.url_redirect);
+      html += `<section class="scheme"><div class="sh">${esc(sc.name)}</div><div class="intro" style="flex-direction:column"><div class="txt">${sc.description ? `<p>${nl(sc.description)}</p>` : ''}<p><a class="btn" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'}"></i> ${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p><p class="muted" style="font-size:.9rem">Opens in a new tab.</p></div></div></section>`;
+    }
+    app.innerHTML = html; reveal(); return;
   }
   if (sc.is_direct_resource) {
     const vid = sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_all;
