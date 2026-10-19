@@ -121,6 +121,32 @@ main { padding-block: 1.5rem 3rem; }
 .lrow .meta i { color: var(--purple); margin-right: .2rem; }
 @media (max-width: 640px) { .lrow .meta span:not(:first-child) { display: none; } .lrow .meta { gap: 0; } }
 .lrow a.cover { position: absolute; inset: 0; }
+/* expandable lesson (category page) */
+.lx { background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); border: 2px solid transparent; transition: border-color .2s, box-shadow .2s; }
+.lx.open { border-color: var(--light-purple); box-shadow: var(--shadow); }
+.lx .lrow { box-shadow: none; border-radius: var(--radius-sm); background: none; cursor: pointer; width: 100%; border: 0; text-align: left; font: inherit; }
+.lx .lrow::after { border-color: var(--mid-purple); transform: rotate(135deg); margin-top: -4px; transition: transform .25s var(--ease), margin .25s; }
+.lx.open .lrow::after { transform: rotate(-45deg); margin-top: 4px; }
+.lx.open .lrow > i.res { background: var(--purple); color: #fff; }
+.lx .lrow:hover { transform: none; background: #faf7fb; }
+.lx .lb { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .36s var(--ease), opacity .25s ease; }
+.lx.open .lb { grid-template-rows: 1fr; opacity: 1; }
+.lx .lb > .lbi { min-height: 0; overflow: hidden; }
+.lx .lbc { border-top: 1px solid var(--light-purple); padding: 1rem 1rem 1.1rem; }
+.lx .lbc .ltext { font-weight: 400; color: var(--text); margin-bottom: .9rem; }
+.lx .lbc .ltext p { white-space: pre-line; }
+.lx .lbc .ltext h4 { color: var(--purple); margin: .6rem 0 .2rem; }
+.lx .lbc .lmeta { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; font-size: .88rem; color: var(--mid-purple); margin-bottom: .9rem; align-items: center; }
+.lx .lbc .lmeta i { color: var(--purple); margin-right: .25rem; }
+.lx .lbc .lmeta a { margin-left: auto; }
+.lx .parts { padding: 0; }
+.lx .part { background: #fbf9fc; }
+.btn.small { padding: .35rem .9rem; min-height: 36px; font-size: .9rem; }
+.scheme.single .intro { padding-bottom: .25rem; }
+.scheme.single .lbc { border-top: 0; padding-top: .25rem; }
+.lmini { padding: .4rem 1rem 0; font-size: .95rem; color: var(--mid-purple); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.lmini i { color: var(--purple); margin-right: .25rem; }
+.lmini a { margin-left: auto; }
 
 /* lesson page */
 .lesson-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
@@ -182,7 +208,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.4</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.5</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -395,13 +421,54 @@ function pageSubcategory(subjectId, id) {
   const schemes = D.schemesBySubcat[id] || [];
   for (const s of schemes) {
     const lessons = schemeLessons(s);
-    html += `<section class="scheme" id="scheme-${s.id}"><div class="sh">${esc(s.name)}${s.subheading ? `<small>${esc(s.subheading)}</small>` : ''}${s.is_freemium ? '<span class="badge">Free</span>' : ''}<span class="right">${lessons.length} ${esc(noun(sc, lessons.length))}</span></div>`;
+    const single = lessons.length === 1;
+    html += `<section class="scheme ${single ? 'single' : ''}" id="scheme-${s.id}"><div class="sh">${esc(s.name)}${s.subheading ? `<small>${esc(s.subheading)}</small>` : ''}${s.is_freemium ? '<span class="badge">Free</span>' : ''}<span class="right">${single ? esc(lessons[0].name) : lessons.length + ' ' + esc(noun(sc, lessons.length))}</span></div>`;
     html += `<div class="intro"><img src="${esc(img(s.image))}" alt="" loading="lazy"><div class="txt">${schemeBody(s)}</div></div>`;
-    html += `<div class="lessons">` + lessons.map(l => `<div class="lrow"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) ? `<span title="Suitable for ages ${lessonAges(l)}"><i class="bi-person"></i>${lessonAges(l)} yrs</span>` : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div><a class="cover" href="${lessonHref(l, sc)}" aria-label="${esc(l.name)}"></a></div>`).join('') + `</div></section>`;
+    if (single) {
+      // One lesson in the scheme: show its parts directly in the scheme card.
+      const l = lessons[0];
+      html += `<div class="lmini">${lessonMeta(l)}<a class="btn small outline" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
+      html += `<div class="lbc" data-lesson-body="${l.id}"><div class="loading" style="padding:1.5rem">Loading parts…</div></div>`;
+    } else {
+      html += `<div class="lessons">` + lessons.map(l => `<div class="lx" data-lesson="${l.id}"><button class="lrow" type="button" aria-expanded="false"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) ? `<span title="Suitable for ages ${lessonAges(l)}"><i class="bi-person"></i>${lessonAges(l)} yrs</span>` : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div></button><div class="lb"><div class="lbi"><div class="lbc" data-lesson-body="${l.id}"></div></div></div></div>`).join('') + `</div>`;
+    }
+    html += `</section>`;
   }
   if (!schemes.length && !sc.is_direct_resource) html += '<div class="notice">This section has no live schemes at the moment.</div>';
   app.innerHTML = html;
   reveal();
+  // single-lesson schemes: load their parts straight away
+  app.querySelectorAll('.scheme.single [data-lesson-body]').forEach(el => fillLessonBody(el, +el.dataset.lessonBody, sc, true));
+  // multi-lesson schemes: open one lesson at a time, loading its parts on first open
+  app.querySelectorAll('.lx > .lrow').forEach(btn => btn.addEventListener('click', async () => {
+    const lx = btn.parentElement, wasOpen = lx.classList.contains('open');
+    lx.closest('.lessons').querySelectorAll('.lx.open').forEach(o => { o.classList.remove('open'); o.querySelector('.lrow').setAttribute('aria-expanded', 'false'); });
+    if (wasOpen) return;
+    lx.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
+    const body = lx.querySelector('[data-lesson-body]');
+    if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1.5rem">Loading parts…</div>'; await fillLessonBody(body, +body.dataset.lessonBody, sc, false); }
+    setTimeout(() => btn.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
+  }));
+}
+
+function lessonMeta(l) {
+  return [lessonAges(l) ? `<span><i class="bi-person"></i>Ages ${lessonAges(l)}</span>` : '', l.duration ? `<span><i class="bi-clock"></i>${l.duration} min</span>` : '', l.intensity ? `<span><i class="bi-lightning-charge"></i>${esc(l.intensity)}</span>` : '', l.location && l.location.length ? `<span><i class="bi-geo-alt"></i>${esc(l.location.join(', '))}</span>` : ''].filter(Boolean).join('');
+}
+
+// Fill a lesson drawer on the category page: the lesson's own text, then its parts.
+async function fillLessonBody(el, lessonId, sc, single) {
+  const [rows, parts] = await Promise.all([
+    rest(`lessons?id=eq.${lessonId}&select=*`),
+    rest(`lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index&select=*`),
+  ]);
+  const l = rows[0]; if (!l) { el.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
+  let h = '';
+  if (!single) h += `<div class="lmeta">${lessonMeta(l)}<a class="btn small outline" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
+  const body = schemeBody(l);
+  if (body) h += `<div class="ltext">${l.heading_2 && !single ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
+  h += `<div class="parts">` + parts.map((p, i) => renderPart(p, i === 0)).join('') + (parts.length ? '' : '<div class="notice">This lesson has no live parts at the moment.</div>') + `</div>`;
+  el.innerHTML = h; el.dataset.loaded = '1';
+  el.querySelectorAll('.part .ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
 }
 
 function schemeBody(s) {
