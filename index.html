@@ -140,7 +140,7 @@ main { padding-block: 1.5rem 3rem; }
 .lx .lbc .lmeta i { color: var(--purple); margin-right: .25rem; }
 .lx .lbc .lmeta a { margin-left: auto; }
 .lbc .parts { padding: 0; }
-.lx .part { background: #fbf9fc; }
+.lx .parts .plist { box-shadow: none; border: 1px solid var(--ultra-purple); }
 .btn.small { padding: .35rem .9rem; min-height: 36px; font-size: .9rem; }
 .scheme.single .intro { padding-bottom: .25rem; }
 .scheme.single .lbc { border-top: 0; padding: .25rem 1rem 1.1rem; }
@@ -151,18 +151,23 @@ main { padding-block: 1.5rem 3rem; }
 /* lesson page */
 .lesson-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; align-items: start; }
 @media (max-width: 900px) { .lesson-layout { grid-template-columns: 1fr; } .expect { order: -1; } }
-.parts { padding: .5rem 1rem 1rem; display: flex; flex-direction: column; gap: .5rem; }
-.part { background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); overflow: hidden; border: 2px solid transparent; transition: border-color .15s; }
-.part.open { border-color: var(--light-purple); }
-.part .ph { display: flex; align-items: center; gap: .9rem; padding: .85rem 1rem .85rem 1.1rem; cursor: pointer; user-select: none; min-height: 60px; background: none; border: 0; width: 100%; text-align: left; font: inherit; }
+.parts { padding: .5rem 1rem 1rem; }
+.parts .plist { background: #fff; border-radius: var(--radius-sm); box-shadow: var(--shadow-sm); overflow: hidden; }
+.part { border-top: 1px solid var(--ultra-purple); transition: background .2s; }
+.part:first-child { border-top: 0; }
+.part.open { background: #fcfafd; }
+.part .ph { display: flex; align-items: center; gap: .9rem; padding: .7rem 1rem .7rem 1rem; cursor: pointer; user-select: none; min-height: 56px; background: none; border: 0; width: 100%; text-align: left; font: inherit; color: inherit; text-decoration: none; }
+.part .ph.dl:hover { text-decoration: none; }
+.part .ph .dlpill { display: inline-flex; align-items: center; gap: .4rem; background: var(--ultra-purple); color: var(--purple); border-radius: 999px; padding: .35rem .9rem; font-weight: 600; font-size: .9rem; white-space: nowrap; transition: background .15s, color .15s; }
+.part .ph.dl:hover .dlpill { background: var(--purple); color: #fff; }
 .part .ph:hover { background: #faf7fb; }
-.part .ph i.pi { transition: background .2s, color .2s; font-size: 1.5rem; color: var(--purple); width: 2.2rem; height: 2.2rem; display: inline-flex; align-items: center; justify-content: center; background: var(--ultra-purple); border-radius: 50%; flex: 0 0 auto; }
+.part .ph i.pi { transition: background .2s, color .2s; font-size: 1.35rem; color: var(--purple); width: 2.1rem; height: 2.1rem; display: inline-flex; align-items: center; justify-content: center; background: var(--ultra-purple); border-radius: 50%; flex: 0 0 auto; }
 .part.open .ph i.pi { background: var(--purple); color: #fff; }
-.part .ph h4 { flex: 1; color: var(--purple); font-size: 1.12rem; min-width: 0; }
-.part .ph .pm { font-size: .8rem; color: var(--mid-purple); text-align: right; white-space: nowrap; }
+.part .ph h4 { flex: 1; color: var(--purple); font-size: 1.08rem; min-width: 0; font-weight: 600; }
+.part .ph .pm { font-size: .85rem; color: var(--mid-purple); white-space: nowrap; }
 .part .ph .chev { width: 11px; height: 11px; border-right: 2.5px solid var(--mid-purple); border-bottom: 2.5px solid var(--mid-purple); transform: rotate(45deg); margin: -4px .4rem 0 .2rem; flex: 0 0 auto; transition: transform .2s; }
 .part.open .ph .chev { transform: rotate(-135deg); margin-top: 4px; }
-.part .pc { display: grid; grid-template-rows: 0fr; opacity: 0; padding: 0 1rem; border-top: 1px solid transparent; font-weight: 400; transition: grid-template-rows .32s var(--ease), opacity .22s ease, padding .32s var(--ease), border-color .2s; }
+.part .pc { display: grid; grid-template-rows: 0fr; opacity: 0; padding: 0 1rem 0 4rem; border-top: 1px solid transparent; font-weight: 400; transition: grid-template-rows .32s var(--ease), opacity .22s ease, padding .32s var(--ease), border-color .2s; }
 .part .pc > .pci { min-height: 0; overflow: hidden; }
 .part.open .pc { grid-template-rows: 1fr; opacity: 1; padding: 1rem; border-top-color: var(--light-purple); }
 .part .pc p { white-space: pre-line; color: var(--purple); }
@@ -208,7 +213,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.7</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.8</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -467,9 +472,9 @@ async function fillLessonBody(el, lessonId, sc, single) {
   const body = schemeBody(l);
   const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
   if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
-  h += `<div class="parts">` + parts.map((p, i) => renderPart(p, i === 0)).join('') + (parts.length ? '' : '<div class="notice">This lesson has no live parts at the moment.</div>') + `</div>`;
+  h += `<div class="parts">${renderParts(parts)}</div>`;
   el.innerHTML = h; el.dataset.loaded = '1';
-  el.querySelectorAll('.part .ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
+  el.querySelectorAll('.part button.ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
 }
 
 function schemeBody(s) {
@@ -499,7 +504,7 @@ async function pageLesson(id, scId) {
   html += `<div class="lesson-layout"><div>`;
   html += `<section class="scheme"><div class="sh">${esc(l.name)}${l.heading_2 ? `<small>${esc(l.heading_2)}</small>` : ''}<span class="right">${lessonAges(l) ? `Ages ${lessonAges(l)}` : ''}</span></div>`;
   html += `<div class="intro"><img src="${esc(img(scheme?.image))}" alt="" loading="lazy"><div class="txt">${schemeBody(l)}</div></div>`;
-  html += `<div class="parts">` + parts.map((p, i) => renderPart(p, i === 0)).join('') + (parts.length ? '' : '<div class="notice">This lesson has no live parts at the moment.</div>') + `</div>`;
+  html += `<div class="parts">${renderParts(parts)}</div>`;
   if (seq.length > 1) {
     const label = sc ? noun(sc, 1) : 'lesson';
     html += `<div class="prevnext"><a class="btn outline ${prev ? '' : 'disabled'}" href="${prev ? lessonHref(prev, sc) : '#'}"><i class="bi-skip-backward-circle"></i> Previous ${esc(label)}</a><a class="btn ${next ? '' : 'outline disabled'}" href="${next ? lessonHref(next, sc) : '#'}">Next ${esc(label)} <i class="bi-skip-forward-circle-fill"></i></a></div>`;
@@ -509,22 +514,31 @@ async function pageLesson(id, scId) {
   html += `<aside class="expect"><div class="row head">What to expect…</div>` + rows2.map(r => `<div class="row"><i class="${r[0]}"></i>${esc(r[1])}</div>`).join('') + `</aside></div>`;
   app.innerHTML = html;
   reveal();
-  app.querySelectorAll('.part .ph').forEach(h => h.addEventListener('click', () => { const open = h.parentElement.classList.toggle('open'); h.setAttribute('aria-expanded', open); if (open) h.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }));
+  app.querySelectorAll('.part button.ph').forEach(h => h.addEventListener('click', () => { const open = h.parentElement.classList.toggle('open'); h.setAttribute('aria-expanded', open); if (open) h.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }));
 }
 
 function partIcon(p) { return { Video: 'bi-play-btn-fill', Audio: 'bi-music-note-beamed', Slides: 'bi-easel-fill', Download: 'bi-file-earmark-arrow-down-fill', Image: 'bi-file-image-fill' }[p.media_type] || 'bi-card-text'; }
 function renderPart(p, open) {
-  let body = '';
   const info = p.additional_info ? `<p>${nl(p.additional_info)}</p>` : '';
+  if (p.media_type === 'Download') {
+    // A download is an action, not a drawer: the whole row opens the file.
+    return `<div class="part"><a class="ph dl" href="${esc(p.s3_url)}" target="_blank" rel="noopener"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || 'Download')}</h4><span class="dlpill"><i class="bi-download"></i> Download</span></a>${info ? `<div class="pc" style="display:block;grid-template-rows:1fr;opacity:1;padding:0 1rem .8rem 4rem"><div class="pci">${info}</div></div>` : ''}</div>`;
+  }
+  let body = '';
   switch (p.media_type) {
     case 'Video': body = (p.wistia_id ? wistia(p.wistia_id) : '<div class="notice">No video id on this part.</div>') + info; break;
     case 'Audio': body = `<audio controls controlsList="nodownload" preload="none" src="${esc(p.s3_url)}"></audio>` + info; break;
-    case 'Download': body = `<div class="dlbox"><a class="btn" href="${esc(p.s3_url)}" target="_blank" rel="noopener"><i class="bi-cloud-download"></i> ${esc(p.download_button || 'Download file')}</a><span style="color:var(--purple)">${esc(p.download_info || 'Save and open this file to complete this part of the lesson.')}</span></div>` + info; break;
-    case 'Slides': body = `<div class="slides"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" allowfullscreen title="Slides"></iframe></div><p class="muted" style="font-size:.85rem">Use the slideshow's own menu to play in full screen.</p>` + info; break;
+    case 'Slides': body = `<div class="slides"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" allowfullscreen title="Slides"></iframe></div>` + info; break;
     case 'Image': body = `<img class="pimg" src="${esc(p.s3_url)}" alt="${esc(p.heading)}">` + info; break;
     default: body = info || '<p class="muted">No content.</p>';
   }
-  return `<div class="part ${open ? 'open' : ''}"><button class="ph" type="button" aria-expanded="${open}"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || p.media_type)}</h4><div class="pm">${p.duration ? `<div><i class="bi-stopwatch"></i> ${esc(p.duration)}</div>` : ''}<div>${esc(p.live_part_label || '')}</div></div><span class="chev" aria-hidden="true"></span></button><div class="pc"><div class="pci">${body}</div></div></div>`;
+  return `<div class="part ${open ? 'open' : ''}"><button class="ph" type="button" aria-expanded="${open}"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || p.media_type)}</h4>${p.duration ? `<span class="pm"><i class="bi-stopwatch"></i> ${esc(p.duration)}</span>` : ''}<span class="chev" aria-hidden="true"></span></button><div class="pc"><div class="pci">${body}</div></div></div>`;
+}
+function renderParts(parts) {
+  if (!parts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
+  // open the first part that expands (a download opens straight away, so skip those)
+  const firstOpen = parts.findIndex(p => p.media_type !== 'Download');
+  return `<div class="plist">` + parts.map((p, i) => renderPart(p, i === firstOpen)).join('') + `</div>`;
 }
 
 async function pageSearch(q) {
