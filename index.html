@@ -14,7 +14,7 @@
   --purple: #733088; --mid-purple: #9565a6; --light-purple: #DBCBE1; --xlight-purple: #e4d8e9; --ultra-purple: #ece3ef;
   --pink: #F65275; --blue: #0085CA; --orange: #F68D2E; --green: #198754; --white: #fff; --text: #2b2130; --muted: #7a6a80;
   --font: 'Baloo 2', 'Trebuchet MS', sans-serif;
-  --shadow: 0 .5rem 1.5rem rgba(60,20,80,.12); --shadow-sm: 0 .2rem .6rem rgba(60,20,80,.08); --radius: 10px; --radius-sm: 8px;
+  --shadow: 0 .5rem 1.5rem rgba(60,20,80,.12); --shadow-sm: 0 .2rem .6rem rgba(60,20,80,.08); --radius: 10px; --radius-sm: 8px; --ease: cubic-bezier(.2,.8,.2,1);
 }
 * { box-sizing: border-box; }
 html { font-size: 16px; }
@@ -32,6 +32,9 @@ p { margin: 0 0 .75rem; }
 .muted { color: var(--muted); }
 .light { font-weight: 400; }
 .hidden { display: none !important; }
+
+#app.reveal { animation: reveal .28s var(--ease); }
+@keyframes reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 /* top bar */
 .topbar { background: linear-gradient(180deg, #7e3a95, var(--purple)); color: #fff; box-shadow: var(--shadow); position: sticky; top: 0; z-index: 20; }
@@ -59,6 +62,11 @@ main { padding-block: 1.5rem 3rem; }
 .block > .bh .right { margin-left: auto; font-size: .9rem; font-weight: 600; white-space: nowrap; background: rgba(255,255,255,.16); border-radius: 999px; padding: .25rem .8rem; }
 .block > .bh a.right:hover { background: #fff; color: var(--purple); text-decoration: none; }
 .block > .bb { padding: 1rem 1rem .25rem; }
+.block.collapsible > .bb { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .36s var(--ease), opacity .25s ease, padding .36s var(--ease); }
+.block.collapsible > .bb > .bbi { min-height: 0; overflow: hidden; }
+.block.collapsible.closed > .bb { grid-template-rows: 0fr; opacity: 0; padding-block: 0; }
+.collapse-btn i { display: inline-block; transition: transform .3s var(--ease); }
+.block.closed .collapse-btn i { transform: rotate(180deg); }
 .block.ultra { background: var(--ultra-purple); border-color: transparent; }
 .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); margin-bottom: 1rem; }
 .tile { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; display: flex; flex-direction: column; transition: transform .15s, box-shadow .15s; position: relative; }
@@ -122,14 +130,15 @@ main { padding-block: 1.5rem 3rem; }
 .part.open { border-color: var(--light-purple); }
 .part .ph { display: flex; align-items: center; gap: .9rem; padding: .85rem 1rem .85rem 1.1rem; cursor: pointer; user-select: none; min-height: 60px; background: none; border: 0; width: 100%; text-align: left; font: inherit; }
 .part .ph:hover { background: #faf7fb; }
-.part .ph i.pi { font-size: 1.5rem; color: var(--purple); width: 2.2rem; height: 2.2rem; display: inline-flex; align-items: center; justify-content: center; background: var(--ultra-purple); border-radius: 50%; flex: 0 0 auto; }
+.part .ph i.pi { transition: background .2s, color .2s; font-size: 1.5rem; color: var(--purple); width: 2.2rem; height: 2.2rem; display: inline-flex; align-items: center; justify-content: center; background: var(--ultra-purple); border-radius: 50%; flex: 0 0 auto; }
 .part.open .ph i.pi { background: var(--purple); color: #fff; }
 .part .ph h4 { flex: 1; color: var(--purple); font-size: 1.12rem; min-width: 0; }
 .part .ph .pm { font-size: .8rem; color: var(--mid-purple); text-align: right; white-space: nowrap; }
 .part .ph .chev { width: 11px; height: 11px; border-right: 2.5px solid var(--mid-purple); border-bottom: 2.5px solid var(--mid-purple); transform: rotate(45deg); margin: -4px .4rem 0 .2rem; flex: 0 0 auto; transition: transform .2s; }
 .part.open .ph .chev { transform: rotate(-135deg); margin-top: 4px; }
-.part .pc { display: none; border-top: 1px solid var(--light-purple); padding: 1rem; font-weight: 400; }
-.part.open .pc { display: block; }
+.part .pc { display: grid; grid-template-rows: 0fr; opacity: 0; padding: 0 1rem; border-top: 1px solid transparent; font-weight: 400; transition: grid-template-rows .32s var(--ease), opacity .22s ease, padding .32s var(--ease), border-color .2s; }
+.part .pc > .pci { min-height: 0; overflow: hidden; }
+.part.open .pc { grid-template-rows: 1fr; opacity: 1; padding: 1rem; border-top-color: var(--light-purple); }
 .part .pc p { white-space: pre-line; color: var(--purple); }
 .part .pc audio { width: 100%; }
 .part .pc img.pimg { max-width: 100%; border-radius: var(--radius); box-shadow: var(--shadow-sm); }
@@ -173,7 +182,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.2</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.3</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -244,7 +253,12 @@ const byOrder = (a, b) => (a.order ?? 1e12) - (b.order ?? 1e12) || String(a.name
 
 // ---------- helpers ----------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const nl = s => esc(s).trim();
+// Body text: escape everything, then let through the few harmless tags staff use in Quickbase
+// (icon <i class="bi-...">, <b>, <strong>, <em>, <br>), as the current site renders these fields unescaped.
+const nl = s => esc(s).trim()
+  .replace(/&lt;i class=&quot;(bi-[a-z0-9-]+)&quot;&gt;&lt;\/i&gt;/g, '<i class="$1"></i>')
+  .replace(/&lt;(\/?)(b|strong|em)&gt;/g, '<$1$2>')
+  .replace(/&lt;br ?\/?&gt;/g, '<br>');
 const img = p => p ? (p.startsWith('http') ? p : CF + p) : CF + 'defaultimages/default_s.png';
 const limit = (s, n) => (s && s.length > n) ? s.slice(0, n - 1) + '…' : (s || '');
 function schemeLessons(scheme) { return (D.lessonsByScheme[scheme.id] || []); }
@@ -267,6 +281,7 @@ function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.re
 
 // ---------- routing ----------
 const app = document.getElementById('app');
+function reveal() { app.classList.remove('reveal'); void app.offsetWidth; app.classList.add('reveal'); }
 window.addEventListener('hashchange', route);
 async function route() {
   const hash = location.hash.slice(1) || '/';
@@ -309,6 +324,7 @@ function pageHome() {
     html += `</div></div></section>`;
   }
   app.innerHTML = html || '<div class="notice">Nothing to show on the home page yet.</div>';
+  reveal();
 }
 
 function pageSubject(id) {
@@ -325,7 +341,7 @@ function pageSubject(id) {
   for (const sg of subgroups) {
     const subcats = visibleSubcats(sg);
     if (!subcats.length) continue; any = true;
-    html += `<section class="block"><div class="bh">${esc(sg.name)}${sg.description ? `<small>${esc(sg.description)}</small>` : ''}<button class="collapse-btn right" data-toggle aria-label="Collapse"><i class="bi-chevron-up"></i></button></div><div class="bb"><div class="grid">`;
+    html += `<section class="block collapsible"><div class="bh">${esc(sg.name)}${sg.description ? `<small>${esc(sg.description)}</small>` : ''}<button class="collapse-btn right" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"><i class="bi-chevron-up"></i></button></div><div class="bb"><div class="bbi"><div class="grid">`;
     for (const sc of subcats) {
       const lessons = subcatLessons(sc), ages = ageRange(lessons);
       const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
@@ -336,11 +352,12 @@ function pageSubject(id) {
         (subcatIsFree(sc) ? `<span class="badge">Free</span>` : '') +
         `</div><a class="cover" href="${subcatHref(sc)}" aria-label="${esc(sc.name)}"></a></div>`;
     }
-    html += `</div></div></section>`;
+    html += `</div></div></div></section>`;
   }
   if (!any) html += '<div class="notice">This subject has no live content at the moment.</div>';
   app.innerHTML = html;
-  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => { const bb = b.closest('.block').querySelector('.bb'); bb.classList.toggle('hidden'); b.querySelector('i').className = bb.classList.contains('hidden') ? 'bi-chevron-down' : 'bi-chevron-up'; }));
+  reveal();
+  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => { const closed = b.closest('.block').classList.toggle('closed'); b.setAttribute('aria-expanded', !closed); }));
 }
 
 function crumbs(parts) {
@@ -373,6 +390,7 @@ function pageSubcategory(subjectId, id) {
   }
   if (!schemes.length && !sc.is_direct_resource) html += '<div class="notice">This section has no live schemes at the moment.</div>';
   app.innerHTML = html;
+  reveal();
 }
 
 function schemeBody(s) {
@@ -411,6 +429,7 @@ async function pageLesson(id, scId) {
   const rows2 = [['bi-lightning-charge', l.intensity], ['bi-bullseye', l.focus], ['bi-clock', l.duration_text], ['bi-geo-alt', (l.location || []).join(', ')], ['bi-stopwatch', l.preparation_text ? `Prep: ${l.preparation_text}` : null]].filter(r => r[1]);
   html += `<aside class="expect"><div class="row head">What to expect…</div>` + rows2.map(r => `<div class="row"><i class="${r[0]}"></i>${esc(r[1])}</div>`).join('') + `</aside></div>`;
   app.innerHTML = html;
+  reveal();
   app.querySelectorAll('.part .ph').forEach(h => h.addEventListener('click', () => { const open = h.parentElement.classList.toggle('open'); h.setAttribute('aria-expanded', open); if (open) h.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }));
 }
 
@@ -426,7 +445,7 @@ function renderPart(p, open) {
     case 'Image': body = `<img class="pimg" src="${esc(p.s3_url)}" alt="${esc(p.heading)}">` + info; break;
     default: body = info || '<p class="muted">No content.</p>';
   }
-  return `<div class="part ${open ? 'open' : ''}"><button class="ph" type="button" aria-expanded="${open}"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || p.media_type)}</h4><div class="pm">${p.duration ? `<div><i class="bi-stopwatch"></i> ${esc(p.duration)}</div>` : ''}<div>${esc(p.live_part_label || '')}</div></div><span class="chev" aria-hidden="true"></span></button><div class="pc">${body}</div></div>`;
+  return `<div class="part ${open ? 'open' : ''}"><button class="ph" type="button" aria-expanded="${open}"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || p.media_type)}</h4><div class="pm">${p.duration ? `<div><i class="bi-stopwatch"></i> ${esc(p.duration)}</div>` : ''}<div>${esc(p.live_part_label || '')}</div></div><span class="chev" aria-hidden="true"></span></button><div class="pc"><div class="pci">${body}</div></div></div>`;
 }
 
 async function pageSearch(q) {
@@ -452,6 +471,7 @@ async function pageSearch(q) {
       g.items.map(({ l, scheme, sc }) => `<div class="lrow"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4><span>${esc(scheme ? scheme.name : '')}${sc ? ' · ' + esc(sc.name) : ''}${l.description ? ' · ' + esc(l.description) : ''}</span></div><div class="meta">${lessonAges(l) ? `<span><i class="bi-person"></i>${lessonAges(l)} yrs</span>` : ''}${l.duration ? `<span><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div><a class="cover" href="${lessonHref(l, sc)}"></a></div>`).join('') + `</div></div></section>`;
   }
   out.innerHTML = html;
+  reveal();
 }
 
 function pageBrowse() {
@@ -464,6 +484,7 @@ function pageBrowse() {
     html += `<section class="block"><div class="bh"><a href="#/subject/${s.id}">${esc(s.name)}</a></div><div class="bb"><ul>` + sgs.map(({ sg, subcats }) => `<li class="sg">${esc(sg.name)}</li>` + subcats.map(sc => `<li><a href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('')).join('') + `</ul></div></section>`;
   }
   app.innerHTML = html + '</div>';
+  reveal();
 }
 
 // ---------- boot ----------
