@@ -29,6 +29,7 @@
   --danger: #e8707d; --danger-soft: #3b1b21;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); }
 body { display: grid; grid-template-rows: 52px 1fr; height: 100vh; overflow: hidden; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -346,6 +347,18 @@ async function api(method, path, body, prefer) {
   return text ? JSON.parse(text) : null;
 }
 const get = (path) => api('GET', path);
+// Supabase caps a response at 1,000 rows; page with Range until a short page comes back.
+async function getAll(path, page = 1000) {
+  const out = [];
+  for (let from = 0; ; from += page) {
+    const h = { ...headers(), Range: `${from}-${from + page - 1}`, 'Range-Unit': 'items' };
+    const r = await fetch(`${CONFIG.url}${CONFIG.restPath}/${path}`, { headers: h });
+    if (!r.ok && r.status !== 206) { let msg = `${r.status}`; try { msg = (await r.json()).message || msg; } catch (e) {} throw new Error(msg); }
+    const rows = await r.json(); out.push(...rows);
+    if (rows.length < page) break;
+  }
+  return out;
+}
 const insert = (table, row) => api('POST', table, row, 'return=representation').then(r => r[0]);
 const update = (table, id, patch) => api('PATCH', `${table}?id=eq.${id}`, patch, 'return=representation').then(r => r[0]);
 const remove = (table, id) => api('DELETE', `${table}?id=eq.${id}`);
@@ -432,13 +445,13 @@ function explainError(e) {
 // ------------------------------------------------------------------------------------------
 async function loadAll() {
   const [subjects, groups, cats, schemes, schemeCats, schemeSubjects, backgrounds] = await Promise.all([
-    get('subjects?select=id,name,is_live,order&order=order.asc.nullslast,id.asc'),
-    get('subgroups?select=id,name,subject_id,order,is_live&order=order.asc.nullslast,id.asc'),
-    get('subcategories?select=id,name,subject_id,subgroup_id,order,is_live,image&order=order.asc.nullslast,id.asc'),
-    get('schemes?select=id,name,internal_name,live_flag,is_live,order,total_lessons,image,management_group,qb_record_id&order=order.asc.nullslast,id.asc'),
-    get('scheme_subcategories?select=scheme_id,subcategory_id,position&limit=10000'),
-    get('scheme_subjects?select=scheme_id,subject_id,position&limit=10000'),
-    get('backgrounds?select=id,name,s3_filename&order=sort_order.asc'),
+    getAll('subjects?select=id,name,is_live,order&order=order.asc.nullslast,id.asc'),
+    getAll('subgroups?select=id,name,subject_id,order,is_live&order=order.asc.nullslast,id.asc'),
+    getAll('subcategories?select=id,name,subject_id,subgroup_id,order,is_live,image&order=order.asc.nullslast,id.asc'),
+    getAll('schemes?select=id,name,internal_name,live_flag,is_live,order,total_lessons,image,management_group,qb_record_id&order=order.asc.nullslast,id.asc'),
+    getAll('scheme_subcategories?select=scheme_id,subcategory_id,position&order=scheme_id.asc,position.asc'),
+    getAll('scheme_subjects?select=scheme_id,subject_id,position&order=scheme_id.asc,position.asc'),
+    getAll('backgrounds?select=id,name,s3_filename&order=sort_order.asc,id.asc'),
   ]);
   Object.assign(S, { subjects, groups, cats, schemes, schemeCats, schemeSubjects, backgrounds });
   renderTree();
@@ -589,7 +602,7 @@ async function openScheme(id) {
   const ed = $('#editor'); ed.innerHTML = '<div class="empty">Loading…</div>';
   const [full, lessons] = await Promise.all([
     get(`schemes?id=eq.${id}&select=*`).then(r => r[0]),
-    get(`lessons?scheme_id=eq.${id}&select=id,name,internal_name,live_status,is_live,lesson_order,order,age_min,age_max,qb_record_id&order=order.asc.nullslast,id.asc`),
+    getAll(`lessons?scheme_id=eq.${id}&select=id,name,internal_name,live_status,is_live,lesson_order,order,age_min,age_max,qb_record_id&order=order.asc.nullslast,id.asc`),
   ]);
   S.lessons = lessons;
   const cat = byId(S.cats, S.catId);
@@ -706,7 +719,7 @@ async function openLesson(id) {
   const ed = $('#editor'); ed.innerHTML = '<div class="empty">Loading…</div>';
   const [full, parts] = await Promise.all([
     get(`lessons?id=eq.${id}&select=*`).then(r => r[0]),
-    get(`lesson_parts?lesson_id=eq.${id}&select=*&order=index.asc.nullslast,id.asc`),
+    getAll(`lesson_parts?lesson_id=eq.${id}&select=*&order=index.asc.nullslast,id.asc`),
   ]);
   if (!full) { ed.innerHTML = '<div class="empty">Lesson not found.</div>'; return; }
   S.lessonId = id; S.schemeId = full.scheme_id; S.parts = parts;
@@ -893,14 +906,12 @@ async function newPart(lesson, media) {
 // ------------------------------------------------------------------------------------------
 async function ensureWistia() {
   if (S.wistia) return;
-  S.wistia = await get('wistia_videos?select=id,hashed_id,name,project,duration,thumbnail_url,deleted_at&order=name.asc&limit=5000');
+  S.wistia = await getAll('wistia_videos?select=id,hashed_id,name,project,duration,thumbnail_url,deleted_at&order=name.asc,id.asc');
   S.wistiaById = Object.fromEntries(S.wistia.map(v => [v.hashed_id, v]));
 }
 async function ensureS3() {
   if (S.s3) return;
-  const all = [];
-  for (let from = 0; ; from += 5000) { const page = await get(`s3_files?select=id,name,path,filename,extension,size&order=name.asc&limit=5000&offset=${from}`); all.push(...page); if (page.length < 5000) break; }
-  S.s3 = all;
+  S.s3 = await getAll('s3_files?select=id,name,path,filename,extension,size&order=name.asc,id.asc');
 }
 function openPicker(title, filters, renderItems) {
   return new Promise(res => {
