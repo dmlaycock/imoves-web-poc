@@ -231,7 +231,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.11</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.12</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -310,7 +310,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 // Body text: escape everything, then let through the few harmless tags staff use in Quickbase
 // (icon <i class="bi-...">, <b>, <strong>, <em>, <br>), as the current site renders these fields unescaped.
 const nl = s => esc(s).trim()
-  .replace(/&lt;i class=&quot;(bi-[a-z0-9-]+)&quot;&gt;&lt;\/i&gt;/g, '<i class="$1"></i>')
+  .replace(/&lt;i class=&quot;((?:bi )?bi-[a-z0-9-]+)&quot;&gt;\s*&lt;\/i&gt;/g, '<i class="$1"></i>')
   .replace(/&lt;(\/?)(b|strong|em)&gt;/g, '<$1$2>')
   .replace(/&lt;br ?\/?&gt;/g, '<br>');
 const img = p => p ? (p.startsWith('http') ? p : CF + p) : CF + 'defaultimages/default_s.png';
