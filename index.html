@@ -200,8 +200,10 @@ main { padding-block: 1.5rem 3rem; }
 @media (max-width: 640px) { .lrow .meta .ages b:not(.on) { display: none; } }
 
 /* age switch on merged resource cards */
-.agerow { display: flex; justify-content: flex-start; align-items: center; padding: 0 1rem 1rem; flex-wrap: wrap; }
-.scheme .intro:has(+ .agerow) { padding-bottom: .4rem; }
+.agerow { display: flex; justify-content: flex-start; align-items: center; padding: 0 1rem .5rem; flex-wrap: wrap; }
+.scheme .intro:has(+ .agerow) { padding-bottom: .75rem; }
+.agerow + .lessons { padding-top: .25rem; }
+.agerow + .lmini { padding-top: .25rem; }
 .agesw { display: inline-flex; background: #fff; border: 1px solid var(--light-purple); border-radius: 999px; padding: 3px; gap: 2px; box-shadow: var(--shadow-sm); }
 .agesw button { border: 0; background: none; color: var(--mid-purple); font: inherit; font-weight: 600; font-size: .9rem; padding: .35rem .95rem; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; }
 .agesw button:hover { background: var(--ultra-purple); color: var(--purple); }
@@ -235,7 +237,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.17</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.18</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
