@@ -237,7 +237,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.18</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.19</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -518,7 +518,7 @@ function pageSubcategory(subjectId, id) {
   // age switch on merged cards
   app.querySelectorAll('.agesw button').forEach(b => b.addEventListener('click', () => {
     const card = b.closest('.scheme'); const i = +b.dataset.variant;
-    card.querySelectorAll('.agesw button').forEach(x => x.setAttribute('aria-selected', x === b));
+    card.querySelectorAll('.agesw button').forEach(x => x.setAttribute('aria-selected', +x.dataset.variant === i));
     card.querySelectorAll('.variant').forEach((v, j) => { v.hidden = j !== i; });
   }));
   // multi-lesson schemes: open one lesson at a time, loading its parts on first open
