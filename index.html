@@ -200,9 +200,12 @@ main { padding-block: 1.5rem 3rem; }
 @media (max-width: 640px) { .lrow .meta .ages b:not(.on) { display: none; } }
 
 /* age switch on merged resource cards */
-.agesw { display: inline-flex; background: rgba(255,255,255,.18); border-radius: 999px; padding: 3px; gap: 2px; }
-.agesw button { border: 0; background: none; color: rgba(255,255,255,.85); font: inherit; font-weight: 600; font-size: .85rem; padding: .25rem .8rem; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; }
-.agesw button[aria-selected="true"] { background: #fff; color: var(--purple); box-shadow: var(--shadow-sm); }
+.agerow { display: flex; justify-content: flex-end; align-items: center; gap: .6rem; margin-top: .9rem; flex-wrap: wrap; }
+.agerow .lbl { font-size: .85rem; color: var(--mid-purple); font-weight: 600; }
+.agesw { display: inline-flex; background: #fff; border: 1px solid var(--light-purple); border-radius: 999px; padding: 3px; gap: 2px; box-shadow: var(--shadow-sm); }
+.agesw button { border: 0; background: none; color: var(--purple); font: inherit; font-weight: 600; font-size: .9rem; padding: .35rem .95rem; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; }
+.agesw button[aria-selected="true"] { background: var(--purple); color: #fff; }
+.sh .agesw { background: rgba(255,255,255,.18); border: 0; box-shadow: none; }
 .scheme .variant[hidden] { display: none; }
 #classage { appearance: none; -webkit-appearance: none; padding-right: 2rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='white'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .7rem center; background-size: 12px; }
 #classage option { color: var(--text); }
@@ -231,7 +234,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.15</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.16</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -478,11 +481,12 @@ function pageSubcategory(subjectId, id) {
     const labels = variants.map((v, i) => v.ages ? `Ages ${v.ages}` : (v.s.subheading || `Version ${i + 1}`));
     labels.forEach((l, i) => { if (labels.indexOf(l) !== i) labels[i] = `${l} (${i + 1})`; });
     const single = allLessons.length === variants.length;
-    html += `<section class="scheme ${single ? 'single' : ''} ${merged ? 'merged' : ''}" id="scheme-${first.id}" data-scheme-ages="${merged ? '' : (variants[0].ages || '')}"><div class="sh">${esc(first.name)}${!merged && first.subheading ? `<small>${esc(first.subheading)}</small>` : ''}${anyFree ? '<span class="badge">Free</span>' : ''}<span class="right">${merged ? `<span class="agesw" role="tablist" aria-label="Age version">${labels.map((l, i) => `<button type="button" role="tab" aria-selected="${i === sel}" data-variant="${i}">${esc(l)}</button>`).join('')}</span>` : `${ageStripRange(variants[0].ages, 'lg')}${single ? '' : `<span class="rt">${allLessons.length} ${esc(noun(sc, allLessons.length))}</span>`}`}</span></div>`;
+    html += `<section class="scheme ${single ? 'single' : ''} ${merged ? 'merged' : ''}" id="scheme-${first.id}" data-scheme-ages="${merged ? '' : (variants[0].ages || '')}"><div class="sh">${esc(first.name)}${!merged && first.subheading ? `<small>${esc(first.subheading)}</small>` : ''}${anyFree ? '<span class="badge">Free</span>' : ''}<span class="right">${merged ? ageStripRange(ageRange(allLessons), 'lg') : `${ageStripRange(variants[0].ages, 'lg')}${single ? '' : `<span class="rt">${allLessons.length} ${esc(noun(sc, allLessons.length))}</span>`}`}</span></div>`;
+    const ageSwitch = merged ? `<div class="agerow"><span class="lbl">Choose ages</span><span class="agesw" role="tablist" aria-label="Age version">${labels.map((l, i) => `<button type="button" role="tab" aria-selected="${i === sel}" data-variant="${i}">${esc(l)}</button>`).join('')}</span></div>` : '';
     variants.forEach((v, i) => {
       const s2 = v.s, lessons = v.lessons, one = lessons.length === 1, l0 = lessons[0];
       html += `<div class="variant" data-scheme-ages="${v.ages || ''}" ${i === sel ? '' : 'hidden'}>`;
-      html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}</div></div>`;
+      html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}${ageSwitch}</div></div>`;
       if (one) {
         html += `<div class="lmini">${lessonMeta(l0, false)}<a class="btn small outline" href="${lessonHref(l0, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
         html += `<div class="lbc" data-lesson-body="${l0.id}" data-scheme-text="${esc((s2.body_opening_text || s2.description || '').trim().slice(0, 80))}"></div>`;
@@ -547,7 +551,7 @@ function renderLessonBody(el, l, parts, sc, single) {
   const shownAbove = single ? [holderTxt ? holderTxt.textContent : ''] : [l.description];
   let body = schemeBody(l, shownAbove);
   const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
-  if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) txt.insertAdjacentHTML('beforeend', `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`); }
+  if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) { const row = txt.querySelector('.agerow'); const html = `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`; if (row) row.insertAdjacentHTML('beforebegin', html); else txt.insertAdjacentHTML('beforeend', html); } }
   else if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
   h += `<div class="parts">${renderParts(parts, !single)}</div>`;
   el.innerHTML = h; el.dataset.loaded = '1';
