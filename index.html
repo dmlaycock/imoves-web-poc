@@ -231,7 +231,7 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <div class="topbar">
   <div class="container">
     <a class="logo" href="#/"><img src="https://imovesnew.s3.eu-west-1.amazonaws.com/platformlogo/logo" alt="imoves"></a>
-    <span class="slogan">Teacher view <span class="poc">PoC v0.13</span></span>
+    <span class="slogan">Teacher view <span class="poc">PoC v0.14</span></span>
     <nav>
       <a class="nbtn" href="#/" data-nav="home"><i class="bi-house-door-fill"></i> Home</a>
       <a class="nbtn" href="#/search" data-nav="search"><i class="bi-search"></i> Search</a>
@@ -561,11 +561,14 @@ const norm = t => String(t || '').toLowerCase().replace(/<[^>]+>/g, ' ').replace
 function schemeBody(s, already = []) {
   const seen = already.map(norm).filter(Boolean);
   const fresh = t => { const k = norm(t); if (!k) return false; if (seen.some(x => x === k || (k.length > 20 && x.includes(k)))) return false; seen.push(k); return true; };
+  // a field may hold several paragraphs; keep only the ones not already shown
+  const para = t => String(t || '').split(/\n\s*\n/).map(x => x.trim()).filter(fresh).map(nl).join('<br><br>');
+  const p = t => { const x = para(t); return x ? `<p>${x}</p>` : ''; };
   let h = '';
-  if (fresh(s.description)) h += `<p>${nl(s.description)}</p>`;
-  if (fresh(s.body_opening_text)) h += `<p>${nl(s.body_opening_text)}</p>`;
-  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`] && fresh(s[`body_subheading_${i}_text`])) h += `<h4>${esc(s[`body_subheading_${i}`])}</h4><p>${nl(s[`body_subheading_${i}_text`])}</p>`;
-  if (fresh(s.body_closing_text)) h += `<p>${nl(s.body_closing_text)}</p>`;
+  h += p(s.description);
+  h += p(s.body_opening_text);
+  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`]) { const x = para(s[`body_subheading_${i}_text`]); if (x) h += `<h4>${esc(s[`body_subheading_${i}`])}</h4><p>${x}</p>`; }
+  h += p(s.body_closing_text);
   return h;
 }
 
@@ -667,7 +670,7 @@ function pageBrowse() {
 (async () => {
   try {
     await loadTree();
-    document.getElementById('stamp').textContent = '2026-10-19';
+    document.getElementById('stamp').textContent = '2026-10-20';
     renderSubjectBar();
     const picker = document.getElementById('classage');
     try { picker.value = localStorage.getItem('imoves.classAge') || ''; } catch (e) {}
