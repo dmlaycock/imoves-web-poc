@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>imoves accounts</title>
+<!-- accounts PoC page v0.2 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
@@ -147,6 +148,15 @@ table.list td.num, table.list th.num { text-align: right; }
 .note .top b { color: var(--ink); }
 .note .body { margin-top: 3px; white-space: pre-wrap; }
 .note .fu { margin-top: 5px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; }
+
+.tabs { position: sticky; top: 0; z-index: 4; display: flex; gap: 2px; padding: 14px 24px 0; margin-top: 4px; background: var(--bg); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button { border: 0; background: none; padding: 8px 14px 10px; cursor: pointer; font-weight: 500; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; border-radius: 6px 6px 0 0; }
+.tabs button:hover { background: var(--surface-2); color: var(--ink); }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tabs button .n { font-size: 11.5px; font-weight: 600; background: var(--surface-2); color: var(--ink-2); border-radius: 999px; padding: 1px 7px; }
+.tabs button.active .n { background: var(--accent-soft); color: var(--accent); }
+.pane > .panel:first-child { margin-top: 16px; }
 
 .drawer { position: fixed; top: 52px; right: 0; bottom: 0; width: 440px; max-width: 100%; background: var(--surface); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(20,10,60,.12); transform: translateX(100%); transition: transform .2s; z-index: 20; display: grid; grid-template-rows: auto 1fr; }
 .drawer.open { transform: none; }
@@ -581,6 +591,25 @@ async function todayPage() {
     <div class="panel"><h3>Recently expired without a renewal</h3><div class="body tight">${expired.length ? `<table class="list"><tr><th>School</th><th>Package</th><th>Ended</th></tr>${expired.map(x => `<tr class="click" data-go="#school/${x.school_id}"><td>${esc(x.school?.name || '')}<div class="sub">${esc(x.school?.postcode || '')}</div></td><td>${esc(x.package?.display_name || '')}</td><td>${fmtD(x.end_date)}</td></tr>`).join('')}</table>` : '<div class="empty">None in the last 30 days</div>'}</div></div>`);
   wireRows();
 }
+// Tabbed record pages. The open tab lives in the hash (?tab=) so a re-render after an
+// action stays where it was, and the last tab used for each record type is remembered.
+function tabbed(kind, tabs) {
+  let want = S.route && S.route.params ? S.route.params.get('tab') : null;
+  if (!want) { try { want = localStorage.getItem('acc.tab.' + kind); } catch (e) {} }
+  const active = tabs.find(t => t.id === want) ? want : tabs[0].id;
+  return `<div class="tabs" data-kind="${kind}" role="tablist">${tabs.map(t => `<button role="tab" data-tab="${t.id}" class="${t.id === active ? 'active' : ''}" aria-selected="${t.id === active}">${esc(t.label)}${t.count !== undefined && t.count !== null && t.count !== '' ? `<span class="n">${t.count}</span>` : ''}</button>`).join('')}</div>`
+    + tabs.map(t => `<div class="pane" data-pane="${t.id}" ${t.id === active ? '' : 'hidden'}>${t.html}</div>`).join('');
+}
+function wireTabs() {
+  const bar = $('.tabs', $('#page')); if (!bar) return;
+  $$('button', bar).forEach(b => b.onclick = () => {
+    $$('button', bar).forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-selected', x === b); });
+    $$('.pane', $('#page')).forEach(p => p.hidden = p.dataset.pane !== b.dataset.tab);
+    try { localStorage.setItem('acc.tab.' + bar.dataset.kind, b.dataset.tab); } catch (e) {}
+    const [path] = location.hash.split('?'); history.replaceState(null, '', `${path}?tab=${b.dataset.tab}`);
+    if (S.route && S.route.params) S.route.params.set('tab', b.dataset.tab);
+  });
+}
 function wireRows() { $$('[data-go]', $('#page')).forEach(b => { if (!b.onclick) b.onclick = e => { if (e.target.closest('button') && e.target.closest('button') !== b) return; go(b.dataset.go); }; }); }
 function renewalsTable(rows) {
   if (!rows.length) return '<div class="empty">Nothing due</div>';
@@ -707,11 +736,14 @@ async function schoolPage(id) {
       <div class="stat"><div class="v">${members.filter(u => u.membership_state === 'requested').length}</div><div class="k">waiting for approval</div></div>
       <div class="stat"><div class="v">${members.reduce((a, u) => a + (u.logins_30d || 0), 0)}</div><div class="k">logins last 30 days</div></div>
       <div class="stat"><div class="v">${school.last_login_date ? ago(school.last_login_date) : 'never'}</div><div class="k">last login</div></div>
-      <div class="stat"><div class="v">${latest ? esc(latest.package?.display_name || latest.qb_package_display_name || latest.qb_package_name || 'Legacy import') : '–'}</div><div class="k">${latest ? `latest package, ${statusPill(latest.status)}` : 'no subscription yet'}</div></div>
+      <div class="stat"><div class="v" style="font-size:15px;line-height:1.3">${latest ? esc(latest.package?.display_name || latest.qb_package_display_name || latest.qb_package_name || 'Legacy import') : '–'}</div><div class="k">${latest ? `latest package, ${statusPill(latest.status)}` : 'no subscription yet'}</div></div>
     </div></div></div>
-
+    ${tabbed('school', [
+      { id: 'subs', label: 'Subscriptions', count: subs.filter(x => x.status !== 'void').length, html: `
     <div class="panel"><h3>Subscriptions <span class="spacer"></span>${live && !live.is_free ? `<button class="btn sm" data-renew="${live.id}">Renew</button>` : ''}</h3><div class="body tight" id="subs">${subsTable(subs)}</div></div>
-
+    ${requests.length ? `<div class="panel"><h3>Invoice requests from the website</h3><div class="body tight"><table class="list"><tr><th>When</th><th>Requested by</th><th>Package</th><th>Term</th><th class="num">Price shown</th><th>PO</th></tr>${requests.map(r => `<tr><td>${fmtD((r.created_at || '').slice(0, 10))}</td><td>${esc(r.lead_contact_name || '')}<div class="sub">${esc(r.user_email || r.lead_contact_email || '')}</div></td><td>${esc((S.packages.find(p => p.id === r.package_id) || {}).display_name || r.product_id || '')}</td><td>${r.term_years || ''}</td><td class="num">${gbp(r.displayed_price_exc_vat)}</td><td>${esc(r.invoice_po || r.optional_po || '')}</td></tr>`).join('')}</table></div></div>` : ''}
+    <div class="panel"><h3>Invoices <span class="small muted">(Xero, as last imported)</span></h3><div class="body tight">${invoicesTable(invoices)}</div></div>` },
+      { id: 'people', label: 'People', count: members.length, html: `
     <div class="panel"><h3>People <span class="spacer"></span><span class="small muted">${members.length} accounts chose this school</span></h3><div class="body tight">
       ${members.length ? `<table class="list"><tr><th>Teacher</th><th>Role</th><th>Access</th><th>Last login</th><th class="num">Logins 30d</th><th></th></tr>${members.map(u => `<tr class="click" data-go="#user/${u.id}">
         <td>${esc(name(u))}${u.deleted_at ? ' ' + pill('danger', 'Deleted') : ''}<div class="sub">${esc(u.email || '')}</div></td><td class="small">${esc((u.roles || []).join(', '))}</td>
@@ -719,7 +751,10 @@ async function schoolPage(id) {
         <td><div class="acts">${memberActions(u, id)}</div></td></tr>`).join('')}</table>` : '<div class="empty">No teachers have chosen this school yet</div>'}
       ${invites.length ? `<div style="padding:10px 10px 4px" class="small"><b>Open invitations:</b> ${invites.map(i => esc(i.email)).join(', ')}</div>` : ''}
     </div></div>
-
+    <div class="panel"><h3>Membership history <span class="small muted">(latest first)</span></h3><div class="body tight">${membershipsTable(memberships, members)}</div></div>` },
+      { id: 'notes', label: 'Notes', count: notes.length, html: `
+    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>` },
+      { id: 'details', label: 'Details', html: `
     <div class="panel"><h3>Details <span class="spacer"></span><button class="btn sm" id="editSchool">Edit</button></h3><div class="body"><div class="grid">
       ${ro('Address', [school.address_1, school.address_2, school.town, school.region, school.postcode].filter(Boolean).join(', '))}
       ${ro('Country', school.country)} ${ro('Phone', school.phone)} ${ro('Website', school.website)} ${ro('Email domain', school.email_domain)}
@@ -728,14 +763,9 @@ async function schoolPage(id) {
       ${ro('Head', school.head_name)} ${ro('Marketing source', school.marketing_source)} ${ro('Created', fmtD((school.created_at || '').slice(0, 10)))}
       ${school.legacy_notes ? `<div class="field span"><label>Notes carried over from the school record</label><div class="ro small" style="white-space:pre-wrap">${esc(school.legacy_notes)}</div></div>` : ''}
     </div></div></div>
-
-    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>
-
-    <div class="panel"><h3>Invoices <span class="small muted">(Xero, as last imported)</span></h3><div class="body tight">${invoicesTable(invoices)}</div></div>
-    ${requests.length ? `<div class="panel"><h3>Invoice requests from the website</h3><div class="body tight"><table class="list"><tr><th>When</th><th>Requested by</th><th>Package</th><th>Term</th><th class="num">Price shown</th><th>PO</th></tr>${requests.map(r => `<tr><td>${fmtD((r.created_at || '').slice(0, 10))}</td><td>${esc(r.lead_contact_name || '')}<div class="sub">${esc(r.user_email || r.lead_contact_email || '')}</div></td><td>${esc((S.packages.find(p => p.id === r.package_id) || {}).display_name || r.product_id || '')}</td><td>${r.term_years || ''}</td><td class="num">${gbp(r.displayed_price_exc_vat)}</td><td>${esc(r.invoice_po || r.optional_po || '')}</td></tr>`).join('')}</table></div></div>` : ''}
-    <div class="panel"><h3>Membership history <span class="small muted">(latest first)</span></h3><div class="body tight">${membershipsTable(memberships, members)}</div></div>
-    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}`);
-  wireRows();
+    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}` },
+    ])}`);
+  wireRows(); wireTabs();
   $('#editSchool').onclick = () => editSchoolDialog(school);
   $('#addNote').onclick = () => noteDialog({ school_id: id }).then(v => v && route());
   $('#invite').onclick = () => inviteDialog(id).then(v => v && route());
@@ -1067,6 +1097,8 @@ async function userPage(id) {
   shell([{ label: 'Teachers', hash: '#users' }, { label: name(user) }],
     `<h1>${esc(name(user))}<span class="id">#${user.id}</span></h1>${entPill(user.entitlement)} ${user.is_admin ? pill('accent', 'School admin') : ''} ${user.deleted_at ? pill('danger', 'Deleted') : user.is_live ? '' : pill('hidden', 'Not live')} ${user.membership_state === 'requested' ? statePill('requested') : ''}<span class="spacer"></span>
      <button class="btn" id="addNote">Add note</button><button class="btn" id="addSub">Add individual subscription</button><button class="btn primary" id="editUser">Edit</button>`, `
+    ${tabbed('user', [
+      { id: 'access', label: 'Access', html: `
     <div class="panel"><h3>Access <span class="spacer"></span>${user.school_id ? `<span class="small muted">at ${esc(user.school?.name || '')}</span>` : ''}</h3><div class="body"><div class="grid">
       <div class="field"><label>School</label><div class="ro">${user.school ? `<a href="#school/${user.school.id}">${esc(user.school.name)}</a> <span class="muted small">${esc(user.school.postcode || '')}</span>` : '<span class="muted">none chosen</span>'} <button class="btn sm" id="changeSchool" style="margin-left:8px">Change</button></div></div>
       <div class="field"><label>Membership</label><div class="ro">${statePill(user.membership_state)} ${user.is_admin ? pill('accent', 'Admin') : ''}<div class="acts" style="display:inline-flex;gap:4px;margin-left:8px">${memberActions(user, user.school_id)}</div></div></div>
@@ -1074,7 +1106,12 @@ async function userPage(id) {
       <div class="field"><label>Staff override</label><div class="ro">${user.access_override_until ? pill('accent', `Full access to ${fmtD(user.access_override_until)}`) : '<span class="muted">none</span>'} <button class="btn sm" id="override" style="margin-left:8px">Set</button></div></div>
       <div class="field span"><div class="help">Entitlement rule: an approved member of a school with a live school subscription, or a live individual subscription, or a staff override, otherwise free content only. ${esc(qbView)}${overrides.length ? ` · Quickbase per-user content overrides carried as data: ${esc(overrides.join(', '))}` : ''}</div></div>
     </div></div></div>
-
+    <div class="panel"><h3>Membership history</h3><div class="body tight">${memberships.length ? `<table class="list"><tr><th>When</th><th>School</th><th>State</th><th>How</th></tr>${memberships.map(m => `<tr class="click" data-go="#school/${m.school_id}"><td class="nowrap">${fmtD((m.updated_at || m.created_at || '').slice(0, 10))}</td><td>${esc(m.school?.name || '')}<div class="sub">${esc(m.school?.postcode || '')}</div></td><td>${statePill(m.state)} ${m.is_admin ? pill('accent', 'Admin') : ''}</td><td class="small">${[m.requested ? 'requested' : '', m.invited ? 'invited' : '', m.invite_accepted ? 'invite accepted' : '', m.via_invoice_pipeline ? 'from invoice' : '', m.via_automation ? 'auto' : '', m.auto_by_email_domain ? 'by email domain' : '', m.changed_by_staff ? 'by staff' : ''].filter(Boolean).join(', ')}</td></tr>`).join('')}</table>` : '<div class="empty">No school access history</div>'}</div></div>` },
+      { id: 'subs', label: 'Subscriptions', count: subs.filter(x => x.status !== 'void').length, html: `
+    <div class="panel"><h3>Individual subscriptions</h3><div class="body tight" id="subs">${subsTable(subs)}</div></div>` },
+      { id: 'notes', label: 'Notes', count: notes.length, html: `
+    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>` },
+      { id: 'details', label: 'Details', html: `
     <div class="panel"><h3>Details <span class="spacer"></span></h3><div class="body"><div class="grid">
       ${ro('Email', user.email)} ${ro('Phone', user.phone)} ${ro('Roles', (user.roles || []).join(', '))} ${ro('Class', [user.class_name, user.class_pupils ? user.class_pupils + ' pupils' : ''].filter(Boolean).join(', '))}
       ${ro('Age filter', (user.ages || []).join(', '))} ${ro('Marketing', user.marketing_ok ? 'Yes' : 'No')} ${ro('Title', user.title)}
@@ -1092,12 +1129,9 @@ async function userPage(id) {
       <div class="stat"><div class="v">${user.logins_total}</div><div class="k">all time</div></div>
       ${user.segment_2 ? `<div class="stat"><div class="v small">${esc(user.segment_2)}</div><div class="k">segment</div></div>` : ''}
     </div></div></div>
-
-    <div class="panel"><h3>Individual subscriptions</h3><div class="body tight" id="subs">${subsTable(subs)}</div></div>
-    <div class="panel"><h3>Notes and follow-ups</h3><div class="body" id="notes">${notesList(notes)}</div></div>
-    <div class="panel"><h3>Membership history</h3><div class="body tight">${memberships.length ? `<table class="list"><tr><th>When</th><th>School</th><th>State</th><th>How</th></tr>${memberships.map(m => `<tr class="click" data-go="#school/${m.school_id}"><td class="nowrap">${fmtD((m.updated_at || m.created_at || '').slice(0, 10))}</td><td>${esc(m.school?.name || '')}<div class="sub">${esc(m.school?.postcode || '')}</div></td><td>${statePill(m.state)} ${m.is_admin ? pill('accent', 'Admin') : ''}</td><td class="small">${[m.requested ? 'requested' : '', m.invited ? 'invited' : '', m.invite_accepted ? 'invite accepted' : '', m.via_invoice_pipeline ? 'from invoice' : '', m.via_automation ? 'auto' : '', m.auto_by_email_domain ? 'by email domain' : '', m.changed_by_staff ? 'by staff' : ''].filter(Boolean).join(', ')}</td></tr>`).join('')}</table>` : '<div class="empty">No school access history</div>'}</div></div>
-    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}`);
-  wireRows();
+    ${changes.length ? `<div class="panel"><h3>Changes made here</h3><div class="body">${changes.map(changeHtml).join('')}</div></div>` : ''}` },
+    ])}`);
+  wireRows(); wireTabs();
   $('#editUser').onclick = () => editUserDialog(user);
   $('#addNote').onclick = () => noteDialog({ user_id: id, school_id: user.school_id }).then(v => v && route());
   $('#addSub').onclick = () => subscriptionDialog({ kind: 'Individual', user_id: id }).then(v => v && route());
