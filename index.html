@@ -200,8 +200,8 @@ main { padding-block: 1.5rem 3rem; }
 @media (max-width: 640px) { .lrow .meta .ages b:not(.on) { display: none; } }
 
 /* age switch on merged resource cards */
-.agerow { display: flex; justify-content: flex-end; align-items: center; gap: .6rem; margin-top: .9rem; flex-wrap: wrap; }
-.agerow .lbl { font-size: .85rem; color: var(--mid-purple); font-weight: 600; }
+.agerow { display: flex; justify-content: flex-start; align-items: center; padding: 0 1rem 1rem; flex-wrap: wrap; }
+.scheme .intro:has(+ .agerow) { padding-bottom: .4rem; }
 .agesw { display: inline-flex; background: #fff; border: 1px solid var(--light-purple); border-radius: 999px; padding: 3px; gap: 2px; box-shadow: var(--shadow-sm); }
 .agesw button { border: 0; background: none; color: var(--mid-purple); font: inherit; font-weight: 600; font-size: .9rem; padding: .35rem .95rem; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; }
 .agesw button:hover { background: var(--ultra-purple); color: var(--purple); }
@@ -487,7 +487,7 @@ function pageSubcategory(subjectId, id) {
     variants.forEach((v, i) => {
       const s2 = v.s, lessons = v.lessons, one = lessons.length === 1, l0 = lessons[0];
       html += `<div class="variant" data-scheme-ages="${v.ages || ''}" ${i === sel ? '' : 'hidden'}>`;
-      html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}${ageSwitch}</div></div>`;
+      html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}</div></div>${ageSwitch}`;
       if (one) {
         html += `<div class="lmini">${lessonMeta(l0, false)}<a class="btn small outline" href="${lessonHref(l0, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
         html += `<div class="lbc" data-lesson-body="${l0.id}" data-scheme-text="${esc((s2.body_opening_text || s2.description || '').trim().slice(0, 80))}"></div>`;
@@ -552,7 +552,7 @@ function renderLessonBody(el, l, parts, sc, single) {
   const shownAbove = single ? [holderTxt ? holderTxt.textContent : ''] : [l.description];
   let body = schemeBody(l, shownAbove);
   const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
-  if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) { const row = txt.querySelector('.agerow'); const html = `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`; if (row) row.insertAdjacentHTML('beforebegin', html); else txt.insertAdjacentHTML('beforeend', html); } }
+  if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) txt.insertAdjacentHTML('beforeend', `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`); }
   else if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
   h += `<div class="parts">${renderParts(parts, !single)}</div>`;
   el.innerHTML = h; el.dataset.loaded = '1';
