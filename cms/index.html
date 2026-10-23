@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>imoves content manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Baloo+2:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js"></script>
 <style>
 :root {
@@ -131,7 +131,17 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 .tabs button.dirty .dirtydot { display: inline-block; }
 .tabpanel { display: none; }
 .tabpanel.active { display: block; }
-.textrows { display: grid; grid-template-columns: minmax(200px, 1fr) 2.6fr; gap: 10px 16px; align-items: start; }
+.textwork { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr); gap: 20px; align-items: start; }
+.textwork .editors { min-width: 0; }
+.preview { position: sticky; top: 140px; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 18px 20px; font-family: 'Baloo 2', 'BalooPrimary', sans-serif; color: #733088; line-height: 1.35; }
+.preview .pvlabel { font-family: 'Figtree', system-ui, sans-serif; font-size: 11.5px; color: var(--ink-3); margin-bottom: 10px; display: flex; justify-content: space-between; }
+.preview .pvtitle { font-weight: 700; font-size: 22px; color: #733088; margin: 0 0 2px; }
+.preview .pvsub { font-weight: 400; font-size: 15px; color: #9565a6; margin: 0 0 12px; }
+.preview p { margin: 0 0 10px; font-weight: 400; font-size: 15px; color: #733088; }
+.preview h5 { margin: 10px 0 2px; font-size: 17px; font-weight: 700; color: #733088; }
+.preview h5 + p { color: #9565a6; }
+.preview .pvempty { color: #b898c5; font-style: italic; }
+.textrows { display: grid; grid-template-columns: minmax(160px, 1fr) 2.2fr; gap: 10px 16px; align-items: start; }
 .textrows .field textarea { min-height: 64px; }
 .textrows .rowlabel { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
 .place { display: flex; flex-direction: column; gap: 8px; }
@@ -164,8 +174,16 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 .field textarea { min-height: 72px; resize: vertical; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .field.dirty label::after { content: ' • unsaved'; color: var(--pending); }
-.check { display: inline-flex; align-items: center; gap: 6px; margin: 4px 14px 4px 0; cursor: pointer; }
-.check input { width: 15px; height: 15px; accent-color: var(--accent); }
+.field label.check, .check { display: inline-flex; align-items: center; gap: 6px; margin: 4px 14px 4px 0; cursor: pointer; font-size: 13.5px; color: var(--ink); }
+.check input { width: 15px; height: 15px; accent-color: var(--accent); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.field label.chip { display: inline-flex; align-items: center; margin: 0; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); cursor: pointer; font-size: 13px; color: var(--ink-2); user-select: none; }
+.field label.chip:hover { border-color: var(--ink-3); }
+.field label.chip input { position: absolute; opacity: 0; width: 0; height: 0; }
+.field label.chip:has(input:checked) { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.field label.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.grid.four { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.subhead { font-size: 12.5px; font-weight: 600; color: var(--ink-3); text-transform: none; margin: 18px 0 8px; padding-top: 14px; border-top: 1px solid var(--line-2); }
 .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; }
 .switch input { appearance: none; width: 36px; height: 20px; border-radius: 999px; background: var(--hidden); position: relative; transition: background .15s; margin: 0; }
 .switch input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
@@ -242,6 +260,7 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 #login p { color: var(--ink-2); margin: 0 0 16px; }
 #login .field { margin-bottom: 12px; }
 
+@media (max-width: 1100px) { .textwork { grid-template-columns: 1fr; } .preview { position: static; } }
 @media (max-width: 900px) {
   .textrows { grid-template-columns: 1fr; }
   .tabs { position: static; }
@@ -617,8 +636,8 @@ function field(label, name, value, opts = {}) {
   else input = `<input type="text" name="${name}" value="${esc(v)}" ${opts.list ? `list="${opts.list}"` : ''}>`;
   return `<div class="field ${opts.span ? 'span' : ''}" data-field="${name}"><label>${label}</label>${input}${opts.help ? `<div class="help">${opts.help}</div>` : ''}</div>`;
 }
-function checks(label, name, values, choices) {
-  return `<div class="field span" data-field="${name}"><label>${label}</label>${choices.map(c => `<label class="check"><input type="checkbox" name="${name}" value="${esc(c)}" ${values.includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div>`;
+function checks(label, name, values, choices, opts = {}) {
+  return `<div class="field ${opts.span ? 'span' : ''}" data-field="${name}"><label>${label}</label><div class="chips">${choices.map(c => `<label class="chip"><input type="checkbox" name="${name}" value="${esc(c)}" ${values.includes(c) ? 'checked' : ''}>${esc(c)}</label>`).join('')}</div>${opts.help ? `<div class="help">${opts.help}</div>` : ''}</div>`;
 }
 function readForm(root, orig) {
   const out = {};
@@ -647,7 +666,7 @@ function diff(orig, cur) {
 function wireForm(root, orig, onSave) {
   const mark = () => {
     const d = diff(orig, readForm(root, orig));
-    $$('.field', root).forEach(f => f.classList.toggle('dirty', f.dataset.field in d));
+    $$('.field', root).forEach(f => f.classList.toggle('dirty', f.dataset.field in d || (f.dataset.field === 'has' && Object.keys(d).some(k => k.startsWith('has_')))));
     $$('.tabpanel', root).forEach(p => { const b = $(`.tabs [data-tab="${p.dataset.panel}"]`, root); if (b) b.classList.toggle('dirty', $$('.field.dirty', p).length > 0); });
     const n = Object.keys(d).length;
     const btn = $('#saveBtn'); if (btn) { btn.disabled = !n; btn.textContent = n ? `Save ${n} change${n === 1 ? '' : 's'}` : 'Saved'; }
@@ -684,6 +703,24 @@ function wireTabs(root, initial) {
   const bar = $('.tabs', root), c = $('.crumbs', root), h = $('.edhead', root);
   if (bar && c && h) bar.style.top = (c.offsetHeight + h.offsetHeight) + 'px';
   show(initial && $(`.tabs [data-tab="${initial}"]`, root) ? initial : $('.tabs button', root).dataset.tab);
+}
+// Live preview of the page text, rendered as the platform does (nl2br; a section shows only
+// when it has a heading; opening and closing text in purple, section text in mid purple).
+function nl2br(s) { return esc(String(s || '').trim()).replace(/\r?\n/g, '<br>'); }
+function previewHtml(v, title, subtitle) {
+  let h = `<div class="pvlabel"><span>Preview</span><span>as on the platform</span></div>`;
+  h += `<div class="pvtitle">${esc(title || '')}</div>${subtitle ? `<div class="pvsub">${esc(subtitle)}</div>` : ''}`;
+  let any = false;
+  if ((v.body_opening_text || '').trim()) { h += `<p>${nl2br(v.body_opening_text)}</p>`; any = true; }
+  for (const i of [1, 2, 3]) if ((v[`body_subheading_${i}`] || '').trim()) { h += `<h5>${esc(v[`body_subheading_${i}`])}</h5><p>${nl2br(v[`body_subheading_${i}_text`])}</p>`; any = true; }
+  if ((v.body_closing_text || '').trim()) { h += `<p>${nl2br(v.body_closing_text)}</p>`; any = true; }
+  if (!any) h += '<p class="pvempty">Nothing to show yet. Type in the fields on the left and the preview follows.</p>';
+  return h;
+}
+function wirePreview(root, orig, title, subtitle) {
+  const pv = $('.preview', root); if (!pv) return;
+  const draw = () => { const v = readForm(root, orig); pv.innerHTML = previewHtml(v, v.name || title, subtitle); };
+  root.addEventListener('input', draw); draw();
 }
 // Three "heading + text" rows for the page body, the way a teacher sees them.
 function textRows(rec, rows) {
@@ -740,13 +777,13 @@ async function openScheme(id) {
       ${field('Description', 'description', full.description, { type: 'textarea', span: true })}
       ${field('Extra search terms', 'search_terms_additional', full.search_terms_additional, { span: true, help: 'Comma separated' })}
     </div><div class="small muted" style="margin-top:12px">Images: <a href="${esc(full.image)}" target="_blank">standard</a> · <a href="${esc(full.image_featured)}" target="_blank">featured</a> · <a href="${esc(full.image_tall)}" target="_blank">tall</a> (uploads are not part of this proof of concept)</div></div></div></div>
-    <div class="tabpanel" data-panel="text"><div class="panel" id="schemeText"><h3>Scheme page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body">
+    <div class="tabpanel" data-panel="text"><div class="panel" id="schemeText"><h3>Scheme page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body"><div class="textwork"><div class="editors">
       <div class="grid">${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}</div>
       <div style="height:12px"></div>
       ${textRows(full, [['body_subheading_1', 'body_subheading_1_text', 'Section 1'], ['body_subheading_2', 'body_subheading_2_text', 'Section 2'], ['body_subheading_3', 'body_subheading_3_text', 'Section 3']])}
       <div style="height:12px"></div>
       <div class="grid">${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}</div>
-    </div></div></div>
+    </div><div class="preview"></div></div></div></div></div>
     <div class="tabpanel" data-panel="place"><div class="panel"><h3>Where it appears</h3><div class="body">
       <div class="grid">
         <div class="field"><label>Categories</label>
@@ -762,6 +799,7 @@ async function openScheme(id) {
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
   wireTabs(ed, S.tab);
+  wirePreview(ed, orig, full.name, full.subheading);
   $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; S.schemeId = null; renderList(); });
   wireForm(ed, orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; });
   $('#schemeLive').onchange = async e => {
@@ -923,36 +961,48 @@ async function openLesson(id) {
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${CHOICES.media.map(m => `<button class="btn sm" data-addpart="${esc(m)}">+ ${esc(m)}</button>`).join('')}</div>
       ${archived.length ? `<details style="margin-top:12px"><summary class="small muted" style="cursor:pointer">${archived.length} archived part${archived.length === 1 ? '' : 's'}</summary><div class="rows" style="margin-top:6px">${archived.map(p => partCard(p, true)).join('')}</div></details>` : ''}
     </div></div></div>
-    <div class="tabpanel" data-panel="details"><div class="panel" id="lessonForm"><h3>Lesson details</h3><div class="body"><div class="grid">
-      ${field('Title', 'name', full.name)}
-      ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only' })}
-      ${field('Sub title', 'sub_title', full.sub_title, { help: 'Shown under the title; falls back to the short description' })}
-      ${field('Short title', 'short_title', full.short_title)}
-      ${field('Short description', 'description', full.description, { type: 'textarea', span: true })}
-      ${checks('Age ranges', 'age_ranges', orig.age_ranges, CHOICES.ages)}
-      ${checks('Flags', 'flags', orig.flags, CHOICES.flags)}
-      ${checks('Suitable locations', 'location', orig.location, CHOICES.location)}
-      ${field('Duration (mins)', 'duration_choice', full.duration_choice, { type: 'select', choices: CHOICES.duration, blank: 'Not set' })}
-      ${field('Preparation (mins)', 'preparation_choice', full.preparation_choice, { type: 'select', choices: CHOICES.preparation, blank: 'Not set' })}
-      ${field('Intensity', 'intensity_choice', full.intensity_choice, { type: 'select', choices: CHOICES.intensity, blank: 'Not set' })}
-      ${field('Focus', 'focus_choice', full.focus_choice, { type: 'select', choices: CHOICES.focus, blank: 'Not set' })}
-      ${field('Background image', 'background_image_id', full.background_image_id, { type: 'select', choices: [], blank: 'Not set' }).replace('</select>', S.backgrounds.map(b => `<option value="${b.id}" ${b.id === full.background_image_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('') + '</select>')}
-      <div class="field span" data-field="has"><label>Content icons shown on the lesson list</label>
-        ${[['has_video', 'Video'], ['has_audio', 'Audio'], ['has_slides', 'Slides'], ['has_downloads', 'Downloads'], ['has_lesson_plan', 'Lesson plan'], ['has_assessment_template', 'Assessment template']].map(([k, l]) => `<label class="check"><input type="checkbox" name="${k}" ${full[k] ? 'checked' : ''}>${l}</label>`).join('')}
-        <div class="help">These are set by hand in Quickbase today; a later version can derive them from the parts.</div></div>
-      ${field('Extra search terms', 'search_additional', full.search_additional, { span: true, help: 'Comma separated' })}
-    </div></div></div></div>
-    <div class="tabpanel" data-panel="text"><div class="panel" id="lessonBody"><h3>Lesson page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body">
+    <div class="tabpanel" data-panel="details"><div class="panel" id="lessonForm"><h3>Lesson details</h3><div class="body">
+      <div class="grid">
+        ${field('Title', 'name', full.name)}
+        ${field('Sub title', 'sub_title', full.sub_title, { help: 'Shown under the title; falls back to the short description' })}
+        ${field('Short title', 'short_title', full.short_title, { help: 'Used on compact lists' })}
+        ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only; shown in lists and Quickbase' })}
+        ${field('Short description', 'description', full.description, { type: 'textarea', rows: 2 }).replace('class="field "', 'class="field " style="grid-column: span 2"')}
+      </div>
+      <div class="subhead">Who it suits</div>
+      <div class="grid">
+        ${checks('Age ranges', 'age_ranges', orig.age_ranges, CHOICES.ages)}
+        ${checks('Suitable locations', 'location', orig.location, CHOICES.location)}
+        ${checks('Flags', 'flags', orig.flags, CHOICES.flags)}
+      </div>
+      <div class="subhead">Filters teachers can search by</div>
+      <div class="grid four">
+        ${field('Duration (mins)', 'duration_choice', full.duration_choice, { type: 'select', choices: CHOICES.duration, blank: 'Not set' })}
+        ${field('Preparation (mins)', 'preparation_choice', full.preparation_choice, { type: 'select', choices: CHOICES.preparation, blank: 'Not set' })}
+        ${field('Intensity', 'intensity_choice', full.intensity_choice, { type: 'select', choices: CHOICES.intensity, blank: 'Not set' })}
+        ${field('Focus', 'focus_choice', full.focus_choice, { type: 'select', choices: CHOICES.focus, blank: 'Not set' })}
+      </div>
+      <div class="subhead">Presentation</div>
+      <div class="grid">
+        ${field('Background image', 'background_image_id', full.background_image_id, { type: 'select', choices: [], blank: 'Not set' }).replace('</select>', S.backgrounds.map(b => `<option value="${b.id}" ${b.id === full.background_image_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('') + '</select>')}
+        <div class="field" data-field="has" style="grid-column: span 2"><label>Content icons on the lesson list</label><div class="chips">
+          ${[['has_video', 'Video'], ['has_audio', 'Audio'], ['has_slides', 'Slides'], ['has_downloads', 'Downloads'], ['has_lesson_plan', 'Lesson plan'], ['has_assessment_template', 'Assessment template']].map(([k, l]) => `<label class="chip"><input type="checkbox" name="${k}" ${full[k] ? 'checked' : ''}>${l}</label>`).join('')}</div>
+          <div class="help">Set by hand in Quickbase today; a later version can derive them from the parts.</div></div>
+        ${field('Extra search terms', 'search_additional', full.search_additional, { span: true, help: 'Comma separated' })}
+      </div>
+    </div></div></div>
+    <div class="tabpanel" data-panel="text"><div class="panel" id="lessonBody"><h3>Lesson page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body"><div class="textwork"><div class="editors">
       <div class="grid">${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}</div>
       <div style="height:12px"></div>
       ${textRows(full, [['body_subheading_1', 'body_subheading_1_text', 'Section 1'], ['body_subheading_2', 'body_subheading_2_text', 'Section 2'], ['body_subheading_3', 'body_subheading_3_text', 'Section 3']])}
       <div style="height:12px"></div>
       <div class="grid">${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
-      ${field('Long description (legacy)', 'description_long', full.description_long, { type: 'textarea', span: true, help: 'Used by the old lesson page only' })}</div>
-    </div></div></div>
+      ${field('Long description (legacy)', 'description_long', full.description_long, { type: 'textarea', span: true, help: 'Used by the old lesson page only; not shown in the preview' })}</div>
+    </div><div class="preview"></div></div></div></div></div>
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
   wireTabs(ed, S.tab);
+  wirePreview(ed, orig, full.name, full.sub_title || full.description);
   const crumbParts = [cat ? 'cat' : null, 'scheme'].filter(Boolean);
   $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; if (crumbParts[+b.dataset.crumb] === 'cat') { S.schemeId = null; S.lessonId = null; renderList(); } else openScheme(full.scheme_id); });
   const formRoot = ed; // both panels share one save button
