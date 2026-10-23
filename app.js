@@ -73,6 +73,61 @@ const index = rows => Object.fromEntries(rows.map(r => [r.id, r]));
 function group(rows, key) { const g = {}; for (const r of rows) (g[r[key]] ||= []).push(r); return g; }
 const byOrder = (a, b) => (a.order ?? 1e12) - (b.order ?? 1e12) || String(a.name || '').localeCompare(String(b.name || ''));
 
+// ---------- entitlements (Phase 1 increment 2) ----------
+// Mirrors the live platform's SubjectPolicy and LessonPolicy (app/Subjects/Policies,
+// app/Lessons/Policies) using the per-user fields from web_me(). Applied client-side
+// for now; API-level enforcement comes at cutover, when anon read of the content
+// tables (which the CMS PoC still relies on) is withdrawn.
+const E = {};
+function initEntitlements() {
+  const m = Auth.me() || {};
+  E.allContent = !!m.all_content; E.allSubjects = !!m.all_subjects;
+  E.allAges = !!m.all_ages; E.ageRights = m.age_rights || [];
+  E.subjectIds = new Set([...(m.subject_ids || []), ...(m.niche_subject_ids || [])]);
+  E.freeAll = !!m.free_all; E.trialAll = !!m.trial_all; E.payingAll = !!m.paying_all;
+  E.homepage = m.homepage_subject_id || null;
+  E.buttons = m.subject_button_ids || []; E.browse = m.browse_menu_ids || [];
+  E.homeSections = m.home_section_ids || [];
+  E.lessonMessage = m.lesson_message_1 || 'This lesson isn’t included in your subscription.';
+  E.upgradeText = m.lesson_upgrade_button_text || 'Upgrade';
+  E.showUpgrade = !!m.show_upgrade_button;
+}
+// SubjectPolicy::view
+function canViewSubject(s) {
+  return !!(s.show_all || (s.show_free && E.freeAll) || (s.show_trial && E.trialAll) || (s.show_paying && E.payingAll));
+}
+function lessonSubjects(l) {
+  return (D.subcatsByScheme[l.scheme_id] || []).map(id => D.subcatById[id] && D.subcatById[id].subject_id).filter(Boolean);
+}
+// LessonPolicy::access (with age filters)
+function canAccessLesson(l) {
+  if (l.is_freemium || E.allContent) return true;
+  if (!E.allSubjects && !lessonSubjects(l).some(id => E.subjectIds.has(id))) return false;
+  if (E.allAges) return true;
+  if (l.age_min == null) return false;
+  return E.ageRights.some((on, k) => on && l.age_min <= 4 + k && l.age_max >= 5 + k);
+}
+const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
+// The strip next to the logo (school and class name, as the live header), the orange
+// Upgrade button and the per-user sticky banner.
+function renderUserContext() {
+  const m = Auth.me() || {};
+  const ctx = document.getElementById('userctx');
+  if (ctx) ctx.innerHTML = (m.school_name ? `<span class="ctx-school">${esc(m.school_name)}</span>` : '') +
+    (m.class_name ? `<span class="ctx-class">${esc(m.class_name)}</span>` : '');
+  const up = document.getElementById('upgradebtn');
+  if (up) up.classList.toggle('hidden', !E.showUpgrade);
+  const bn = document.getElementById('stickybanner');
+  if (bn) {
+    if (m.banner_show && m.banner_text) {
+      bn.classList.remove('hidden');
+      bn.textContent = m.banner_text;
+      bn.style.color = col(m.banner_color); bn.style.background = col(m.banner_background);
+      bn.style.borderColor = col(m.banner_border);
+    } else bn.classList.add('hidden');
+  }
+}
+
 // ---------- helpers ----------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Body text: escape everything, then let through the few harmless tags staff use in Quickbase
@@ -131,21 +186,27 @@ async function route() {
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
     if (p[0] === 'browse') return pageBrowse();
+    if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
 }
 
 // ---------- pages ----------
 function renderSubjectBar() {
-  const subjects = D.subjects.filter(s => s.is_homepage_button).sort(byOrder);
+  // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
+  const subjects = D.subjects.filter(s => E.buttons.includes(s.id) && canViewSubject(s)).sort(byOrder);
   document.getElementById('subjectbar').innerHTML = subjects.map(s =>
     `<a class="sbtn" data-id="${s.id}" href="#/subject/${s.id}" style="background:#${esc(s.button_colour || '733088')}"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')}"></i>${esc(s.name)}</a>`).join('');
 }
 function cleanIcon(i) { if (!i) return ''; const m = i.match(/class="([^"]+)"/); return (m ? m[1] : i).trim(); }
 
 function pageHome() {
+  // The live "/" sends users with a homepage subject (fid 921) straight to that
+  // subject's page - nearly everyone - so the carousel home below is the fallback.
+  if (E.homepage && D.subjectById[E.homepage]) { location.replace(`#/subject/${E.homepage}`); return; }
   setBg(null);
-  const subjects = D.subjects.filter(s => s.is_carouselable).sort((a, b) => (a.homepage_order ?? 999) - (b.homepage_order ?? 999));
+  const subjects = D.subjects.filter(s => s.is_carouselable && canViewSubject(s) &&
+    (!E.homeSections.length || E.homeSections.includes(s.id))).sort((a, b) => (a.homepage_order ?? 999) - (b.homepage_order ?? 999));
   let html = '';
   for (const s of subjects) {
     const feats = [1, 2, 3, 4].map(i => ({ sc: D.subcatById[s[`featured_subcategory_id_${i}`]], heading: s[`featured_heading_${i}`], sub: s[`featured_subheading_${i}`] })).filter(f => f.sc);
@@ -163,6 +224,7 @@ function pageHome() {
 function pageSubject(id) {
   const s = D.subjectById[id];
   if (!s) { app.innerHTML = '<div class="notice">Subject not found.</div>'; return; }
+  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   setBg(s.background_image_url);
   const video = s.is_featuring_video && (s.featured_video_wistia_id_paid_ks2 || s.featured_video_wistia_id_free);
   const vHead = s.featured_video_heading_paid_ks2 || s.featured_video_heading_free, vSub = s.featured_video_subheading_paid_ks2 || s.featured_video_subheading_free;
@@ -252,11 +314,15 @@ function pageSubcategory(subjectId, id) {
       const s2 = v.s, lessons = v.lessons, one = lessons.length === 1, l0 = lessons[0];
       html += `<div class="variant" data-scheme-ages="${v.ages || ''}" ${i === sel ? '' : 'hidden'}>`;
       html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}</div></div>${ageSwitch}`;
-      if (one) {
+      if (one && !canAccessLesson(l0)) {
+        html += `<div class="lmini"><i class="bi-lock-fill"></i> ${esc(E.lessonMessage)}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div><div style="padding-bottom:1rem"></div>`;
+      } else if (one) {
         html += `<div class="lmini">${lessonMeta(l0, false)}<a class="btn small outline" href="${lessonHref(l0, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
         html += `<div class="lbc" data-lesson-body="${l0.id}" data-scheme-text="${esc((s2.body_opening_text || s2.description || '').trim().slice(0, 80))}"></div>`;
       } else {
-        html += `<div class="lessons">` + lessons.map(l => `<div class="lx" data-lesson="${l.id}"><button class="lrow" type="button" aria-expanded="false"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div></button><div class="lb"><div class="lbi"><div class="lbc" data-lesson-body="${l.id}"></div></div></div></div>`).join('') + `</div>`;
+        html += `<div class="lessons">` + lessons.map(l => canAccessLesson(l)
+          ? `<div class="lx" data-lesson="${l.id}"><button class="lrow" type="button" aria-expanded="false"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div></button><div class="lb"><div class="lbi"><div class="lbc" data-lesson-body="${l.id}"></div></div></div></div>`
+          : `<div class="lx locked"><div class="lrow"><i class="res bi-lock-fill"></i><div class="lt"><h4>${esc(l.name)}</h4><span>${esc(E.lessonMessage)}</span></div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div></div></div>`).join('') + `</div>`;
       }
       html += `</div>`;
     });
@@ -349,6 +415,7 @@ async function pageLesson(id, scId) {
   ]);
   const l = rows[0];
   if (!l || !l.is_live) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
+  if (!canAccessLesson(l)) { app.innerHTML = `<div class="notice"><strong>${esc(l.name)}</strong> - ${esc(E.lessonMessage)}${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   const scheme = D.schemeById[l.scheme_id];
   const sc = D.subcatById[scId] || (scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]);
   const subject = sc && D.subjectById[sc.subject_id], sg = sc && D.subgroupById[sc.subgroup_id];
@@ -405,7 +472,8 @@ async function pageSearch(q) {
   out.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
   const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,scheme_id,age_min,age_max,duration,is_freemium,has_video,has_audio,has_downloads,has_slides&order=order&limit=300`);
-  const live = rows.filter(l => D.lessonById[l.id]);
+  // Only lessons the user can access are shown (schedule 3.8)
+  const live = rows.filter(l => D.lessonById[l.id] && canAccessLesson(l));
   if (!live.length) { out.innerHTML = `<div class="notice">No lessons match "${esc(q)}".</div>`; return; }
   const bySubject = {};
   for (const l of live) {
@@ -424,7 +492,8 @@ async function pageSearch(q) {
 
 function pageBrowse() {
   setBg(null);
-  const subjects = D.subjects.filter(s => s.is_browsable).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
+  // The browse list is the user's own (Users fid 919) filtered by SubjectPolicy.
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
   let html = '<div class="browse">';
   for (const s of subjects) {
     const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
@@ -442,8 +511,10 @@ function pageBrowse() {
 async function startApp() {
   try {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
+    initEntitlements();
     await loadTree();
     renderSubjectBar();
+    renderUserContext();
     const picker = document.getElementById('classage');
     // "My class": the stored choice, or the age range saved on the account (users.ages)
     let saved = null; try { saved = localStorage.getItem('imoves.classAge'); } catch (e) {}

@@ -238,3 +238,17 @@ body.signed-out nav a.nbtn, body.signed-out #classage { display: none; }
 .login-card .btn:disabled { opacity: .6; }
 .login-card .notice { margin: .4rem 0 .2rem; }
 .login-card .small { font-size: .85rem; margin: 1rem 0 0; text-align: center; }
+
+/* per-user context strip, locked lessons, sticky banner (Phase 1 increment 2) */
+.userctx { display: inline-flex; flex-direction: column; line-height: 1.25; margin-right: .5rem; max-width: 30%; }
+.ctx-school { font-weight: 700; color: #fff; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-class { color: var(--light-purple); font-weight: 600; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.signed-out .userctx { display: none; }
+.lx.locked .lrow { cursor: default; }
+.lx.locked .lrow:hover { background: none; }
+.lx.locked .lrow::after { display: none; }
+.lx.locked .lrow > i.res { background: var(--ultra-purple); color: #a493ab; }
+.lx.locked .lt h4 { color: #8d7d94; }
+.lmini .bi-lock-fill { color: #a493ab; }
+#stickybanner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: .7rem max(16px, env(safe-area-inset-left)); text-align: center; font-weight: 600; background: var(--purple); color: #fff; border-top: 3px solid var(--orange); box-shadow: 0 -2px 12px rgba(60,20,80,.25); }
+body:has(#stickybanner:not(.hidden)) footer { padding-bottom: 4.5rem; }

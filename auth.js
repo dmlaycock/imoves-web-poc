@@ -101,7 +101,12 @@ const Auth = (() => {
     const el = document.getElementById('usernav');
     if (!el) return;
     document.body.classList.toggle('signed-out', !session);
-    if (!session) { el.innerHTML = ''; return; }
+    if (!session) {
+      el.innerHTML = '';
+      for (const id of ['userctx']) { const x = document.getElementById(id); if (x) x.innerHTML = ''; }
+      for (const id of ['stickybanner', 'upgradebtn']) { const x = document.getElementById(id); if (x) x.classList.add('hidden'); }
+      return;
+    }
     const name = me && me.first_name ? `${me.first_name} ${me.last_name || ''}`.trim() : (me && me.email) || 'Signed in';
     el.innerHTML = `<span class="userchip" title="${esc(me && me.email || '')}"><i class="bi-person-circle"></i> ${esc(name)}${me && me.staff ? ' <span class="badge purple">Staff</span>' : ''}</span>` +
       `<button class="nbtn" id="logoutbtn" type="button"><i class="bi-box-arrow-right"></i> Log out</button>`;
