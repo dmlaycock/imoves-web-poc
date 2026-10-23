@@ -122,6 +122,39 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 .edhead h1 { font-size: 20px; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .edhead .id { color: var(--ink-3); font-weight: 400; font-size: 14px; margin-left: 8px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; margin: 16px 24px 0; }
+.tabs { display: flex; gap: 2px; padding: 10px 24px 0; border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 86px; z-index: 4; }
+.tabs button { border: 0; background: none; padding: 8px 14px 10px; cursor: pointer; font-weight: 500; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 6px; align-items: center; }
+.tabs button:hover { color: var(--ink); }
+.tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tabs button .n { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.tabs button .dirtydot { width: 7px; height: 7px; border-radius: 50%; background: var(--pending); display: none; }
+.tabs button.dirty .dirtydot { display: inline-block; }
+.tabpanel { display: none; }
+.tabpanel.active { display: block; }
+.textrows { display: grid; grid-template-columns: minmax(200px, 1fr) 2.6fr; gap: 10px 16px; align-items: start; }
+.textrows .field textarea { min-height: 64px; }
+.textrows .rowlabel { grid-column: 1 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.place { display: flex; flex-direction: column; gap: 8px; }
+.place .item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface); }
+.place .item .handle { width: 16px; color: var(--ink-3); cursor: grab; display: grid; place-items: center; }
+.place .item .handle svg { width: 12px; height: 12px; }
+.place .item .path { flex: 1; min-width: 0; }
+.place .item .path b { display: block; }
+.place .item .path span { font-size: 12px; color: var(--ink-3); }
+.place .item.home { border-color: var(--accent); background: var(--accent-soft); }
+.place .item.sortable-ghost { opacity: .35; }
+.picktree details { margin-left: 0; }
+.picktree summary { list-style: none; cursor: pointer; padding: 5px 6px; border-radius: 6px; display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.picktree summary::-webkit-details-marker { display: none; }
+.picktree summary:hover { background: var(--surface-2); }
+.picktree .g { margin-left: 16px; }
+.picktree .g > summary { font-weight: 500; }
+.picktree label.c { display: flex; gap: 8px; align-items: center; padding: 4px 6px 4px 34px; border-radius: 6px; cursor: pointer; }
+.picktree label.c:hover { background: var(--surface-2); }
+.picktree label.c input { accent-color: var(--accent); }
+.picktree .off { color: var(--ink-3); }
+.picktree .off::after { content: ' (hidden)'; font-size: 11px; }
+.picktree .count { margin-left: auto; font-size: 12px; color: var(--ink-3); font-weight: 400; }
 .panel > h3 { padding: 12px 16px 0; font-size: 14px; }
 .panel .body { padding: 12px 16px 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; }
@@ -210,6 +243,8 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 #login .field { margin-bottom: 12px; }
 
 @media (max-width: 900px) {
+  .textrows { grid-template-columns: 1fr; }
+  .tabs { position: static; }
   main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 45vh; }
   :root { --nav-w: 100%; }
@@ -277,7 +312,7 @@ section.editor { overflow: auto; padding: 0 0 80px; }
 <div class="modal" id="login" role="dialog" aria-modal="true">
   <div class="box narrow">
     <h2>Sign in to edit</h2>
-    <p>Browsing is open; changes need a staff login.</p>
+    <p>Use your imoves email address and password (the same as the platform). Editing needs an account on the staff list.</p>
     <div class="field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username"></div>
     <div class="field"><label>Password</label><input type="password" id="loginPass" autocomplete="current-password" style="width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg)"></div>
     <div class="help" id="loginErr" style="color:var(--danger);min-height:18px"></div>
@@ -417,10 +452,11 @@ function askDialog(title, label, help = '', okLabel = 'Create') {
 // Auth (Supabase email + password; a dev token takes its place locally)
 // ------------------------------------------------------------------------------------------
 function decodeJwt(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return null; } }
-function canWrite() { return !!(session.token || CONFIG.devToken); }
+function isStaffToken(tok) { const c = decodeJwt(tok); return !!(c && c.app_metadata && c.app_metadata.staff); }
+function canWrite() { return !!((session.token && isStaffToken(session.token)) || CONFIG.devToken); }
 function renderWho() {
   const who = $('#who');
-  if (session.token) { who.textContent = session.email; $('#signout').hidden = false; }
+  if (session.token) { who.innerHTML = `${esc(session.email)}${isStaffToken(session.token) ? ' <span class="pill new">Staff</span>' : ' <span class="pill hidden" title="This account is not on the staff list, so it can browse but not edit">Read only</span>'}`; $('#signout').hidden = false; }
   else if (CONFIG.devToken) { const c = decodeJwt(CONFIG.devToken); who.textContent = (c && c.email ? c.email : 'local') + ' (dev)'; $('#signout').hidden = true; }
   else { who.innerHTML = '<button class="btn sm" id="signinBtn">Sign in to edit</button>'; $('#signout').hidden = true; $('#signinBtn').onclick = () => $('#login').classList.add('open'); }
 }
@@ -446,13 +482,18 @@ $('#loginGo').onclick = async () => {
     if (!r.ok) throw new Error(j.error_description || j.msg || j.message || 'Sign-in failed');
     session.token = j.access_token; session.email = j.user.email;
     localStorage.setItem('cms.session', JSON.stringify({ token: j.access_token, refresh: j.refresh_token, email: j.user.email }));
-    $('#login').classList.remove('open'); renderWho(); toast(`Signed in as ${session.email}`);
+    $('#login').classList.remove('open'); renderWho();
+    toast(isStaffToken(j.access_token) ? `Signed in as ${session.email}` : `Signed in as ${session.email} (read only: not on the staff list)`, !isStaffToken(j.access_token));
   } catch (e) { $('#loginErr').textContent = e.message; }
 };
 $('#loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loginGo').click(); });
 $('#signout').onclick = () => { session.token = null; session.email = null; localStorage.removeItem('cms.session'); renderWho(); toast('Signed out'); };
 $$('.modal [data-close]').forEach(b => b.onclick = () => b.closest('.modal').classList.remove('open'));
-function requireWrite() { if (canWrite()) return true; $('#login').classList.add('open'); return false; }
+function requireWrite() {
+  if (canWrite()) return true;
+  if (session.token) { toast('This account can browse but not edit: it is not on the imoves staff list.', true); return false; }
+  $('#login').classList.add('open'); return false;
+}
 function explainError(e) {
   const m = e.message || String(e);
   if (/JWT|jwt|permission denied|row-level security|401|403/.test(m)) return 'Your sign-in has expired. Sign in again and retry.';
@@ -524,11 +565,25 @@ function renderList() {
   ed.innerHTML = `
     ${crumbs([sub ? { label: sub.name } : null, g ? { label: g.name } : null, { label: cat.name }].filter(Boolean))}
     <div class="edhead"><h1>${esc(cat.name)}<span class="id">${schemes.length} scheme${schemes.length === 1 ? '' : 's'}${cat.is_live ? '' : ' · category hidden'}</span></h1>
+      <button class="btn" id="addExisting">Add existing scheme</button>
       <button class="btn primary" id="newScheme">+ New scheme</button></div>
     <div class="panel catpage"><h3>Schemes <span class="small muted">drag to reorder, click to open</span></h3><div class="body">
       <div class="rows" id="schemeRows">${schemes.map((s, i) => schemeRow(s, i)).join('') || '<div class="empty">No schemes in this category yet. Create one, or add an existing scheme to this category from its own page.</div>'}</div>
     </div></div>`;
   $('#newScheme').onclick = () => newScheme(cat);
+  $('#addExisting').onclick = async () => {
+    if (!requireWrite()) return;
+    const inCat = new Set(schemes.map(s => s.id));
+    const s = await openPicker('Add an existing scheme to this category', [{ value: '', label: 'All schemes' }, { value: 'live', label: 'Live only' }], (q, flt) => {
+      const list = S.schemes.filter(x => !inCat.has(x.id) && (flt !== 'live' || x.is_live) && (!q || (x.name || '').toLowerCase().includes(q) || (x.internal_name || '').toLowerCase().includes(q) || String(x.id) === q)).slice(0, 100);
+      return { count: `${list.length} shown`, lookup: id => byId(S.schemes, +id),
+        html: list.map(x => { const home = S.schemeCats.filter(l => l.scheme_id === x.id).sort((a, b) => a.position - b.position)[0]; const hc = home && byId(S.cats, home.subcategory_id);
+          return `<button class="pick" data-pickid="${x.id}"><img src="${esc(x.image)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><div class="meta"><b>${esc(x.name)}</b><span>${esc(x.internal_name || '')} · SID ${x.id}${hc ? ' · home: ' + esc(catPath(hc)) : ''}</span></div>${x.is_live ? '<span class="pill live">Live</span>' : '<span class="pill hidden">Hidden</span>'}</button>`; }).join('') || '<div class="empty">No schemes match.</div>' };
+    });
+    if (!s) return;
+    try { await rpc('add_scheme_to_category', { p_scheme_id: s.id, p_category_id: cat.id }); await reloadLinks(s.id); toast(`“${s.name}” added`); renderTree(); refreshPending(); renderList(); }
+    catch (e) { toast(explainError(e), true); }
+  };
   $$('#schemeRows .row').forEach(r => r.onclick = e => { if (!e.target.closest('.handle')) openScheme(+r.dataset.id); });
   if (schemes.length > 1) Sortable.create($('#schemeRows'), { handle: '.handle', animation: 150, onEnd: async () => {
     if (!requireWrite()) { renderList(); return; }
@@ -593,6 +648,7 @@ function wireForm(root, orig, onSave) {
   const mark = () => {
     const d = diff(orig, readForm(root, orig));
     $$('.field', root).forEach(f => f.classList.toggle('dirty', f.dataset.field in d));
+    $$('.tabpanel', root).forEach(p => { const b = $(`.tabs [data-tab="${p.dataset.panel}"]`, root); if (b) b.classList.toggle('dirty', $$('.field.dirty', p).length > 0); });
     const n = Object.keys(d).length;
     const btn = $('#saveBtn'); if (btn) { btn.disabled = !n; btn.textContent = n ? `Save ${n} change${n === 1 ? '' : 's'}` : 'Saved'; }
     S.dirtyCount = n;
@@ -614,6 +670,26 @@ async function guardDirty() {
   const ok = await confirmDialog('Leave without saving?', 'You have unsaved changes on this record. Leaving discards them.', 'Discard changes');
   if (ok) S.dirtyCount = 0;
   return ok;
+}
+function tabs(list) {
+  return `<div class="tabs">${list.map((x, i) => `<button data-tab="${x.id}" class="${i === 0 ? 'active' : ''}">${esc(x.label)}${x.count !== undefined ? ` <span class="n">${x.count}</span>` : ''}<span class="dirtydot"></span></button>`).join('')}</div>`;
+}
+function wireTabs(root, initial) {
+  const show = id => {
+    $$('.tabs button', root).forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+    $$('.tabpanel', root).forEach(p => p.classList.toggle('active', p.dataset.panel === id));
+    S.tab = id;
+  };
+  $$('.tabs button', root).forEach(b => b.onclick = () => show(b.dataset.tab));
+  const bar = $('.tabs', root), c = $('.crumbs', root), h = $('.edhead', root);
+  if (bar && c && h) bar.style.top = (c.offsetHeight + h.offsetHeight) + 'px';
+  show(initial && $(`.tabs [data-tab="${initial}"]`, root) ? initial : $('.tabs button', root).dataset.tab);
+}
+// Three "heading + text" rows for the page body, the way a teacher sees them.
+function textRows(rec, rows) {
+  return `<div class="textrows">${rows.map(([h, tx, label]) => `
+    <div class="field" data-field="${h}"><label>${label} heading</label><input type="text" name="${h}" value="${esc(rec[h] ?? '')}" list="subheads"></div>
+    <div class="field" data-field="${tx}"><label>${label} text</label><textarea name="${tx}" rows="3">${esc(rec[tx] ?? '')}</textarea></div>`).join('')}</div>`;
 }
 function crumbs(parts) {
   return `<div class="crumbs">${parts.map((p, i) => (i ? '<span class="sep">/</span>' : '') + (p.onclick ? `<button data-crumb="${i}">${esc(p.label)}</button>` : `<span class="cur">${esc(p.label)}</span>`)).join('')}</div>`;
@@ -643,16 +719,18 @@ async function openScheme(id) {
     body_subheading_3: full.body_subheading_3, body_subheading_3_text: full.body_subheading_3_text,
     duration_label: full.duration_label, length_label: full.length_label, search_terms_additional: full.search_terms_additional,
   };
+  const liveLessons = lessons.filter(l => l.is_live).length;
   ed.innerHTML = `
     ${crumbs([cat ? { label: cat.name, onclick: true } : { label: 'Scheme' }, { label: full.name }])}
     <div class="edhead"><h1>${esc(full.name)}<span class="id">SID ${full.id}</span></h1>
       <label class="switch" title="Live schemes with at least one live lesson appear on the platform"><input type="checkbox" id="schemeLive" ${full.live_flag ? 'checked' : ''}> ${full.live_flag ? 'Live' : 'Hidden'}</label>
       ${full.qb_record_id ? '' : '<button class="btn danger sm" id="deleteScheme">Delete</button>'}
       <button class="btn primary" id="saveBtn" disabled>Saved</button></div>
-    <div class="panel"><h3>Lessons <span class="small muted">${lessons.length} · drag to reorder, click to open</span></h3><div class="body childlist">
+    ${tabs([{ id: 'lessons', label: 'Lessons', count: `${liveLessons} live of ${lessons.length}` }, { id: 'details', label: 'Details' }, { id: 'text', label: 'Page text' }, { id: 'place', label: 'Placement', count: `${catIds.length} categor${catIds.length === 1 ? 'y' : 'ies'}` }])}
+    <div class="tabpanel" data-panel="lessons"><div class="panel"><h3>Lessons <span class="small muted">drag to reorder, click to open</span></h3><div class="body childlist">
       <div class="rows" id="lessonRows">${sortBy(lessons, 'order').map((l, i) => lessonRow(l, i)).join('') || '<div class="empty">No lessons yet.</div>'}</div>
-      <div style="margin-top:10px"><button class="btn sm" id="newLesson">+ New lesson</button></div></div></div>
-    <div class="panel" id="schemeForm"><h3>Scheme details</h3><div class="body"><div class="grid">
+      <div style="margin-top:10px"><button class="btn sm" id="newLesson">+ New lesson</button></div></div></div></div>
+    <div class="tabpanel" data-panel="details"><div class="panel" id="schemeForm"><h3>Scheme details</h3><div class="body"><div class="grid">
       ${field('Display name', 'name', full.name)}
       ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only; shown in lists and Quickbase' })}
       ${field('Management group', 'management_group', full.management_group, { type: 'select', choices: CHOICES.group, blank: 'Not set' })}
@@ -660,28 +738,32 @@ async function openScheme(id) {
       ${field('Duration label', 'duration_label', full.duration_label, { help: 'e.g. 40 minutes' })}
       ${field('Length label', 'length_label', full.length_label, { help: 'e.g. 3 sessions' })}
       ${field('Description', 'description', full.description, { type: 'textarea', span: true })}
-      ${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true })}
-      ${field('Sub heading 1', 'body_subheading_1', full.body_subheading_1, { list: 'subheads' })}
-      ${field('Sub heading 1 text', 'body_subheading_1_text', full.body_subheading_1_text, { type: 'textarea' })}
-      ${field('Sub heading 2', 'body_subheading_2', full.body_subheading_2, { list: 'subheads' })}
-      ${field('Sub heading 2 text', 'body_subheading_2_text', full.body_subheading_2_text, { type: 'textarea' })}
-      ${field('Sub heading 3', 'body_subheading_3', full.body_subheading_3, { list: 'subheads' })}
-      ${field('Sub heading 3 text', 'body_subheading_3_text', full.body_subheading_3_text, { type: 'textarea' })}
-      ${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
       ${field('Extra search terms', 'search_terms_additional', full.search_terms_additional, { span: true, help: 'Comma separated' })}
+    </div><div class="small muted" style="margin-top:12px">Images: <a href="${esc(full.image)}" target="_blank">standard</a> · <a href="${esc(full.image_featured)}" target="_blank">featured</a> · <a href="${esc(full.image_tall)}" target="_blank">tall</a> (uploads are not part of this proof of concept)</div></div></div></div>
+    <div class="tabpanel" data-panel="text"><div class="panel" id="schemeText"><h3>Scheme page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body">
+      <div class="grid">${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}</div>
+      <div style="height:12px"></div>
+      ${textRows(full, [['body_subheading_1', 'body_subheading_1_text', 'Section 1'], ['body_subheading_2', 'body_subheading_2_text', 'Section 2'], ['body_subheading_3', 'body_subheading_3_text', 'Section 3']])}
+      <div style="height:12px"></div>
+      <div class="grid">${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}</div>
     </div></div></div>
-    <div class="panel"><h3>Where it appears</h3><div class="body">
-      <div class="grid"><div class="field"><label>Categories (in position order)</label><div id="schemeCats">${catIds.map(c => catChip(c)).join('')}</div>
-        <div style="margin-top:8px"><select id="addCat"><option value="">Add to a category…</option>${S.cats.filter(c => !catIds.includes(c.id)).map(c => `<option value="${c.id}">${esc(catPath(c))}</option>`).join('')}</select></div>
-        <div class="help">A scheme can sit in up to six categories. Its order number is shared across all of them.</div></div>
-      <div class="field"><label>Subjects</label><div>${subjIds.map(i => `<span class="pill hidden">${esc((byId(S.subjects, i) || { name: i }).name)}</span> `).join('') || '<span class="muted">None</span>'}</div>
-        <div class="help">Subject links follow the categories; editing them directly is a later step.</div></div></div>
-      <div style="margin-top:12px" class="small muted">Images: <a href="${esc(full.image)}" target="_blank">standard</a> · <a href="${esc(full.image_featured)}" target="_blank">featured</a> · <a href="${esc(full.image_tall)}" target="_blank">tall</a> (uploads are not part of this proof of concept)</div>
-    </div></div>
+    <div class="tabpanel" data-panel="place"><div class="panel"><h3>Where it appears</h3><div class="body">
+      <div class="grid">
+        <div class="field"><label>Categories</label>
+          <div class="place" id="placeList">${placementItems(catIds)}</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="pickCats">Choose categories</button></div>
+          <div class="help">The first is the home category: it sets the background image and the primary subject. Drag to change. A scheme can sit in up to six categories; its position number is shared across all of them (a Quickbase limit).</div></div>
+        <div class="field"><label>Subjects</label>
+          <div id="subjChips">${subjIds.map(i => `<span class="pill hidden" style="margin:0 6px 6px 0">${esc((byId(S.subjects, i) || { name: i }).name)} <button class="btn quiet sm" data-unsubj="${i}" title="Remove" style="padding:0 4px;margin-left:2px">×</button></span>`).join('') || '<span class="muted">None</span>'}</div>
+          <div style="margin-top:8px"><select id="addSubj"><option value="">Add a subject…</option>${S.subjects.filter(x => !subjIds.includes(x.id)).map(x => `<option value="${x.id}">${esc(x.name)}${x.is_live ? '' : ' (hidden)'}</option>`).join('')}</select></div>
+          <div class="help">A category's subject is added automatically when you add the category. Extra subjects (for search and filters) can be added here.</div></div>
+      </div>
+    </div></div></div>
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
+  wireTabs(ed, S.tab);
   $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; S.schemeId = null; renderList(); });
-  wireForm($('#schemeForm'), orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; });
+  wireForm(ed, orig, async d => { const row = await update('schemes', id, d); Object.assign(s, { name: row.name, internal_name: row.internal_name, management_group: row.management_group }); $('.edhead h1', ed).innerHTML = `${esc(row.name)}<span class="id">SID ${row.id}</span>`; });
   $('#schemeLive').onchange = async e => {
     if (!requireWrite()) { e.target.checked = !e.target.checked; return; }
     try { const row = await update('schemes', id, { live_flag: e.target.checked }); Object.assign(s, { live_flag: row.live_flag, is_live: row.is_live }); e.target.parentElement.lastChild.textContent = row.live_flag ? ' Live' : ' Hidden'; toast(row.live_flag ? 'Scheme is live' : 'Scheme hidden'); refreshPending(); openScheme(id); }
@@ -702,20 +784,83 @@ async function openScheme(id) {
     try { await rpc('resequence_lessons', { p_ids: ids }); toast('Lesson order saved'); refreshPending(); openScheme(id); }
     catch (e) { toast(explainError(e), true); openScheme(id); }
   }});
-  $('#addCat').onchange = async e => {
-    const cid = +e.target.value; if (!cid || !requireWrite()) { e.target.value = ''; return; }
-    try { await insert('scheme_subcategories', { scheme_id: id, subcategory_id: cid, position: catIds.length + 1 }); S.schemeCats.push({ scheme_id: id, subcategory_id: cid, position: catIds.length + 1 }); toast('Added to category'); renderTree(); refreshPending(); openScheme(id); }
+
+  // Placement
+  const savePlacement = async ids => {
+    if (!requireWrite()) { openScheme(id); return; }
+    if (!ids.length && !await confirmDialog('Remove the last category?', 'A scheme with no category is not reachable on the platform.', 'Remove')) { openScheme(id); return; }
+    try { await rpc('set_scheme_placement', { p_scheme_id: id, p_category_ids: ids }); await reloadLinks(id); toast('Placement saved'); renderTree(); refreshPending(); openScheme(id); }
+    catch (e) { toast(explainError(e), true); openScheme(id); }
+  };
+  const wirePlace = () => {
+    $$('[data-unplace]', ed).forEach(b => b.onclick = () => savePlacement(catIds.filter(c => c !== +b.dataset.unplace)));
+    $$('[data-makehome]', ed).forEach(b => b.onclick = () => { const c = +b.dataset.makehome; savePlacement([c, ...catIds.filter(x => x !== c)]); });
+    if (catIds.length > 1) Sortable.create($('#placeList'), { handle: '.handle', animation: 150, onEnd: () => savePlacement($$('#placeList .item').map(x => +x.dataset.cat)) });
+  };
+  wirePlace();
+  $('#pickCats').onclick = async () => { const ids = await pickCategories(catIds); if (ids) savePlacement(ids); };
+  $('#addSubj').onchange = async e => {
+    const sid = +e.target.value; if (!sid || !requireWrite()) { e.target.value = ''; return; }
+    try { await rpc('set_scheme_subjects', { p_scheme_id: id, p_subject_ids: [...subjIds, sid] }); await reloadLinks(id); toast('Subject added'); refreshPending(); openScheme(id); }
     catch (err) { toast(explainError(err), true); e.target.value = ''; }
   };
-  $$('[data-uncat]', ed).forEach(b => b.onclick = async () => {
-    const cid = +b.dataset.uncat; if (!requireWrite()) return;
-    if (catIds.length === 1 && !await confirmDialog('Remove the last category?', 'A scheme with no category is not reachable on the platform.', 'Remove')) return;
-    try { await api('DELETE', `scheme_subcategories?scheme_id=eq.${id}&subcategory_id=eq.${cid}`); S.schemeCats = S.schemeCats.filter(l => !(l.scheme_id === id && l.subcategory_id === cid)); toast('Removed from category'); renderTree(); refreshPending(); openScheme(id); }
+  $$('[data-unsubj]', ed).forEach(b => b.onclick = async () => {
+    if (!requireWrite()) return;
+    try { await rpc('set_scheme_subjects', { p_scheme_id: id, p_subject_ids: subjIds.filter(x => x !== +b.dataset.unsubj) }); await reloadLinks(id); toast('Subject removed'); refreshPending(); openScheme(id); }
     catch (err) { toast(explainError(err), true); }
   });
 }
+function placementItems(catIds) {
+  if (!catIds.length) return '<div class="empty" style="padding:12px">Not in any category yet.</div>';
+  return catIds.map((cid, i) => { const c = byId(S.cats, cid); const g = c && byId(S.groups, c.subgroup_id), sub = c && byId(S.subjects, c.subject_id);
+    return `<div class="item ${i === 0 ? 'home' : ''}" data-cat="${cid}"><span class="handle" title="Drag to reorder">${ICON.grip}</span>
+      <div class="path"><b>${esc(c ? c.name : `Category ${cid}`)}${c && !c.is_live ? ' <span class="pill hidden">Hidden</span>' : ''}</b><span>${esc([sub && sub.name, g && g.name].filter(Boolean).join(' / '))}</span></div>
+      ${i === 0 ? '<span class="pill new">Home</span>' : `<button class="btn quiet sm" data-makehome="${cid}">Make home</button>`}
+      <button class="btn quiet sm" data-unplace="${cid}" title="Remove from this category">×</button></div>`; }).join('');
+}
+async function reloadLinks(schemeId) {
+  const [sc, sj] = await Promise.all([
+    get(`scheme_subcategories?scheme_id=eq.${schemeId}&select=scheme_id,subcategory_id,position`),
+    get(`scheme_subjects?scheme_id=eq.${schemeId}&select=scheme_id,subject_id,position`),
+  ]);
+  S.schemeCats = S.schemeCats.filter(l => l.scheme_id !== schemeId).concat(sc);
+  S.schemeSubjects = S.schemeSubjects.filter(l => l.scheme_id !== schemeId).concat(sj);
+}
+// Tree picker: subject > group > category with tick boxes; returns the new ordered list
+// (existing order kept, new ticks added at the end) or null when cancelled.
+function pickCategories(current) {
+  return new Promise(res => {
+    const m = $('#picker'); $('#pickerTitle').textContent = 'Choose categories';
+    const q = $('#pickerQ'), f = $('#pickerFilter'), body = $('#pickerBody');
+    f.innerHTML = '<option value="">All</option><option value="live">Live only</option>';
+    const chosen = new Set(current);
+    const catCount = {}; for (const l of S.schemeCats) catCount[l.subcategory_id] = (catCount[l.subcategory_id] || 0) + 1;
+    const draw = () => {
+      const term = q.value.trim().toLowerCase(), liveOnly = f.value === 'live';
+      const html = [];
+      for (const sub of S.subjects) {
+        const groups = S.groups.filter(g => g.subject_id === sub.id);
+        const blocks = [];
+        const catLine = c => (liveOnly && !c.is_live) || (term && !c.name.toLowerCase().includes(term) && !sub.name.toLowerCase().includes(term)) ? '' :
+          `<label class="c"><input type="checkbox" value="${c.id}" ${chosen.has(c.id) ? 'checked' : ''}><span class="${c.is_live ? '' : 'off'}">${esc(c.name)}</span><span class="count">${catCount[c.id] || ''}</span></label>`;
+        for (const g of groups) { const cs = S.cats.filter(c => c.subgroup_id === g.id).map(catLine).filter(Boolean); if (cs.length) blocks.push(`<details class="g" ${term || cs.some(x => x.includes('checked')) ? 'open' : ''}><summary><span class="${g.is_live ? '' : 'off'}">${esc(g.name)}</span><span class="count">${cs.length}</span></summary>${cs.join('')}</details>`); }
+        const loose = S.cats.filter(c => c.subject_id === sub.id && !groups.some(g => g.id === c.subgroup_id)).map(catLine).filter(Boolean);
+        if (loose.length) blocks.push(`<details class="g" ${term ? 'open' : ''}><summary><span class="muted">No group</span><span class="count">${loose.length}</span></summary>${loose.join('')}</details>`);
+        if (blocks.length) html.push(`<details ${term || blocks.some(x => x.includes('checked')) ? 'open' : ''}><summary><span class="${sub.is_live ? '' : 'off'}">${esc(sub.name)}</span></summary>${blocks.join('')}</details>`);
+      }
+      body.innerHTML = `<div class="picktree">${html.join('') || '<div class="empty">Nothing matches.</div>'}</div>`;
+      $$('input[type=checkbox]', body).forEach(cb => cb.onchange = () => { cb.checked ? chosen.add(+cb.value) : chosen.delete(+cb.value); $('#pickerCount').textContent = `${chosen.size} chosen`; });
+      $('#pickerCount').textContent = `${chosen.size} chosen`;
+    };
+    const foot = $('.mfoot', m); const okBtn = document.createElement('button'); okBtn.className = 'btn primary'; okBtn.textContent = 'Use these categories'; foot.appendChild(okBtn);
+    const done = v => { m.classList.remove('open'); q.oninput = null; f.onchange = null; okBtn.remove(); res(v); };
+    okBtn.onclick = () => { const kept = current.filter(c => chosen.has(c)); const added = [...chosen].filter(c => !current.includes(c)); done([...kept, ...added]); };
+    q.value = ''; q.oninput = draw; f.onchange = draw; draw();
+    m.classList.add('open'); q.focus();
+    $$('[data-close]', m).forEach(b => b.onclick = () => done(null));
+  });
+}
 function catPath(c) { const g = byId(S.groups, c.subgroup_id), sub = byId(S.subjects, c.subject_id); return [sub && sub.name, g && g.name, c.name].filter(Boolean).join(' / '); }
-function catChip(cid) { const c = byId(S.cats, cid); return `<span class="pill hidden" style="margin:0 6px 6px 0">${esc(c ? catPath(c) : `Category ${cid}`)} <button class="btn quiet sm" data-uncat="${cid}" title="Remove from this category" style="padding:0 4px;margin-left:2px">×</button></span>`; }
 function lessonRow(l, i) {
   const ages = l.age_min ? `ages ${l.age_min}-${l.age_max}` : '';
   return `<div class="row" data-id="${l.id}"><span class="handle" title="Drag to reorder">${ICON.grip}</span><span class="num">${i + 1}</span>
@@ -731,9 +876,8 @@ async function newScheme(cat) {
   try {
     const maxOrder = Math.max(0, ...schemesInCat(cat.id).map(s => s.order || 0));
     const row = await insert('schemes', { name, internal_name: name, live_flag: false, order: maxOrder + 10 });
-    await insert('scheme_subcategories', { scheme_id: row.id, subcategory_id: cat.id, position: 1 });
-    if (cat.subject_id) await insert('scheme_subjects', { scheme_id: row.id, subject_id: cat.subject_id, position: 1 }).catch(() => {});
-    S.schemes.push(row); S.schemeCats.push({ scheme_id: row.id, subcategory_id: cat.id, position: 1 });
+    await rpc('set_scheme_placement', { p_scheme_id: row.id, p_category_ids: [cat.id] });
+    S.schemes.push(row); await reloadLinks(row.id);
     toast('Scheme created'); renderTree(); refreshPending(); openScheme(row.id);
   } catch (e) { toast(explainError(e), true); }
 }
@@ -764,8 +908,8 @@ async function openLesson(id) {
     has_downloads: full.has_downloads, has_lesson_plan: full.has_lesson_plan, has_assessment_template: full.has_assessment_template,
     search_additional: full.search_additional, background_image_id: full.background_image_id,
   };
-  const live = sortBy(parts.filter(p => p.is_live && !p.is_archived), 'index');
   const archived = parts.filter(p => p.is_archived);
+  const livePartCount = parts.filter(p => p.is_live && !p.is_archived).length;
   ed.innerHTML = `
     ${crumbs([cat ? { label: cat.name, onclick: 'cat' } : null, { label: scheme ? scheme.name : 'Scheme', onclick: 'scheme' }, { label: full.name }].filter(Boolean))}
     <div class="edhead"><h1>${esc(full.name)}<span class="id">LID ${full.id}</span></h1>
@@ -773,12 +917,13 @@ async function openLesson(id) {
       ${scheme && !scheme.live_flag ? '<span class="pill hidden" title="This lesson cannot show until its scheme is live">Scheme hidden</span>' : ''}
       ${full.qb_record_id ? '' : '<button class="btn danger sm" id="deleteLesson">Delete</button>'}
       <button class="btn primary" id="saveBtn" disabled>Saved</button></div>
-    <div class="panel"><h3>Parts <span class="small muted">${parts.length - archived.length} · drag to reorder, click a row to edit</span></h3><div class="body childlist">
+    ${tabs([{ id: 'parts', label: 'Parts', count: `${livePartCount} live of ${parts.length - archived.length}` }, { id: 'details', label: 'Details' }, { id: 'text', label: 'Page text' }])}
+    <div class="tabpanel" data-panel="parts"><div class="panel"><h3>Parts <span class="small muted">drag to reorder, click a row to edit</span></h3><div class="body childlist">
       <div class="rows" id="partRows">${sortBy(parts.filter(p => !p.is_archived), 'index').map(p => partCard(p)).join('') || '<div class="empty">No parts yet. Add a video, audio file, slideshow, download, image or text block.</div>'}</div>
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${CHOICES.media.map(m => `<button class="btn sm" data-addpart="${esc(m)}">+ ${esc(m)}</button>`).join('')}</div>
       ${archived.length ? `<details style="margin-top:12px"><summary class="small muted" style="cursor:pointer">${archived.length} archived part${archived.length === 1 ? '' : 's'}</summary><div class="rows" style="margin-top:6px">${archived.map(p => partCard(p, true)).join('')}</div></details>` : ''}
-    </div></div>
-    <div class="panel" id="lessonForm"><h3>Lesson details</h3><div class="body"><div class="grid">
+    </div></div></div>
+    <div class="tabpanel" data-panel="details"><div class="panel" id="lessonForm"><h3>Lesson details</h3><div class="body"><div class="grid">
       ${field('Title', 'name', full.name)}
       ${field('Internal name', 'internal_name', full.internal_name, { help: 'Staff-only' })}
       ${field('Sub title', 'sub_title', full.sub_title, { help: 'Shown under the title; falls back to the short description' })}
@@ -795,21 +940,19 @@ async function openLesson(id) {
       <div class="field span" data-field="has"><label>Content icons shown on the lesson list</label>
         ${[['has_video', 'Video'], ['has_audio', 'Audio'], ['has_slides', 'Slides'], ['has_downloads', 'Downloads'], ['has_lesson_plan', 'Lesson plan'], ['has_assessment_template', 'Assessment template']].map(([k, l]) => `<label class="check"><input type="checkbox" name="${k}" ${full[k] ? 'checked' : ''}>${l}</label>`).join('')}
         <div class="help">These are set by hand in Quickbase today; a later version can derive them from the parts.</div></div>
-    </div></div></div>
-    <div class="panel" id="lessonBody"><h3>Lesson page text</h3><div class="body"><div class="grid">
-      ${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}
-      ${field('Sub heading 1', 'body_subheading_1', full.body_subheading_1, { list: 'subheads' })}
-      ${field('Sub heading 1 text', 'body_subheading_1_text', full.body_subheading_1_text, { type: 'textarea' })}
-      ${field('Sub heading 2', 'body_subheading_2', full.body_subheading_2, { list: 'subheads' })}
-      ${field('Sub heading 2 text', 'body_subheading_2_text', full.body_subheading_2_text, { type: 'textarea' })}
-      ${field('Sub heading 3', 'body_subheading_3', full.body_subheading_3, { list: 'subheads' })}
-      ${field('Sub heading 3 text', 'body_subheading_3_text', full.body_subheading_3_text, { type: 'textarea' })}
-      ${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
-      ${field('Long description (legacy)', 'description_long', full.description_long, { type: 'textarea', span: true, help: 'Used by the old lesson page only' })}
       ${field('Extra search terms', 'search_additional', full.search_additional, { span: true, help: 'Comma separated' })}
+    </div></div></div></div>
+    <div class="tabpanel" data-panel="text"><div class="panel" id="lessonBody"><h3>Lesson page text <span class="small muted">in the order a teacher reads it</span></h3><div class="body">
+      <div class="grid">${field('Opening text', 'body_opening_text', full.body_opening_text, { type: 'textarea', span: true, rows: 5 })}</div>
+      <div style="height:12px"></div>
+      ${textRows(full, [['body_subheading_1', 'body_subheading_1_text', 'Section 1'], ['body_subheading_2', 'body_subheading_2_text', 'Section 2'], ['body_subheading_3', 'body_subheading_3_text', 'Section 3']])}
+      <div style="height:12px"></div>
+      <div class="grid">${field('Closing text', 'body_closing_text', full.body_closing_text, { type: 'textarea', span: true })}
+      ${field('Long description (legacy)', 'description_long', full.description_long, { type: 'textarea', span: true, help: 'Used by the old lesson page only' })}</div>
     </div></div></div>
     <datalist id="subheads">${CHOICES.subheadings.map(c => `<option value="${esc(c)}">`).join('')}</datalist>`;
 
+  wireTabs(ed, S.tab);
   const crumbParts = [cat ? 'cat' : null, 'scheme'].filter(Boolean);
   $$('[data-crumb]', ed).forEach(b => b.onclick = async () => { if (!await guardDirty()) return; if (crumbParts[+b.dataset.crumb] === 'cat') { S.schemeId = null; S.lessonId = null; renderList(); } else openScheme(full.scheme_id); });
   const formRoot = ed; // both panels share one save button
