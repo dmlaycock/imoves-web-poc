@@ -257,12 +257,15 @@ footer { text-align: center; color: var(--mid-purple); font-size: .85rem; paddin
 <script>
 const SUPABASE_URL = 'https://oscnzixjjganyzjppqqb.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_5XkVClKKeE1nbm1lRAqB5w_TAgaRNVE';
+// Which database schema to read: '' is the live public schema; a frozen demo build names its snapshot schema.
+const SUPABASE_SCHEMA = '';
 const CF = 'https://d1i2jq09uv1ah.cloudfront.net/';
 
 // ---------- data access (PostgREST) ----------
 async function rest(path, { all = false } = {}) {
   // Publishable keys (sb_publishable_...) go in the apikey header only; legacy anon JWTs also as a bearer token.
   const headers = SUPABASE_KEY.startsWith('sb_') ? { apikey: SUPABASE_KEY } : { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+  if (SUPABASE_SCHEMA && !SUPABASE_SCHEMA.startsWith('__')) headers['Accept-Profile'] = SUPABASE_SCHEMA;
   if (!all) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers });
     if (!r.ok) throw new Error(`${path}: ${r.status}`);
@@ -677,7 +680,7 @@ function pageBrowse() {
 (async () => {
   try {
     await loadTree();
-    document.getElementById('stamp').textContent = '2026-10-20';
+    document.getElementById('stamp').textContent = '2026-10-23';
     renderSubjectBar();
     const picker = document.getElementById('classage');
     try { picker.value = localStorage.getItem('imoves.classAge') || ''; } catch (e) {}
