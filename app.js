@@ -443,7 +443,6 @@ async function startApp() {
   try {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
     await loadTree();
-    document.getElementById('stamp').textContent = LOADED_AT;
     renderSubjectBar();
     const picker = document.getElementById('classage');
     // "My class": the stored choice, or the age range saved on the account (users.ages)
@@ -457,5 +456,6 @@ async function startApp() {
   }
 }
 (async () => {
+  document.getElementById('stamp').textContent = LOADED_AT;
   if (await Auth.init()) await startApp();
 })();
