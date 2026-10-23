@@ -1,7 +1,8 @@
 // Phase 1 auth: Supabase email + password over the GoTrue REST API (no SDK, matching the
-// page's plain-fetch style). Teachers sign in with their real platform credentials
-// (synced from Quickbase by the "Web PoC auth export" workflow); CMS/accounts staff
-// log-ins work here too. After a fresh sign-in the page logs the login and takes the
+// page's plain-fetch style). Only Quickbase Users credentials work (decision 23 Oct
+// 2026): everyone signs in with their real platform email and password, synced from
+// Quickbase by the "Web PoC auth export" workflow; accounts on the staff list carry a
+// staff badge. After a fresh sign-in the page logs the login and takes the
 // single-session token (web_login in web-poc/db/030_phase1_auth.sql); signing in
 // elsewhere rotates the token, and this page notices and signs out - the live
 // platform's single-session design, enforced here because its own middleware never was
@@ -43,18 +44,18 @@ const Auth = (() => {
   }
 
   // After a session exists: profile, login log + single-session token, top bar.
+  // Every account is a Quickbase teacher (only Quickbase credentials work); staff
+  // is just an extra claim on some of them, shown as a badge.
   async function afterAuth(freshSignIn) {
-    if (isStaff()) { me = { staff: true }; }
-    else {
-      try { const rows = await rpc('web_me'); me = (rows && rows[0]) || null; } catch (e) { me = null; }
-      let token = lsGet(LS_TOKEN);
-      if (freshSignIn || !token) {
-        try { token = await rpc('web_login', { p_login_cookie: loginCookie(), p_user_agent: navigator.userAgent }); lsSet(LS_TOKEN, token); }
-        catch (e) { /* login logging is best-effort */ }
-      } else if (!(await sessionStillOk())) { signOut('elsewhere'); return false; }
-      if (timer) clearInterval(timer);
-      timer = setInterval(watch, 5 * 60 * 1000);
-    }
+    try { const rows = await rpc('web_me'); me = (rows && rows[0]) || null; } catch (e) { me = null; }
+    if (isStaff()) me = Object.assign(me || {}, { staff: true });
+    let token = lsGet(LS_TOKEN);
+    if (freshSignIn || !token) {
+      try { token = await rpc('web_login', { p_login_cookie: loginCookie(), p_user_agent: navigator.userAgent }); lsSet(LS_TOKEN, token); }
+      catch (e) { /* login logging is best-effort */ }
+    } else if (!(await sessionStillOk())) { signOut('elsewhere'); return false; }
+    if (timer) clearInterval(timer);
+    timer = setInterval(watch, 5 * 60 * 1000);
     renderUser();
     return true;
   }
@@ -64,7 +65,7 @@ const Auth = (() => {
     try { return (await rpc('web_session_ok', { p_token: token })) !== false; }
     catch (e) { return true; }   // a network blip never signs anyone out
   }
-  async function watch() { if (session && !isStaff() && !(await sessionStillOk())) signOut('elsewhere'); }
+  async function watch() { if (session && !(await sessionStillOk())) signOut('elsewhere'); }
 
   async function init() {
     try { session = JSON.parse(lsGet(LS_SESSION) || 'null'); } catch (e) { session = null; }
@@ -101,7 +102,7 @@ const Auth = (() => {
     if (!el) return;
     document.body.classList.toggle('signed-out', !session);
     if (!session) { el.innerHTML = ''; return; }
-    const name = me && me.first_name ? `${me.first_name} ${me.last_name || ''}`.trim() : (me && me.staff ? 'Staff' : 'Signed in');
+    const name = me && me.first_name ? `${me.first_name} ${me.last_name || ''}`.trim() : (me && me.email) || 'Signed in';
     el.innerHTML = `<span class="userchip" title="${esc(me && me.email || '')}"><i class="bi-person-circle"></i> ${esc(name)}${me && me.staff ? ' <span class="badge purple">Staff</span>' : ''}</span>` +
       `<button class="nbtn" id="logoutbtn" type="button"><i class="bi-box-arrow-right"></i> Log out</button>`;
     document.getElementById('logoutbtn').addEventListener('click', () => signOut('bye'));
