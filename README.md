@@ -19,3 +19,6 @@ concept (source: `accounts-poc/site/index.html` in the `imoves` repository). Eve
 is personal data, so nothing is shown without a Supabase Auth login; the database allows the
 signed-in staff role only. Its tables are loaded by the "Accounts PoC database" workflow in
 that repository.
+
+`version-b/index.html` is the teacher view at v0.23 playing videos from Cloudflare Stream, with
+Wistia as the fallback (see `version-b/README.md`). The root page and `demo/` still use Wistia.
