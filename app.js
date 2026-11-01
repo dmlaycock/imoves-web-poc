@@ -1157,9 +1157,11 @@ function resultPanels(lessons, withCounts) {
     const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
     // The lesson's own subjects (Lessons fid 944), as ResultsController does; a lesson sits under
     // each subject it belongs to. Fallback: the subject of its first category.
-    let subjects = (l.subject_ids || []).map(id => D.subjectById[+id]).filter(s => s && canViewSubject(s));
-    if (!subjects.length) { const s = sc && D.subjectById[sc.subject_id]; subjects = s ? [s] : [null]; }
-    for (const subj of subjects) (bySubject[subj ? subj.name : 'Other'] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
+    // SubjectPolicy::search: all-content users, or the subject is in the user's subject or niche lists.
+    const canSearch = s => s && (withCounts || E.allContent || E.subjectIds.has(s.id));   // favourites: every subject (showFavourites has no policy)
+    let subjects = (l.subject_ids || []).map(id => D.subjectById[+id]).filter(canSearch);
+    if (!subjects.length && !(l.subject_ids || []).length) { const s = sc && D.subjectById[sc.subject_id]; if (canSearch(s)) subjects = [s]; }   // no subject data at all: the category's subject
+    for (const subj of subjects) (bySubject[subj.name] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
   let html = '';
   for (const name of Object.keys(bySubject).sort((x, y) => x.localeCompare(y))) {
