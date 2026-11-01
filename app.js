@@ -413,12 +413,16 @@ function subcatCard(sc, { heading, sub, cols } = {}) {
     (lessons.length ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-collection-play text-primary me-1"></i> ${lessons.length} ${esc(noun(sc, lessons.length))}</span></li>` : '') +
     (vid ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-film text-primary me-1"></i> ${esc(vid)} video</span></li>` : '') +
     (subcatIsFree(sc) ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-end align-items-center"><span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span></li>` : '');
+  // Mobile variant (below md): image left, title right, fw-light meta - the "<!-- mobile -->" card in the partial.
+  const metaMobile = meta.replace(/<span class="text-primary">/g, '<span class="fw-light text-primary">');
+  const mobile = `<div class="card subcategory-card h-100 shadow-sm d-flex flex-column d-md-none"><div class="border-bottom border-primary"><div class="row"><div class="col-5"><img src="${esc(img(sc.image))}" class="w-100 border-primary border-right border-end rounded-top-left" alt="${esc(sc.name)}" loading="lazy"></div><div class="col-7 ms-n2 d-flex align-items-center"><div class="h5 text-primary my-2 card-title">${esc(limit(heading || sc.name, 30))}</div></div></div></div>
+    <div class="card-body p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-3 d-flex flex-column w-100 h-100 justify-content-center"><h6 class="subcategory-card--subheading fw-light text-mid-purple my-0 mx-3 card-title">${esc(limit(subheading || '', 200))}</h6><ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple i-small text-nowrap justify-content-around">${metaMobile}</ul></div></div></div></div>`;
   return `<div class="${cols || 'col-12 col-md-6 col-lg-6 col-xl-3 mb-4'}"><a href="${subcatHref(sc)}" title="${esc(sc.name)}" class="text-decoration-none">
-    <div class="card subcategory-card lift shadow-sm d-flex flex-column h-100"><img src="${esc(img(sc.image))}" class="card-img-top" alt="${esc(sc.name)}" loading="lazy">
+    <div class="card subcategory-card lift shadow-sm d-none d-md-flex flex-column h-100"><img src="${esc(img(sc.image))}" class="card-img-top" alt="${esc(sc.name)}" loading="lazy">
     <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center">
       <h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>
       ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
-    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div></a></div>`;
+    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div>${mobile}</a></div>`;
 }
 
 // ---------- teacher actions (v0.27) ----------
@@ -459,6 +463,7 @@ function paintStates() {
   document.querySelectorAll('[data-fav-for]').forEach(el => {
     const on = MY.fav.has(+el.dataset.favFor); const row = el.dataset.favKind === 'icon';
     if (row) { el.innerHTML = on ? '<i class="bi-star-fill text-warning"></i>' : '<i class="bi-star text-mid-purple"></i>'; el.title = on ? 'Remove from Favourites' : 'Add to Favourites'; }
+    else if (el.dataset.favKind === 'mobile') { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? 'Unfavourite' : '<span class="d-inline">Favourite</span>'; }   // lessons/show.blade.php d-lg-none buttons
     else { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? `<i class="bi-star-fill text-warning me-2"></i>Favourite ${esc(el.dataset.label)}` : `<i class="bi-star me-2"></i>Add to <span class="d-none d-xl-inline">Favourite ${esc(el.dataset.labels)}</span><span class="d-inline d-xl-none">Favourites</span>`; }
   });
   document.querySelectorAll('[data-done-for]').forEach(el => {
@@ -1030,10 +1035,10 @@ async function pageLesson(id, scId) {
       ${item('bi-lightning-charge', l.intensity)}${item('bi-lightbulb', l.focus)}${item('bi-clock', l.duration ? `About ${l.duration}m long` : '')}${item('bi-building', l.location && l.location.length ? `In the ${l.location.join(', ')}` : '')}${item('bi-watch', l.preparation ? `Prep in ${l.preparation}m` : '')}
     </div></div></div></div>
     <hr class="d-none d-lg-block mx-lg-2 ${bg ? 'border-mid-purple' : ''}">
-    <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-done-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}"></button></div>
+    <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="d-lg-none mx-2 btn shadow add-to-favourites ${btn}" data-fav-for="${l.id}" data-fav-kind="mobile" data-bg="${bg ? 1 : 0}"></button><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-done-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}"></button></div>
     <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
     <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-fav-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}" data-labels="${esc(Labels)}"></button></div>
-    ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div><div class="d-none d-lg-block my-4 px-2 text-primary" id="readings"></div>` : ''}
+    ${l.show_assessment ? `<div class="d-lg-none px-2 mb-3 row"><div class="col"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}">Thumb-o-meter</button></div><div class="col d-flex align-items-center"><a href="#" class="fw-bold text-decoration-underline" id="past-readings">Past measurements</a></div></div><div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div><div class="d-none d-lg-block my-4 px-2 text-primary" id="readings"></div>` : ''}
     <div class="my-4 px-2"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus me-1"></i> Add to Curriculum</button></div>
   </div></div>`;
   app.innerHTML = html;
@@ -1041,7 +1046,14 @@ async function pageLesson(id, scId) {
   bindParts(app);
   bindActions(app);
   logView(l.id);
-  if (l.show_assessment) { renderReadings(l.id); app.querySelector('[data-thumb]').addEventListener('click', () => openThumb(l)); }
+  if (l.show_assessment) {
+    renderReadings(l.id); app.querySelectorAll('[data-thumb]').forEach(b => b.addEventListener('click', () => openThumb(l)));
+    // #assessmentResultsModal: the readings in a modal, for the mobile layout
+    document.getElementById('past-readings').addEventListener('click', e => { e.preventDefault(); const body = (document.getElementById('readings') || {}).innerHTML || '<p class="fw-light">No readings for this lesson yet.</p>';
+      smModal('assessmentResultsModal', '', '', ''); const m = document.getElementById('assessmentResultsModal');
+      m.innerHTML = `<div class="modal-dialog modal-lg text-primary"><div class="modal-content"><div class="modal-header bg-primary text-white"><h1 class="modal-title fs-5"><i class="bi-hand-thumbs-up me-2"></i> Your thumb-o-meter readings</h1><button type="button" class="btn-close" data-close aria-label="Close"></button></div><div class="modal-body">${body.replace('<div class="mb-3">Your thumb-o-meter readings</div>', '')}</div></div></div>`;
+      m.querySelector('[data-close]').addEventListener('click', () => hideModal('assessmentResultsModal')); });
+  }
 }
 
 // Thumb-o-meter (lessons/show.blade.php #assessmentModal) and the readings list
