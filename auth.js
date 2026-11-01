@@ -144,20 +144,21 @@ const Auth = (() => {
       : reason === 'bye' ? 'You have signed out.' : '');
   }
 
+  // The live header carries no user name: Log Out lives in the Menu dropdown. The PoC adds
+  // a "Passcode" badge beside the school name while impersonating from Quickbase.
   function renderUser() {
-    const el = document.getElementById('usernav');
-    if (!el) return;
     document.body.classList.toggle('signed-out', !session);
+    const badge = document.getElementById('passcodebadge');
+    if (badge) badge.remove();
     if (!session) {
-      el.innerHTML = '';
-      for (const id of ['userctx']) { const x = document.getElementById(id); if (x) x.innerHTML = ''; }
+      for (const id of ['userctx', 'subjectbar', 'usermenu']) { const x = document.getElementById(id); if (x) x.innerHTML = ''; }
       for (const id of ['stickybanner', 'upgradebtn']) { const x = document.getElementById(id); if (x) x.classList.add('hidden'); }
       return;
     }
-    const name = me && me.first_name ? `${me.first_name} ${me.last_name || ''}`.trim() : (me && me.email) || 'Signed in';
-    el.innerHTML = `<span class="userchip" title="${esc(me && me.email || '')}"><i class="bi-person-circle"></i> ${esc(name)}${me && me.staff ? ' <span class="badge purple">Staff</span>' : ''}${me && me.passcode ? ' <span class="badge purple" title="Signed in from Quickbase with this user’s passcode">Passcode</span>' : ''}</span>` +
-      `<button class="nbtn" id="logoutbtn" type="button"><i class="bi-box-arrow-right"></i> Log out</button>`;
-    document.getElementById('logoutbtn').addEventListener('click', () => signOut('bye'));
+    if (me && me.passcode) {
+      const ctx = document.getElementById('userctx');
+      if (ctx) ctx.insertAdjacentHTML('beforeend', ` <span class="badge passcode" id="passcodebadge" title="Signed in from Quickbase with this user’s passcode">Passcode</span>`);
+    }
   }
 
   function showLogin(message = '') {
@@ -197,5 +198,5 @@ const Auth = (() => {
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) watch(); });
 
-  return { init, refresh, signOut, showLogin, me: () => me, accessToken: () => session && session.access_token, isStaff };
+  return { init, refresh, signOut, showLogin, renderUser, me: () => me, accessToken: () => session && session.access_token, isStaff };
 })();

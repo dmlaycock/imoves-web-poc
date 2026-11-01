@@ -113,8 +113,7 @@ const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
 function renderUserContext() {
   const m = Auth.me() || {};
   const ctx = document.getElementById('userctx');
-  if (ctx) ctx.innerHTML = (m.school_name ? `<span class="ctx-school">${esc(m.school_name)}</span>` : '') +
-    (m.class_name ? `<span class="ctx-class">${esc(m.class_name)}</span>` : '');
+  if (ctx) ctx.innerHTML = esc(m.school_name || '') + ' <span class="text-light-purple">' + (m.class_name ? esc(m.class_name) : '<a class="text-light-purple text-decoration-none" href="#/profile">Enter your class name</a>') + '</span>';
   const up = document.getElementById('upgradebtn');
   if (up) up.classList.toggle('hidden', !E.showUpgrade);
   const bn = document.getElementById('stickybanner');
@@ -164,11 +163,11 @@ function subcatIsFree(sc) { return (D.schemesBySubcat[sc.id] || []).some(s => s.
 function subcatHref(sc) { return `#/subject/${sc.subject_id}/subcategory/${sc.id}`; }
 function lessonHref(l, sc) { return `#/lesson/${l.id}` + (sc ? `?sc=${sc.id}` : ''); }
 function lessonIcon(l) { return l.has_video ? 'bi-play-btn-fill' : l.has_audio ? 'bi-music-note-beamed' : l.has_slides ? 'bi-easel' : l.has_downloads ? 'bi-file-earmark-arrow-down' : 'bi-circle'; }
-function wistia(id) { return `<div class="videobox"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`; }
-function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; }
+function wistia(id) { return `<div class="wistia-ratio videobox"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`; }
+function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; document.body.classList.toggle('with-bg-img', !!url); }
 
 // ---------- routing ----------
-const app = document.getElementById('app');
+const app = document.getElementById('app-page');
 function reveal() { app.classList.remove('reveal'); void app.offsetWidth; app.classList.add('reveal'); }
 window.addEventListener('hashchange', route);
 async function route() {
@@ -177,7 +176,10 @@ async function route() {
   const qs = Object.fromEntries(new URLSearchParams(query));
   const p = pathPart.split('/').filter(Boolean);
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (p[0] || 'home')));
-  document.querySelectorAll('.sbtn').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
+  document.querySelectorAll('#subjectbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
+  const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
+  const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
+  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile');
   window.scrollTo(0, 0);
   try {
     if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
@@ -186,7 +188,10 @@ async function route() {
     if (p[0] === 'subject') return pageSubject(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
-    if (p[0] === 'browse') return pageBrowse();
+    if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
+    if (p[0] === 'favourites') { app.innerHTML = '<div class="notice">Favourites arrive in the next increment (v0.27).</div>'; return; }
+    if (p[0] === 'curriculum') { app.innerHTML = '<div class="notice">The School Curriculum Management page arrives in v0.28.</div>'; return; }
+    if (p[0] === 'profile') { app.innerHTML = '<div class="notice">My personal profile arrives in v0.28.</div>'; return; }
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
@@ -197,7 +202,76 @@ function renderSubjectBar() {
   // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
   const subjects = D.subjects.filter(s => E.buttons.includes(s.id) && canViewSubject(s)).sort(byOrder);
   document.getElementById('subjectbar').innerHTML = subjects.map(s =>
-    `<a class="sbtn" data-id="${s.id}" href="#/subject/${s.id}" style="background:#${esc(s.button_colour || '733088')}"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')}"></i>${esc(s.name)}</a>`).join('');
+    `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
+  document.getElementById('subjectnav').classList.toggle('hidden', subjects.length < 2);
+}
+
+// Menu dropdown: nav/partials/user-info.blade.php. Items whose pages are not built yet still
+// appear, as on the live site, and land on a short notice.
+function renderUserMenu() {
+  const m = Auth.me() || {};
+  const item = (href, label, extra = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none" ${extra}>${label}</a>`;
+  const div = '<div class="dropdown-divider"></div>';
+  let html = item('#/', 'Home') + div + item('#/search', 'Search') + item('#/favourites', 'Favourites') + item('#/curriculum', 'Curriculum') + div +
+    item('#/profile', 'My Profile') + item(m.has_admin ? '#/school-management' : '#/my-school', m.has_admin ? 'School Management' : 'My School') +
+    (E.showUpgrade ? item('#/upgrade', 'Upgrade') : '') + div + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div +
+    `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
+  const menu = document.getElementById('usermenu'); menu.innerHTML = html;
+  menu.querySelector('#logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
+  const btn = document.getElementById('dropdownMenuButton');
+  if (!btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('show'); });
+    document.addEventListener('click', () => menu.classList.remove('show'));
+    menu.addEventListener('click', () => menu.classList.remove('show'));
+  }
+}
+
+// Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
+function renderBrowse() {
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
+  const tabs = [], panes = [];
+  subjects.forEach((s, i) => {
+    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
+    if (!sgs.length) return;
+    const on = tabs.length === 0 ? ' active' : '';
+    tabs.push(`<a class="list-group-item list-group-item-action cursor-pointer text-truncate${on}" data-pane="${s.id}" role="tab"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')} text-primary me-2 d-none d-sm-inline"></i> ${esc(s.name)}</a>`);
+    panes.push(`<div class="tab-pane py-4 px-3${on}" data-pane="${s.id}" role="tabpanel">
+      <div class="row"><div class="col-12 title"><a class="h4 text-primary" href="#/subject/${s.id}">${esc(s.name)}</a><button type="button" class="btn-close float-end text-primary" data-close aria-label="Close"></button><hr class="mt-2"></div></div>
+      <div class="card-columns subject-subgroup-columns">` + sgs.map(({ sg, subcats }) =>
+        `<div class="card w-100 d-inline-block bg-transparent border-0 my-2"><div class="card-body p-0"><ul class="list-unstyled"><li class="h6 text-primary"><a class="text-primary" href="#/subject/${s.id}">${esc(sg.name)}</a></li>` +
+        subcats.map(sc => `<li class="mb-1"><a class="text-mid-purple fw-light" href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('') + `</ul></div></div>`).join('') + `</div></div>`);
+  });
+  document.getElementById('browse-tabs').innerHTML = tabs.join('');
+  document.getElementById('browse-panes').innerHTML = panes.join('');
+  const modal = document.getElementById('subject-browse-modal');
+  modal.querySelectorAll('#browse-tabs a').forEach(a => a.addEventListener('click', () => {
+    modal.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === a.dataset.pane));
+  }));
+  modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeBrowse));
+  modal.querySelectorAll('#browse-panes a[href]').forEach(a => a.addEventListener('click', closeBrowse));
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = '1';
+    modal.addEventListener('click', e => { if (e.target === modal) closeBrowse(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBrowse(); });
+    document.getElementById('browsebtn').addEventListener('click', openBrowse);
+  }
+  document.getElementById('browsebtnwrap').classList.toggle('hidden', !tabs.length);
+}
+function openBrowse() {
+  const m = document.getElementById('subject-browse-modal');
+  const cur = (location.hash.match(/^#\/subject\/(\d+)/) || [])[1];
+  if (cur) m.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === cur));
+  if (!m.querySelector('#browse-tabs a.active')) { const f = m.querySelector('#browse-tabs a'); if (f) f.click(); }
+  m.style.display = 'block'; document.body.classList.add('modal-open');
+  requestAnimationFrame(() => m.classList.add('show'));
+  let bd = document.getElementById('poc-backdrop');
+  if (!bd) { bd = document.createElement('div'); bd.id = 'poc-backdrop'; bd.className = 'modal-backdrop fade show'; document.body.appendChild(bd); }
+}
+function closeBrowse() {
+  const m = document.getElementById('subject-browse-modal');
+  m.classList.remove('show'); m.style.display = 'none'; document.body.classList.remove('modal-open');
+  const bd = document.getElementById('poc-backdrop'); if (bd) bd.remove();
 }
 function cleanIcon(i) { if (!i) return ''; const m = i.match(/class="([^"]+)"/); return (m ? m[1] : i).trim(); }
 
@@ -212,11 +286,11 @@ function pageHome() {
   for (const s of subjects) {
     const feats = [1, 2, 3, 4].map(i => ({ sc: D.subcatById[s[`featured_subcategory_id_${i}`]], heading: s[`featured_heading_${i}`], sub: s[`featured_subheading_${i}`] })).filter(f => f.sc);
     if (!feats.length) continue;
-    html += `<section class="block"><div class="bh"><a href="#/subject/${s.id}">${esc(s.name)}</a><a class="right" href="#/subject/${s.id}">View all &rarr;</a></div><div class="bb"><div class="grid">`;
-    for (const f of feats) {
-      html += `<div class="tile"><img src="${esc(img(f.sc.image))}" alt="" loading="lazy"><div class="tb"><h4>${esc(limit(f.heading || f.sc.name, 30))}</h4><p>${esc(limit(f.sub || f.sc.subheading, 200))}</p></div><a class="cover" href="${subcatHref(f.sc)}" aria-label="${esc(f.sc.name)}"></a></div>`;
-    }
-    html += `</div></div></section>`;
+    html += `<div class="row"><div class="col-12 position-relative"><div class="card shadow bg-light-purple border-primary mb-5">
+      <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex justify-content-between position-relative"><a href="#/subject/${s.id}" class="text-decoration-none stretched-link text-white d-flex justify-content-between w-100"><div>${esc(s.name)}</div><div class="flex-end"><small class="ml-3 text-white">View all &rarr;</small></div></a></h5>
+      <div class="card-body pb-1"><div class="row row-cols-1 row-cols-md-2 row-cols-xxl-4">`;
+    for (const f of feats) html += subcatCard(f.sc, { heading: f.heading, sub: f.sub, cols: 'col mb-4' });
+    html += `</div></div></div></div></div>`;
   }
   app.innerHTML = html || '<div class="notice">Nothing to show on the home page yet.</div>';
   reveal();
@@ -229,31 +303,55 @@ function pageSubject(id) {
   setBg(s.background_image_url);
   const video = s.is_featuring_video && (s.featured_video_wistia_id_paid_ks2 || s.featured_video_wistia_id_free);
   const vHead = s.featured_video_heading_paid_ks2 || s.featured_video_heading_free, vSub = s.featured_video_subheading_paid_ks2 || s.featured_video_subheading_free;
-  let html = `<div class="subject-head ${video ? 'with-video' : ''}"><div><h1>${esc(s.name)}</h1><p class="light">${nl(s.description)}</p></div>`;
-  if (video) html += `<div><h4 style="color:var(--purple)">${esc(vHead || 'Featured')} <span class="muted light">${esc(vSub || '')}</span></h4>${wistia(video)}</div>`;
-  html += `</div>`;
+  const vDesc = s.featured_video_description_paid_ks2 || s.featured_video_description_free || '';
+  let html = `<div class="row pt-4 pb-2 d-none d-sm-block"><div class="col"><div class="card shadow border-primary bg-ultra-light-purple rounded">
+    <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(s.name)}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide"></button></div></h5>
+    ${s.description ? `<div class="collapse-smooth"><div><div class="card-body"><p class="fw-light text-primary h6 mb-0">${nl(s.description)}</p></div></div></div>` : ''}</div><hr></div></div>`;
+  if (video) html += `<div class="row"><div class="col-12"><div class="card shadow-lg border-primary mb-5">
+    <h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(vHead || 'Featured')}${vSub ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(vSub)}</small>` : ''}<small class="float-end"><span class="badge bg-warning"><i class="bi-star-fill mr-1 mt-1"></i> <span style="position: relative; top: 1px;">Featured</span></span></small></h5>
+    <div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block"><div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(video)}</div>
+    ${vDesc ? `<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(vDesc)}</p></div>` : ''}</div></div></div></div></div></div></div>`;
   const subgroups = (D.subgroupsBySubject[id] || []).sort(byOrder);
   let any = false;
   for (const sg of subgroups) {
     const subcats = visibleSubcats(sg);
     if (!subcats.length) continue; any = true;
-    html += `<section class="block collapsible"><div class="bh">${esc(sg.name)}${sg.description ? `<small>${esc(sg.description)}</small>` : ''}<button class="collapse-btn right" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"><i class="bi-chevron-up"></i></button></div><div class="bb"><div class="bbi"><div class="grid">`;
-    for (const sc of subcats) {
-      const lessons = subcatLessons(sc), ages = ageRange(lessons);
-      const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
-      html += `<div class="tile"><img src="${esc(img(sc.image))}" alt="" loading="lazy"><div class="tb"><h4>${esc(limit(sc.name, 25))}</h4>${sc.subheading ? `<p>${esc(limit(sc.subheading, 130))}</p>` : ''}</div><div class="tf">` +
-        (ages ? ageStripRange(ages) : '') +
-        (lessons.length ? `<span><i class="bi-collection-play"></i>${lessons.length} ${esc(noun(sc, lessons.length))}</span>` : '') +
-        (vid ? `<span><i class="bi-film"></i>${esc(vid)} video</span>` : '') +
-        (subcatIsFree(sc) ? `<span class="badge">Free</span>` : '') +
-        `</div><a class="cover" href="${subcatHref(sc)}" aria-label="${esc(sc.name)}"></a></div>`;
-    }
-    html += `</div></div></div></section>`;
+    html += `<div class="row" id="parent-subgroup-${sg.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
+      <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(sg.name)}${sg.description ? ` <small class="text-light-purple ml-0 ml-sm-3 d-block d-sm-inline fw-light i-small">${esc(sg.description)}</small>` : ''}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"></button></div></h5>
+      <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row">`;
+    for (const sc of subcats) html += subcatCard(sc, {});
+    html += `</div></div></div></div></div></div></div>`;
   }
   if (!any) html += '<div class="notice">This subject has no live content at the moment.</div>';
   app.innerHTML = html;
   reveal();
-  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => { const closed = b.closest('.block').classList.toggle('closed'); b.setAttribute('aria-expanded', !closed); }));
+  bindCollapses();
+}
+
+// Collapsible panels (live: Bootstrap collapse + subcategory_display_state.js remembering the
+// state); here with the expand-in-place transition agreed on 19 Oct.
+function bindCollapses() {
+  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+    const body = b.closest('.card').querySelector('.collapse-smooth'); if (!body) return;
+    const closed = body.classList.toggle('closed'); b.classList.toggle('collapsed', closed); b.setAttribute('aria-expanded', !closed);
+  }));
+}
+
+// A subcategory card: subjects/partials/subcategory-card.blade.php (desktop variant).
+function subcatCard(sc, { heading, sub, cols } = {}) {
+  const lessons = subcatLessons(sc), ages = ageRange(lessons);
+  const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
+  const subheading = sub || sc.subheading;
+  const meta = (ages ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><i class="bi-person-lines-fill text-primary me-1"></i> Ages ${esc(ages)}</li>` : '') +
+    (lessons.length ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-collection-play text-primary me-1"></i> ${lessons.length} ${esc(noun(sc, lessons.length))}</span></li>` : '') +
+    (vid ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-film text-primary me-1"></i> ${esc(vid)} video</span></li>` : '') +
+    (subcatIsFree(sc) ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-end align-items-center"><span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span></li>` : '');
+  return `<div class="${cols || 'col-12 col-md-6 col-lg-6 col-xl-3 mb-4'}"><a href="${subcatHref(sc)}" title="${esc(sc.name)}" class="text-decoration-none">
+    <div class="card subcategory-card lift shadow-sm d-flex flex-column h-100"><img src="${esc(img(sc.image))}" class="card-img-top" alt="${esc(sc.name)}" loading="lazy">
+    <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center">
+      <h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>
+      ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
+    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div></a></div>`;
 }
 
 function crumbs(parts) {
@@ -491,20 +589,6 @@ async function pageSearch(q) {
   reveal();
 }
 
-function pageBrowse() {
-  setBg(null);
-  // The browse list is the user's own (Users fid 919) filtered by SubjectPolicy.
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
-  let html = '<div class="browse">';
-  for (const s of subjects) {
-    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
-    if (!sgs.length) continue;
-    html += `<section class="block"><div class="bh"><a href="#/subject/${s.id}">${esc(s.name)}</a></div><div class="bb"><ul>` + sgs.map(({ sg, subcats }) => `<li class="sg">${esc(sg.name)}</li>` + subcats.map(sc => `<li><a href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('')).join('') + `</ul></div></section>`;
-  }
-  app.innerHTML = html + '</div>';
-  reveal();
-}
-
 // ---------- boot ----------
 // Auth first (Phase 1): no content without signing in, as on the live platform.
 // Auth.init() restores a saved session; otherwise auth.js shows the sign-in screen
@@ -516,6 +600,9 @@ async function startApp() {
     await loadTree();
     renderSubjectBar();
     renderUserContext();
+    renderUserMenu();
+    renderBrowse();
+    Auth.renderUser();
     const picker = document.getElementById('classage');
     // "My class": the stored choice, or the age range saved on the account (users.ages)
     let saved = null; try { saved = localStorage.getItem('imoves.classAge'); } catch (e) {}
