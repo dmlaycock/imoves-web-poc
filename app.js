@@ -457,7 +457,7 @@ function pageSubcategory(subjectId, id) {
     variants.forEach((v, i) => {
       const s2 = v.s;
       html += `<div class="variant" ${i === sel ? '' : 'hidden'}>
-        <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(s2.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(s2.name)}" loading="lazy"><div class="media-body px-1">${merged && s2.subheading ? para(s2.subheading, 'text-mid-purple') : ''}${schemeBody(s2)}</div></div></div></div>
+        <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(s2.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(s2.name)}"><div class="media-body px-1">${merged && s2.subheading ? para(s2.subheading, 'text-mid-purple') : ''}${schemeBody(s2)}</div></div></div></div>
         <div class="row mt-2"><div class="col"><div class="card-body pt-0 pb-4">` + v.lessons.map(l => lessonRow(l, sc, v.ages)).join('') + `</div></div></div></div>`;
     });
     html += `</div></div></div>`;
@@ -494,7 +494,7 @@ function lessonRow(l, sc, schemeAges) {
     <div class="list-group-item px-1 px-md-3"><div class="d-none d-md-flex flex-column h-100 justify-content-around align-items-center"><div>
       <div class="${l.description ? 'mb-1' : ''}"><div class="lesson-icon cursor-pointer mark-as-complete" title="Mark as Complete" data-lesson-id="${l.id}"><i class="bi-circle text-mid-purple"></i></div></div>
       <div><div class="lesson-icon cursor-pointer add-to-favourites" title="Add to Favourites" data-lesson-id="${l.id}"><i class="bi-star text-mid-purple"></i></div></div>
-    </div></div></div>
+    </div><div><div class="btn-outline-primary curriculum-btn" title="Add to Curriculum" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus"></i></div></div></div></div>
   </div>
   <div class="lesson-drawer collapse-smooth closed" data-lesson-body="${l.id}"><div></div></div>`;
 }
@@ -511,7 +511,7 @@ function bindLessonRows(sc) {
     if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1rem">Loading…</div>'; await fillLessonBody(body, +drawer.dataset.lessonBody, sc); }
     setTimeout(() => x.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
   }));
-  app.querySelectorAll('.mark-as-complete, .add-to-favourites').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); }));
+  app.querySelectorAll('.mark-as-complete, .add-to-favourites, .curriculum-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); }));
 }
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
