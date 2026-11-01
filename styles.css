@@ -136,3 +136,7 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .scheme-card .variant[hidden] { display: none; }
 .videobox .wistia-ratio, .wistia-ratio { position: relative; padding: 56.25% 0 0 0; }
 .wistia-ratio iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* v0.31 drag-to-reorder (SortableJS ghost look) */
+.dnd-ghost { opacity: 0.4; }
+#cur-tabs .nav-item.handle { cursor: grab; }
