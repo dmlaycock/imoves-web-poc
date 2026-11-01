@@ -212,7 +212,8 @@ async function route() {
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
   const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
-  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
   try {
     if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
@@ -1098,6 +1099,8 @@ async function pageLessonHistory(id) {
   reveal();
 }
 
+// ResultsController groups results under "<i class=\"{icon} text-white mr-1\"></i> {name}".
+function subjectIcon(s) { return s && s.icon ? `<i class="${esc(s.icon)} text-white mr-1"></i> ` : ''; }
 // Favourites (results/show-favourites.blade.php): personal favourites grouped by subject.
 async function pageFavourites() {
   setBg(null);
@@ -1112,11 +1115,11 @@ async function pageFavourites() {
   const bySubject = {};
   for (const l of lessons) {
     const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc && D.subjectById[sc.subject_id];
-    (bySubject[subj ? subj.name : 'Other'] ||= { sc, items: [] }).items.push({ l, scheme, sc });
+    (bySubject[subj ? subj.name : 'Other'] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
   for (const [name, g] of Object.entries(bySubject)) {
     const n = g.items.length, lab = (g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons')).toLowerCase();
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row">`;
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subj)}${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
     for (const { l, scheme, sc } of g.items) {
       const blurb = (l.description || l.body_opening_text || '').trim();
       html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
@@ -1182,7 +1185,7 @@ async function pageSearch(q) {
   const groups = Object.values(bySubject);
   if (!groups.length) html += `<div class="notice">No lessons match "${esc(q)}".</div>`;
   for (const g of groups) {
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row">`;
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subject)}${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
     for (const { scheme, sc, lessons } of Object.values(g.schemes)) {
       const ages = ageRange(lessons), name = `${scheme.name}${ages ? ' (' + ageTextRange(ages) + ')' : ''}`;
       const href = lessons.length === 1 ? lessonHref(lessons[0], sc) : (sc ? subcatHref(sc) + `#scheme-${scheme.id}` : lessonHref(lessons[0], sc));
