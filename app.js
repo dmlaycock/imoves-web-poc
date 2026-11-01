@@ -549,7 +549,7 @@ async function pageLesson(id, scId) {
   setBg(l.background_image_url || sc?.background_image_url || subject?.background_image_url);
   const seq = scheme ? schemeLessons(scheme) : [l];
   const pos = seq.findIndex(x => x.id === l.id), prev = seq[pos - 1], next = seq[pos + 1];
-  const label = sc ? noun(sc, 1) : 'lesson', Label = label.charAt(0).toUpperCase() + label.slice(1);
+  const label = sc ? noun(sc, 1) : 'lesson', Label = label.charAt(0).toUpperCase() + label.slice(1), Labels = (sc ? noun(sc, 2) : 'lessons').replace(/^./, c => c.toUpperCase());
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, sc && { name: sc.name, href: subcatHref(sc) }, scheme && { name: scheme.name }].filter(Boolean));
   html += `<div class="row"><div class="col-12 order-2 col-lg-9 order-lg-1"><div class="row"><div class="col-sm">
     <div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow">
@@ -570,13 +570,14 @@ async function pageLesson(id, scId) {
     <hr class="d-none d-lg-block mx-lg-2 ${bg ? 'border-mid-purple' : ''}">
     <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-lesson-id="${l.id}"><i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done</button></div>
     <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
-    <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-lesson-id="${l.id}"><i class="bi-star me-2"></i> Add to <span class="d-none d-xl-inline">Favourite ${esc(Label)}s</span><span class="d-inline d-xl-none">Favourites</span></button></div>
-    ${l.show_assessment ? `<div class="px-2 mb-3 row"><div class="col"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}">Thumb-o-meter</button></div></div>` : ''}
+    <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-lesson-id="${l.id}"><i class="bi-star me-2"></i> Add to <span class="d-none d-xl-inline">Favourite ${esc(Labels)}</span><span class="d-inline d-xl-none">Favourites</span></button></div>
+    ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div>` : ''}
+    <div class="my-4 px-2"><div class="${btn}"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}" title="Add to Curriculum"><i class="bi bi-bookmark-plus"></i></button></div></div>
   </div></div>`;
   app.innerHTML = html;
   reveal();
   bindParts(app);
-  app.querySelectorAll('.mark-as-complete, .add-to-favourites, [data-thumb]').forEach(b => b.addEventListener('click', () => { b.classList.add('disabled'); b.title = 'Arrives in v0.27'; }));
+  app.querySelectorAll('.mark-as-complete, .add-to-favourites, [data-thumb], .curriculum-btn').forEach(b => b.addEventListener('click', () => { b.classList.add('disabled'); b.title = 'Arrives in v0.27/v0.28'; }));
 }
 
 // Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
