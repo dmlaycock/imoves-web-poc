@@ -299,7 +299,7 @@ function pageHome() {
 function pageSubject(id) {
   const s = D.subjectById[id];
   if (!s) { app.innerHTML = '<div class="notice">Subject not found.</div>'; return; }
-  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
+  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn btn-primary btn-sm" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   setBg(s.background_image_url);
   const video = s.is_featuring_video && (s.featured_video_wistia_id_paid_ks2 || s.featured_video_wistia_id_free);
   const vHead = s.featured_video_heading_paid_ks2 || s.featured_video_heading_free, vSub = s.featured_video_subheading_paid_ks2 || s.featured_video_subheading_free;
@@ -376,7 +376,7 @@ function pageSubcategory(subjectId, id) {
     } else {
       const host = sc.url_redirect.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
       const isFile = /\.(pdf|jpg|jpeg|png)(\?|$)/i.test(sc.url_redirect);
-      html += `<section class="scheme"><div class="sh">${esc(sc.name)}</div><div class="intro" style="flex-direction:column"><div class="txt">${sc.description ? `<p>${nl(sc.description)}</p>` : ''}<p><a class="btn" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'}"></i> ${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p><p class="muted" style="font-size:.9rem">Opens in a new tab.</p></div></div></section>`;
+      html += `<section class="scheme"><div class="sh">${esc(sc.name)}</div><div class="intro" style="flex-direction:column"><div class="txt">${sc.description ? `<p>${nl(sc.description)}</p>` : ''}<p><a class="btn btn-primary" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'}"></i> ${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p><p class="muted" style="font-size:.9rem">Opens in a new tab.</p></div></div></section>`;
     }
     app.innerHTML = html; reveal(); return;
   }
@@ -384,7 +384,7 @@ function pageSubcategory(subjectId, id) {
     const vid = sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_all;
     html += `<section class="scheme"><div class="sh">${esc(sc.direct_resource_heading_paid || sc.direct_resource_heading_all || sc.name)}</div><div class="intro" style="flex-direction:column">` +
       (vid ? wistia(vid) : '') + `<div class="txt"><p>${nl(sc.direct_resource_text_paid || sc.direct_resource_text_all || sc.description)}</p>` +
-      (sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<a class="btn" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener">${esc(sc.direct_resource_link_text || 'Open')}</a>` : '') + `</div></div></section>`;
+      (sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<a class="btn btn-primary" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener">${esc(sc.direct_resource_link_text || 'Open')}</a>` : '') + `</div></div></section>`;
   }
   const schemes = D.schemesBySubcat[id] || [];
   // Same-named schemes in one category are age variants of one resource (a Quickbase workaround
@@ -414,14 +414,14 @@ function pageSubcategory(subjectId, id) {
       html += `<div class="variant" data-scheme-ages="${v.ages || ''}" ${i === sel ? '' : 'hidden'}>`;
       html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}</div></div>${ageSwitch}`;
       if (one && !canAccessLesson(l0)) {
-        html += `<div class="lmini"><i class="bi-lock-fill"></i> ${esc(E.lessonMessage)}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div><div style="padding-bottom:1rem"></div>`;
+        html += `<div class="lmini"><i class="bi-lock-fill"></i> ${esc(E.lessonMessage)}${E.showUpgrade ? `<a class="btn btn-primary btn-sm" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div><div style="padding-bottom:1rem"></div>`;
       } else if (one) {
         html += `<div class="lmini">${lessonMeta(l0, false)}<a class="btn small outline" href="${lessonHref(l0, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
         html += `<div class="lbc" data-lesson-body="${l0.id}" data-scheme-text="${esc((s2.body_opening_text || s2.description || '').trim().slice(0, 80))}"></div>`;
       } else {
         html += `<div class="lessons">` + lessons.map(l => canAccessLesson(l)
           ? `<div class="lx" data-lesson="${l.id}"><button class="lrow" type="button" aria-expanded="false"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div></button><div class="lb"><div class="lbi"><div class="lbc" data-lesson-body="${l.id}"></div></div></div></div>`
-          : `<div class="lx locked"><div class="lrow"><i class="res bi-lock-fill"></i><div class="lt"><h4>${esc(l.name)}</h4><span>${esc(E.lessonMessage)}</span></div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div></div></div>`).join('') + `</div>`;
+          : `<div class="lx locked"><div class="lrow"><i class="res bi-lock-fill"></i><div class="lt"><h4>${esc(l.name)}</h4><span>${esc(E.lessonMessage)}</span></div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${E.showUpgrade ? `<a class="btn btn-primary btn-sm" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div></div></div>`).join('') + `</div>`;
       }
       html += `</div>`;
     });
@@ -514,7 +514,7 @@ async function pageLesson(id, scId) {
   ]);
   const l = rows[0];
   if (!l || !l.is_live) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
-  if (!canAccessLesson(l)) { app.innerHTML = `<div class="notice"><strong>${esc(l.name)}</strong> - ${esc(E.lessonMessage)}${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
+  if (!canAccessLesson(l)) { app.innerHTML = `<div class="notice"><strong>${esc(l.name)}</strong> - ${esc(E.lessonMessage)}${E.showUpgrade ? ` <a class="btn btn-primary btn-sm" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   const scheme = D.schemeById[l.scheme_id];
   const sc = D.subcatById[scId] || (scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]);
   const subject = sc && D.subjectById[sc.subject_id], sg = sc && D.subgroupById[sc.subgroup_id];
@@ -604,9 +604,11 @@ async function startApp() {
     renderBrowse();
     Auth.renderUser();
     const picker = document.getElementById('classage');
-    // "My class": the stored choice, or the age range saved on the account (users.ages)
+    // "Show lessons suitable for": the user's saved filter (Users fid 569) as on the live site;
+    // a change made here is kept locally until the Phase 1 profile write lands.
+    const me = Auth.me() || {};
     let saved = null; try { saved = localStorage.getItem('imoves.classAge'); } catch (e) {}
-    if (saved === null) { const a = (Auth.me()?.ages || [])[0]; if (a) saved = String(parseInt(a)); }
+    if (saved === null && me.filter_age_min != null) saved = String(me.filter_age_min);
     try { picker.value = saved || ''; } catch (e) { picker.value = ''; }
     picker.addEventListener('change', () => { try { localStorage.setItem('imoves.classAge', picker.value); } catch (e) {} route(); });
     route();
