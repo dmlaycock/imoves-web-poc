@@ -227,11 +227,9 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 /* Live: single row, scrolls sideways below lg with round arrow buttons (nav-scroll.js). */
 #scrollable-navbar { overflow-x: auto; scrollbar-width: none; }
 #scrollable-navbar::-webkit-scrollbar { display: none; }
-#subjectbar { min-width: max-content; }
-.navbar-subjects .scroll-button button { border: 0; background: none; }
 .navbar-subjects .scroll-button i { font-size: 30px; opacity: .5; }
+#headerfilter .form-select option { color: var(--mid-purple); }
 #headerfilter .form-select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right .75rem center; background-size: 16px 12px; padding-right: 2.25rem; appearance: none; }
-#classage { max-width: 22rem; min-width: 12rem; }
 .navbar .btn-outline-secondary { border-radius: var(--bs-border-radius); }
 #subjectbar .subject-button .button-text { white-space: nowrap; }
 .user-dropdown .dropdown-menu.show { position: absolute; right: 0; left: auto; }
