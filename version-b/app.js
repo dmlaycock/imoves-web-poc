@@ -195,6 +195,7 @@ async function route() {
   document.querySelectorAll('.sbtn').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
   window.scrollTo(0, 0);
   try {
+    if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
     if (!p.length) return pageHome();
     if (p[0] === 'subject' && p[2] === 'subcategory') return pageSubcategory(+p[1], +p[3]);
     if (p[0] === 'subject') return pageSubject(+p[1]);

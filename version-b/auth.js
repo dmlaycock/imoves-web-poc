@@ -7,10 +7,18 @@
 // elsewhere rotates the token, and this page notices and signs out - the live
 // platform's single-session design, enforced here because its own middleware never was
 // (schedule 11.16).
+//
+// Staff passcode sign-in (v0.24): #/login/{userId}/{passcode} - the PoC's version of the
+// live platform's /login/{userId}/{passcode}, opened from the Quickbase Users form. The
+// edge function web-passcode-login checks the passcode (Users fid 788) server-side and
+// returns a single-use token, exchanged here for a normal session. A passcode session
+// is not logged as the teacher's own login and does not take their single-session
+// token, so impersonating never signs the real teacher out.
 const Auth = (() => {
   const LS_SESSION = 'imoves.session';
   const LS_TOKEN = 'imoves.sessionToken';
   const LS_COOKIE = 'imoves.loginCookie';
+  const LS_VIA = 'imoves.via';         // 'passcode' while impersonating
   let session = null;   // { access_token, refresh_token, expires_at (seconds) }
   let me = null;        // web_me() row, or { staff: true } for staff log-ins
   let timer = null;
@@ -49,8 +57,11 @@ const Auth = (() => {
   async function afterAuth(freshSignIn) {
     try { const rows = await rpc('web_me'); me = (rows && rows[0]) || null; } catch (e) { me = null; }
     if (isStaff()) me = Object.assign(me || {}, { staff: true });
+    const viaPasscode = lsGet(LS_VIA) === 'passcode';
+    if (viaPasscode) me = Object.assign(me || {}, { passcode: true });
     let token = lsGet(LS_TOKEN);
-    if (freshSignIn || !token) {
+    if (viaPasscode) { /* staff passcode session: no login record, no single-session token */ }
+    else if (freshSignIn || !token) {
       try { token = await rpc('web_login', { p_login_cookie: loginCookie(), p_user_agent: navigator.userAgent }); lsSet(LS_TOKEN, token); }
       catch (e) { /* login logging is best-effort */ }
     } else if (!(await sessionStillOk())) { signOut('elsewhere'); return false; }
@@ -68,6 +79,12 @@ const Auth = (() => {
   async function watch() { if (session && !(await sessionStillOk())) signOut('elsewhere'); }
 
   async function init() {
+    const m = location.hash.match(/^#\/login\/(\d+)\/([^/?#]+)/);
+    if (m) {
+      // Take the passcode out of the address bar and history straight away.
+      history.replaceState(null, '', location.pathname + location.search + '#/');
+      return passcodeSignIn(+m[1], decodeURIComponent(m[2]));
+    }
     try { session = JSON.parse(lsGet(LS_SESSION) || 'null'); } catch (e) { session = null; }
     if (session && (session.expires_at || 0) * 1000 < Date.now() + 60000 && !(await refresh())) session = null;
     if (!session) { showLogin(); return false; }
@@ -86,9 +103,39 @@ const Auth = (() => {
     return afterAuth(true);
   }
 
+  function clearSession() {
+    const t = session && session.access_token;
+    store(null); lsSet(LS_TOKEN, null); lsSet(LS_VIA, null); me = null;
+    if (t) gotrue('logout', null, t).catch(() => {});
+  }
+
+  // Staff "log in as" link: whoever is signed in on this browser is signed out first,
+  // as on the live platform.
+  async function passcodeSignIn(userId, passcode) {
+    clearSession();
+    app.innerHTML = '<div class="loading">Signing in from Quickbase…</div>';
+    try {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/web-passcode-login`, {
+        method: 'POST', headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, passcode }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.token_hash) throw new Error(j.error || `Sign-in from Quickbase failed (${r.status}).`);
+      const v = await gotrue('verify', { type: j.type || 'magiclink', token_hash: j.token_hash });
+      if (!v.ok) throw new Error(`Sign-in from Quickbase failed at the last step (${v.status}). Open the link again.`);
+      const s = await v.json();
+      store({ access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at || Math.floor(Date.now() / 1000) + (s.expires_in || 3600) });
+      lsSet(LS_VIA, 'passcode');
+      return afterAuth(true);
+    } catch (e) {
+      showLogin(e.message);
+      return false;
+    }
+  }
+
   function signOut(reason) {
     const t = session && session.access_token;
-    store(null); lsSet(LS_TOKEN, null); me = null;
+    store(null); lsSet(LS_TOKEN, null); lsSet(LS_VIA, null); me = null;
     if (timer) clearInterval(timer);
     if (t) gotrue('logout', null, t).catch(() => {});
     renderUser();
@@ -108,7 +155,7 @@ const Auth = (() => {
       return;
     }
     const name = me && me.first_name ? `${me.first_name} ${me.last_name || ''}`.trim() : (me && me.email) || 'Signed in';
-    el.innerHTML = `<span class="userchip" title="${esc(me && me.email || '')}"><i class="bi-person-circle"></i> ${esc(name)}${me && me.staff ? ' <span class="badge purple">Staff</span>' : ''}</span>` +
+    el.innerHTML = `<span class="userchip" title="${esc(me && me.email || '')}"><i class="bi-person-circle"></i> ${esc(name)}${me && me.staff ? ' <span class="badge purple">Staff</span>' : ''}${me && me.passcode ? ' <span class="badge purple" title="Signed in from Quickbase with this user’s passcode">Passcode</span>' : ''}</span>` +
       `<button class="nbtn" id="logoutbtn" type="button"><i class="bi-box-arrow-right"></i> Log out</button>`;
     document.getElementById('logoutbtn').addEventListener('click', () => signOut('bye'));
   }

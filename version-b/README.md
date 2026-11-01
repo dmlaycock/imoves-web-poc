@@ -1,6 +1,9 @@
-# Version B - Cloudflare Stream videos (v0.23-B.1, 30 Oct 2026)
+# Version B - Cloudflare Stream videos (v0.24-B.2, 1 Nov 2026)
 
-The teacher view at v0.23 with one change: videos play from Cloudflare Stream instead of Wistia.
+B.2 (1 Nov 2026): rebuilt on v0.24, which adds the staff passcode sign-in link
+(`#/login/{userId}/{passcode}`). B.1 (30 Oct 2026) was built on v0.23.
+
+The teacher view at v0.24 with one change: videos play from Cloudflare Stream instead of Wistia.
 The root page (`/`) and the frozen demo (`/demo/`) are untouched and still play from Wistia,
 so the two can be compared side by side.
 
@@ -34,7 +37,7 @@ The view exposes only the id pair, which is no more than the content tables alre
 
 ## Source
 
-Built by hand from the published v0.23 files (`../app.js` and friends) plus the change above;
+Built by hand from the published v0.24 files (`../app.js` and friends) plus the change above;
 the source of record is `web-poc/site/` in the private `imoves` repository, where the same
 change should land as a `useStream` option before Phase 1 goes live. Longer term the Stream
 UIDs should travel in the content tables (add the seven Stream UID fields to
