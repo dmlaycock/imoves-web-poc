@@ -1159,7 +1159,7 @@ function resultPanels(lessons, withCounts) {
     // each subject it belongs to. Fallback: the subject of its first category.
     // SubjectPolicy::search: all-content users, or the subject is in the user's subject or niche lists.
     const canSearch = s => s && (withCounts || E.allContent || E.subjectIds.has(s.id));   // favourites: every subject (showFavourites has no policy)
-    let subjects = (l.subject_ids || []).map(id => D.subjectById[+id]).filter(canSearch);
+    let subjects = [...new Set(l.subject_ids || [])].map(id => D.subjectById[+id]).filter(canSearch);   // Quickbase lists a subject twice at times
     if (!subjects.length && !(l.subject_ids || []).length) { const s = sc && D.subjectById[sc.subject_id]; if (canSearch(s)) subjects = [s]; }   // no subject data at all: the category's subject
     for (const subj of subjects) (bySubject[subj.name] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
