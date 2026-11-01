@@ -1103,32 +1103,39 @@ async function pageLessonHistory(id) {
 // ResultsController groups results under "<i class=\"{icon} text-white mr-1\"></i> {name}".
 function subjectIcon(s) { return s && s.icon ? `<i class="${esc(s.icon)} text-white mr-1"></i> ` : ''; }
 // Favourites (results/show-favourites.blade.php): personal favourites grouped by subject.
-async function pageFavourites() {
-  setBg(null);
-  const ids = [...MY.fav];
-  let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
-    <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
-  if (!ids.length) {
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white"><i class="bi-star-fill mr-1 text-warning"></i> Favourite Lessons</h5><div class="card-body pb-1"><div class="row"><div class="col-12"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><span><span class="text-primary h5">You haven't favourited any lessons yet.</span> <span class="text-mid-purple ms-1">To save a lesson to your favourites, click the <i class="bi-star mx-1 text-primary"></i> icon.</span></span></p></div></div></div></div></div></div></div>`;
-    app.innerHTML = html; reveal(); return;
-  }
-  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration&order=name`);
+// results/show-favourites.blade.php lesson card (favourites and search results share it).
+function resultLessonCard(l, scheme, sc) {
+  const blurb = (l.description || l.body_opening_text || '').trim();
+  return `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
+        <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul></div></div></a></div>`;
+}
+// Lessons grouped under one panel per subject (ResultsController), subjects in name order,
+// lessons in name order. withCounts adds the "N favourite lessons" small (favourites only).
+function resultPanels(lessons, withCounts) {
   const bySubject = {};
   for (const l of lessons) {
     const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc && D.subjectById[sc.subject_id];
     (bySubject[subj ? subj.name : 'Other'] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
-  for (const [name, g] of Object.entries(bySubject)) {
+  let html = '';
+  for (const name of Object.keys(bySubject).sort((x, y) => x.localeCompare(y))) {
+    const g = bySubject[name]; g.items.sort((x, y) => x.l.name.localeCompare(y.l.name));
     const n = g.items.length, lab = (g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons')).toLowerCase();
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subj)}${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
-    for (const { l, scheme, sc } of g.items) {
-      const blurb = (l.description || l.body_opening_text || '').trim();
-      html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
-        <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul></div></div></a></div>`;
-    }
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subj)}${esc(name)}${withCounts ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small>` : ''}</h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
+    for (const { l, scheme, sc } of g.items) html += resultLessonCard(l, scheme, sc);
     html += `</div></div></div></div></div>`;
   }
-  app.innerHTML = html; reveal();
+  return html;
+}
+const NO_FAVOURITES = `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white"><i class="bi-star-fill mr-1 text-warning"></i> Favourite Lessons</h5><div class="card-body pb-1"><div class="row"><div class="col-12"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><span><span class="text-primary h5">You haven't favourited any lessons yet.</span> <span class="text-mid-purple ms-1">To save a lesson to your favourites, click the <i class="bi-star mx-1 text-primary"></i> icon.</span></span></p></div></div></div></div></div></div></div>`;
+async function pageFavourites() {
+  setBg(null);
+  const ids = [...MY.fav];
+  let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
+    <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
+  if (!ids.length) { app.innerHTML = html + NO_FAVOURITES; reveal(); return; }
+  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration&order=name`);
+  app.innerHTML = html + resultPanels(lessons, true); reveal();
 }
 
 // Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
@@ -1165,36 +1172,18 @@ function bindParts(root) {
   }));
 }
 
-// Search results (results/partials/results-list.blade.php): a title, then one panel per
-// subject holding scheme cards for the schemes with matching lessons.
+// Search results: ResultsController::search() renders results/show-favourites.blade.php with
+// no header - one panel per subject of lesson cards (lessons whose "search" text matches),
+// inaccessible lessons left out. With no match, live shows the favourites empty-state card.
 async function pageSearch(q) {
   setBg(null);
   if (!q.trim()) { app.innerHTML = '<div class="notice mt-4">Use Search in the header to find lessons by title, topic, subject or lesson ID.</div>'; return; }
   app.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
-  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,scheme_id,is_freemium,age_min,age_max&order=order&limit=500`);
-  const live = rows.filter(l => D.lessonById[l.id] && canAccessLesson(l));   // inaccessible lessons are hidden, as live
+  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration&order=name&limit=500`);
+  const live = rows.filter(l => D.lessonById[l.id] && D.schemeById[l.scheme_id] && canAccessLesson(l));
   logSearch(q.trim(), live.length);
-  const bySubject = {};
-  for (const l of live) {
-    const scheme = D.schemeById[l.scheme_id]; if (!scheme) continue;
-    const sc = D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc ? D.subjectById[sc.subject_id] : null;
-    const g = (bySubject[subj ? subj.id : 0] ||= { subject: subj, schemes: {} });
-    (g.schemes[scheme.id] ||= { scheme, sc, lessons: [] }).lessons.push(l);
-  }
-  let html = `<div class="results-page-title d-flex flex-wrap mt-4"><div class="mt-2 heading-2 heading-xs text-primary mr-auto mb-3">Search results for "${esc(q)}"</div></div>`;
-  const groups = Object.values(bySubject);
-  if (!groups.length) html += `<div class="notice">No lessons match "${esc(q)}".</div>`;
-  for (const g of groups) {
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subject)}${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
-    for (const { scheme, sc, lessons } of Object.values(g.schemes)) {
-      const ages = ageRange(lessons), name = `${scheme.name}${ages ? ' (' + ageTextRange(ages) + ')' : ''}`;
-      const href = lessons.length === 1 ? lessonHref(lessons[0], sc) : (sc ? subcatHref(sc) + `#scheme-${scheme.id}` : lessonHref(lessons[0], sc));
-      html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${href}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme.image))}" class="card-img-top" alt="${esc(name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(name)}<br></small></h5></div></div></div></div></a></div>`;
-    }
-    html += `</div></div></div></div></div>`;
-  }
-  app.innerHTML = html;
+  app.innerHTML = `<div class="my-3">${live.length ? resultPanels(live, false) : NO_FAVOURITES}</div>`;
   reveal();
 }
 
