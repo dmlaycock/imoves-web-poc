@@ -223,6 +223,7 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 
 /* ---------- v0.25.1 home page fixes ---------- */
 .navbar-logo img { box-shadow: none; outline: none; border: 0; background: none; }
+.navbar .navbar-logo.uncollapsed { width: 140px; }
 /* Live: single row, scrolls sideways below lg with round arrow buttons (nav-scroll.js). */
 #scrollable-navbar { overflow-x: auto; scrollbar-width: none; }
 #scrollable-navbar::-webkit-scrollbar { display: none; }
@@ -232,9 +233,6 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 #headerfilter .form-select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right .75rem center; background-size: 16px 12px; padding-right: 2.25rem; appearance: none; }
 #classage { max-width: 22rem; min-width: 12rem; }
 .navbar .btn-outline-secondary { border-radius: var(--bs-border-radius); }
-.navbar .navbar-logo { width: 175px; min-width: 175px; }
-.navbar .navbar-logo img { width: 175px; max-width: 175px; }
-.navbar .nav-slogan { margin-left: 1rem; }
 #subjectbar .subject-button .button-text { white-space: nowrap; }
 .user-dropdown .dropdown-menu.show { position: absolute; right: 0; left: auto; }
 .navbar-actions { position: relative; }
