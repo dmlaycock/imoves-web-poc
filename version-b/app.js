@@ -48,7 +48,7 @@ async function loadTree() {
     rest('subcategories?select=id,name,order,homepage_order,image,background_image_url,description,subheading,is_live,is_schemes,is_direct_resource,is_redirect_to_category,is_redirect_to_lesson,is_redirect_to_url,direct_resource_heading_all,direct_resource_heading_paid,direct_resource_text_all,direct_resource_text_paid,direct_resource_wistia_id_all,direct_resource_wistia_id_paid,direct_resource_wistia_duration_all,direct_resource_wistia_duration_paid,is_direct_resource_linked,direct_resource_link_text,direct_resource_link_url,subject_id,subgroup_id,subcategory_redirect_id,lesson_redirect_id,url_redirect,content_noun_derived_plural,content_noun_derived_singular,is_visible_on_homepage&order=order', { all: true }),
     rest('schemes?select=id,name,subheading,description,body_opening_text,body_closing_text,body_subheading_1,body_subheading_1_text,body_subheading_2,body_subheading_2_text,body_subheading_3,body_subheading_3_text,is_live,is_freemium,image,order', { all: true }),
     rest('scheme_subcategories?select=*', { all: true }),
-    rest('lessons?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides&order=order', { all: true }),
+    rest('lessons?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template&order=order', { all: true }),
   ]);
   D.subjects = subjects.filter(s => s.is_live);
   D.subgroups = subgroups.filter(s => s.is_live);
@@ -113,8 +113,7 @@ const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
 function renderUserContext() {
   const m = Auth.me() || {};
   const ctx = document.getElementById('userctx');
-  if (ctx) ctx.innerHTML = (m.school_name ? `<span class="ctx-school">${esc(m.school_name)}</span>` : '') +
-    (m.class_name ? `<span class="ctx-class">${esc(m.class_name)}</span>` : '');
+  if (ctx) ctx.innerHTML = esc(m.school_name || '') + ' <span class="text-light-purple">' + (m.class_name ? esc(m.class_name) : '<a class="text-light-purple text-decoration-none" href="#/profile">Enter your class name</a>') + '</span>';
   const up = document.getElementById('upgradebtn');
   if (up) up.classList.toggle('hidden', !E.showUpgrade);
   const bn = document.getElementById('stickybanner');
@@ -163,15 +162,13 @@ function visibleSubcats(sg) {
 function subcatIsFree(sc) { return (D.schemesBySubcat[sc.id] || []).some(s => s.is_freemium); }
 function subcatHref(sc) { return `#/subject/${sc.subject_id}/subcategory/${sc.id}`; }
 function lessonHref(l, sc) { return `#/lesson/${l.id}` + (sc ? `?sc=${sc.id}` : ''); }
-function lessonIcon(l) { return l.has_video ? 'bi-play-btn-fill' : l.has_audio ? 'bi-music-note-beamed' : l.has_slides ? 'bi-easel' : l.has_downloads ? 'bi-file-earmark-arrow-down' : 'bi-circle'; }
 // Version B player: Cloudflare Stream when the video has a ready Stream copy, else Wistia.
 const FORCE_WISTIA = /[?&]player=wistia\b/.test(location.search);
 function wistia(id) {
   const uid = !FORCE_WISTIA && D.streamMap && D.streamMap.get(id);
-  if (uid) return `<div class="videobox" data-player="stream"><iframe src="https://${STREAM_DOMAIN}/${esc(uid)}/iframe?preload=metadata&letterboxColor=transparent" loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Video"></iframe></div>`;
-  return `<div class="videobox" data-player="wistia"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`;
+  if (uid) return `<div class="wistia-ratio videobox" data-player="stream"><iframe src="https://${STREAM_DOMAIN}/${esc(uid)}/iframe?preload=metadata&letterboxColor=transparent" loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Video"></iframe></div>`;
+  return `<div class="wistia-ratio videobox" data-player="wistia"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`;
 }
-// The map is optional: if the view is missing or unreadable, every video falls back to Wistia.
 async function loadStreamMap() {
   try {
     const rows = await rest('video_stream_map?select=wistia_id,stream_uid', { all: true });
@@ -180,10 +177,10 @@ async function loadStreamMap() {
   const el = document.getElementById('playerstamp');
   if (el) el.textContent = FORCE_WISTIA ? 'Videos: Wistia (forced).' : D.streamMap.size ? `Videos: Cloudflare Stream (${D.streamMap.size} mapped), Wistia fallback.` : 'Videos: Wistia (Stream map not available yet).';
 }
-function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; }
+function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; document.body.classList.toggle('with-bg-img', !!url); }
 
 // ---------- routing ----------
-const app = document.getElementById('app');
+const app = document.getElementById('app-page');
 function reveal() { app.classList.remove('reveal'); void app.offsetWidth; app.classList.add('reveal'); }
 window.addEventListener('hashchange', route);
 async function route() {
@@ -192,7 +189,10 @@ async function route() {
   const qs = Object.fromEntries(new URLSearchParams(query));
   const p = pathPart.split('/').filter(Boolean);
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (p[0] || 'home')));
-  document.querySelectorAll('.sbtn').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
+  document.querySelectorAll('#scrollable-navbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
+  const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
+  const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
+  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile');
   window.scrollTo(0, 0);
   try {
     if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
@@ -201,7 +201,10 @@ async function route() {
     if (p[0] === 'subject') return pageSubject(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
-    if (p[0] === 'browse') return pageBrowse();
+    if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
+    if (p[0] === 'favourites') { app.innerHTML = '<div class="notice">Favourites arrive in the next increment (v0.27).</div>'; return; }
+    if (p[0] === 'curriculum') { app.innerHTML = '<div class="notice">The School Curriculum Management page arrives in v0.28.</div>'; return; }
+    if (p[0] === 'profile') { app.innerHTML = '<div class="notice">My personal profile arrives in v0.28.</div>'; return; }
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
@@ -211,9 +214,107 @@ async function route() {
 function renderSubjectBar() {
   // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
   const subjects = D.subjects.filter(s => E.buttons.includes(s.id) && canViewSubject(s)).sort(byOrder);
-  document.getElementById('subjectbar').innerHTML = subjects.map(s =>
-    `<a class="sbtn" data-id="${s.id}" href="#/subject/${s.id}" style="background:#${esc(s.button_colour || '733088')}"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')}"></i>${esc(s.name)}</a>`).join('');
+  document.getElementById('scrollable-navbar').innerHTML = subjects.map(s =>
+    `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
+  document.getElementById('subjectnav').classList.toggle('hidden', subjects.length < 2);
+  setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
+
+// Menu dropdown: nav/partials/user-info.blade.php. Items whose pages are not built yet still
+// appear, as on the live site, and land on a short notice.
+function renderUserMenu() {
+  const m = Auth.me() || {};
+  const item = (href, label, extra = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none" ${extra}>${label}</a>`;
+  const div = '<div class="dropdown-divider"></div>';
+  let html = item('#/', 'Home') + div + item('#/search', 'Search') + item('#/favourites', 'Favourites') + item('#/curriculum', 'Curriculum') + div +
+    item('#/profile', 'My Profile') + item(m.is_admin ? '#/school-management' : '#/my-school', m.is_admin ? 'School Management' : 'My School') +
+    (E.showUpgrade ? item('#/upgrade', 'Upgrade') : '') + div + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div +
+    `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
+  const menu = document.getElementById('usermenu'); menu.innerHTML = html;
+  menu.querySelector('#logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
+  const btn = document.getElementById('dropdownMenuButton');
+  if (!btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('show'); });
+    document.addEventListener('click', () => menu.classList.remove('show'));
+    menu.addEventListener('click', () => menu.classList.remove('show'));
+  }
+}
+
+// Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
+function renderBrowse() {
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
+  const tabs = [], panes = [];
+  subjects.forEach((s, i) => {
+    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
+    if (!sgs.length) return;
+    const on = tabs.length === 0 ? ' active' : '';
+    tabs.push(`<a class="list-group-item list-group-item-action cursor-pointer text-truncate${on}" data-pane="${s.id}" role="tab"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')} text-primary me-2 d-none d-sm-inline"></i> ${esc(s.name)}</a>`);
+    panes.push(`<div class="tab-pane py-4 px-3${on}" data-pane="${s.id}" role="tabpanel">
+      <div class="row"><div class="col-12 title"><a class="h4 text-primary" href="#/subject/${s.id}">${esc(s.name)}</a><button type="button" class="btn-close float-end text-primary" data-close aria-label="Close"></button><hr class="mt-2"></div></div>
+      <div class="card-columns subject-subgroup-columns">` + sgs.map(({ sg, subcats }) =>
+        `<div class="card w-100 d-inline-block bg-transparent border-0 my-2"><div class="card-body p-0"><ul class="list-unstyled"><li class="h6 text-primary"><a class="text-primary" href="#/subject/${s.id}">${esc(sg.name)}</a></li>` +
+        subcats.map(sc => `<li class="mb-1"><a class="text-mid-purple fw-light" href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('') + `</ul></div></div>`).join('') + `</div></div>`);
+  });
+  document.getElementById('browse-tabs').innerHTML = tabs.join('');
+  document.getElementById('browse-panes').innerHTML = panes.join('');
+  const modal = document.getElementById('subject-browse-modal');
+  modal.querySelectorAll('#browse-tabs a').forEach(a => a.addEventListener('click', () => {
+    modal.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === a.dataset.pane));
+  }));
+  modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeBrowse));
+  modal.querySelectorAll('#browse-panes a[href]').forEach(a => a.addEventListener('click', closeBrowse));
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = '1';
+    modal.addEventListener('click', e => { if (e.target === modal) closeBrowse(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBrowse(); hideModal('search-modal'); } });
+    document.getElementById('browsebtn').addEventListener('click', openBrowse);
+  }
+  document.getElementById('browsebtnwrap').classList.toggle('hidden', !tabs.length);
+}
+// Modals (live: Bootstrap). One small helper here instead of the Bootstrap JS bundle.
+function showModal(id) {
+  const m = document.getElementById(id);
+  m.style.display = 'block'; document.body.classList.add('modal-open');
+  requestAnimationFrame(() => m.classList.add('show'));
+  let bd = document.getElementById('poc-backdrop');
+  if (!bd) { bd = document.createElement('div'); bd.id = 'poc-backdrop'; bd.className = 'modal-backdrop fade show'; document.body.appendChild(bd); }
+  bd.onclick = () => hideModal(id);
+}
+function hideModal(id) {
+  const m = document.getElementById(id);
+  m.classList.remove('show'); m.style.display = 'none'; document.body.classList.remove('modal-open');
+  const bd = document.getElementById('poc-backdrop'); if (bd) bd.remove();
+}
+function bindSearchModal() {
+  const m = document.getElementById('search-modal');
+  if (m.dataset.bound) return; m.dataset.bound = '1';
+  document.getElementById('searchopen').addEventListener('click', () => { showModal('search-modal'); setTimeout(() => document.getElementById('search_term').focus(), 50); });
+  m.querySelector('[data-close]').addEventListener('click', () => hideModal('search-modal'));
+  m.addEventListener('click', e => { if (e.target === m) hideModal('search-modal'); });
+  document.getElementById('search-form').addEventListener('submit', e => {
+    e.preventDefault(); hideModal('search-modal');
+    location.hash = '#/search?q=' + encodeURIComponent(document.getElementById('search_term').value.trim());
+  });
+}
+function bindSubjectScroll() {
+  const nav = document.getElementById('scrollable-navbar'); if (!nav || nav.dataset.bound) return; nav.dataset.bound = '1';
+  document.querySelectorAll('.navbar-subjects .scroll-button').forEach(b => b.addEventListener('click', () => nav.scrollBy({ left: b.dataset.scroll === 'left' ? -150 : 150, behavior: 'smooth' })));
+  const upd = () => {
+    const max = nav.scrollWidth - nav.clientWidth;
+    document.querySelector('.scroll-button[data-scroll="left"]').classList.toggle('d-none', nav.scrollLeft <= 0);
+    document.querySelector('.scroll-button[data-scroll="right"]').classList.toggle('d-none', max <= 0 || nav.scrollLeft >= max - 1);
+  };
+  nav.addEventListener('scroll', upd); window.addEventListener('resize', upd); upd();
+}
+function openBrowse() {
+  const m = document.getElementById('subject-browse-modal');
+  const cur = (location.hash.match(/^#\/subject\/(\d+)/) || [])[1];
+  if (cur) m.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === cur));
+  if (!m.querySelector('#browse-tabs a.active')) { const f = m.querySelector('#browse-tabs a'); if (f) f.click(); }
+  showModal('subject-browse-modal');
+}
+function closeBrowse() { hideModal('subject-browse-modal'); }
 function cleanIcon(i) { if (!i) return ''; const m = i.match(/class="([^"]+)"/); return (m ? m[1] : i).trim(); }
 
 function pageHome() {
@@ -227,11 +328,11 @@ function pageHome() {
   for (const s of subjects) {
     const feats = [1, 2, 3, 4].map(i => ({ sc: D.subcatById[s[`featured_subcategory_id_${i}`]], heading: s[`featured_heading_${i}`], sub: s[`featured_subheading_${i}`] })).filter(f => f.sc);
     if (!feats.length) continue;
-    html += `<section class="block"><div class="bh"><a href="#/subject/${s.id}">${esc(s.name)}</a><a class="right" href="#/subject/${s.id}">View all &rarr;</a></div><div class="bb"><div class="grid">`;
-    for (const f of feats) {
-      html += `<div class="tile"><img src="${esc(img(f.sc.image))}" alt="" loading="lazy"><div class="tb"><h4>${esc(limit(f.heading || f.sc.name, 30))}</h4><p>${esc(limit(f.sub || f.sc.subheading, 200))}</p></div><a class="cover" href="${subcatHref(f.sc)}" aria-label="${esc(f.sc.name)}"></a></div>`;
-    }
-    html += `</div></div></section>`;
+    html += `<div class="row"><div class="col-12 position-relative"><div class="card shadow bg-light-purple border-primary mb-5">
+      <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex justify-content-between position-relative"><a href="#/subject/${s.id}" class="text-decoration-none stretched-link text-white d-flex justify-content-between w-100"><div>${esc(s.name)}</div><div class="flex-end"><small class="ml-3 text-white">View all &rarr;</small></div></a></h5>
+      <div class="card-body pb-1"><div class="row row-cols-1 row-cols-md-2 row-cols-xxl-4">`;
+    for (const f of feats) html += subcatCard(f.sc, { heading: f.heading, sub: f.sub, cols: 'col mb-4' });
+    html += `</div></div></div></div></div>`;
   }
   app.innerHTML = html || '<div class="notice">Nothing to show on the home page yet.</div>';
   reveal();
@@ -240,40 +341,95 @@ function pageHome() {
 function pageSubject(id) {
   const s = D.subjectById[id];
   if (!s) { app.innerHTML = '<div class="notice">Subject not found.</div>'; return; }
-  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
+  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn btn-primary btn-sm" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   setBg(s.background_image_url);
   const video = s.is_featuring_video && (s.featured_video_wistia_id_paid_ks2 || s.featured_video_wistia_id_free);
   const vHead = s.featured_video_heading_paid_ks2 || s.featured_video_heading_free, vSub = s.featured_video_subheading_paid_ks2 || s.featured_video_subheading_free;
-  let html = `<div class="subject-head ${video ? 'with-video' : ''}"><div><h1>${esc(s.name)}</h1><p class="light">${nl(s.description)}</p></div>`;
-  if (video) html += `<div><h4 style="color:var(--purple)">${esc(vHead || 'Featured')} <span class="muted light">${esc(vSub || '')}</span></h4>${wistia(video)}</div>`;
-  html += `</div>`;
+  const vDesc = s.featured_video_description_paid_ks2 || s.featured_video_description_free || '';
+  let html = `<div class="row pt-4 pb-2 d-none d-sm-block"><div class="col"><div class="card shadow border-primary bg-ultra-light-purple rounded">
+    <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(s.name)}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide"></button></div></h5>
+    ${s.description ? `<div class="collapse-smooth"><div><div class="card-body"><p class="fw-light text-primary h6 mb-0">${nl(s.description)}</p></div></div></div>` : ''}</div><hr></div></div>`;
+  if (video) html += `<div class="row"><div class="col-12"><div class="card shadow-lg border-primary mb-5">
+    <h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(vHead || 'Featured')}${vSub ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(vSub)}</small>` : ''}<small class="float-end"><span class="badge bg-warning"><i class="bi-star-fill mr-1 mt-1"></i> <span style="position: relative; top: 1px;">Featured</span></span></small></h5>
+    <div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block"><div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(video)}</div>
+    ${vDesc ? `<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(vDesc)}</p></div>` : ''}</div></div></div></div></div></div></div>`;
   const subgroups = (D.subgroupsBySubject[id] || []).sort(byOrder);
   let any = false;
   for (const sg of subgroups) {
     const subcats = visibleSubcats(sg);
     if (!subcats.length) continue; any = true;
-    html += `<section class="block collapsible"><div class="bh">${esc(sg.name)}${sg.description ? `<small>${esc(sg.description)}</small>` : ''}<button class="collapse-btn right" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"><i class="bi-chevron-up"></i></button></div><div class="bb"><div class="bbi"><div class="grid">`;
-    for (const sc of subcats) {
-      const lessons = subcatLessons(sc), ages = ageRange(lessons);
-      const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
-      html += `<div class="tile"><img src="${esc(img(sc.image))}" alt="" loading="lazy"><div class="tb"><h4>${esc(limit(sc.name, 25))}</h4>${sc.subheading ? `<p>${esc(limit(sc.subheading, 130))}</p>` : ''}</div><div class="tf">` +
-        (ages ? ageStripRange(ages) : '') +
-        (lessons.length ? `<span><i class="bi-collection-play"></i>${lessons.length} ${esc(noun(sc, lessons.length))}</span>` : '') +
-        (vid ? `<span><i class="bi-film"></i>${esc(vid)} video</span>` : '') +
-        (subcatIsFree(sc) ? `<span class="badge">Free</span>` : '') +
-        `</div><a class="cover" href="${subcatHref(sc)}" aria-label="${esc(sc.name)}"></a></div>`;
-    }
-    html += `</div></div></div></section>`;
+    html += `<div class="row" id="parent-subgroup-${sg.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
+      <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(sg.name)}${sg.description ? ` <small class="text-light-purple ml-0 ml-sm-3 d-block d-sm-inline fw-light i-small">${esc(sg.description)}</small>` : ''}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"></button></div></h5>
+      <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row">`;
+    for (const sc of subcats) html += subcatCard(sc, {});
+    html += `</div></div></div></div></div></div></div>`;
   }
   if (!any) html += '<div class="notice">This subject has no live content at the moment.</div>';
   app.innerHTML = html;
   reveal();
-  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => { const closed = b.closest('.block').classList.toggle('closed'); b.setAttribute('aria-expanded', !closed); }));
+  bindCollapses();
 }
 
-function crumbs(parts) {
-  return `<div class="breadcrumb">` + parts.map((p, i) => (i ? '<i class="bi-chevron-right"></i>' : '') + (p.href ? `<a href="${p.href}">${esc(p.name)}</a>` : `<span class="cur">${esc(p.name)}</span>`)).join('') + `</div>`;
+// Collapsible panels (live: Bootstrap collapse + subcategory_display_state.js remembering the
+// state); here with the expand-in-place transition agreed on 19 Oct.
+function bindCollapses() {
+  app.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => {
+    const body = b.closest('.card').querySelector('.collapse-smooth'); if (!body) return;
+    const closed = body.classList.toggle('closed'); b.classList.toggle('collapsed', closed); b.setAttribute('aria-expanded', !closed);
+  }));
 }
+
+// A subcategory card: subjects/partials/subcategory-card.blade.php (desktop variant).
+function subcatCard(sc, { heading, sub, cols } = {}) {
+  const lessons = subcatLessons(sc), ages = ageRange(lessons);
+  const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
+  const subheading = sub || sc.subheading;
+  const meta = (ages ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><i class="bi-person-lines-fill text-primary me-1"></i> Ages ${esc(ages)}</li>` : '') +
+    (lessons.length ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-collection-play text-primary me-1"></i> ${lessons.length} ${esc(noun(sc, lessons.length))}</span></li>` : '') +
+    (vid ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-film text-primary me-1"></i> ${esc(vid)} video</span></li>` : '') +
+    (subcatIsFree(sc) ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-end align-items-center"><span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span></li>` : '');
+  return `<div class="${cols || 'col-12 col-md-6 col-lg-6 col-xl-3 mb-4'}"><a href="${subcatHref(sc)}" title="${esc(sc.name)}" class="text-decoration-none">
+    <div class="card subcategory-card lift shadow-sm d-flex flex-column h-100"><img src="${esc(img(sc.image))}" class="card-img-top" alt="${esc(sc.name)}" loading="lazy">
+    <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center">
+      <h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>
+      ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
+    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div></a></div>`;
+}
+
+// ---------- category, scheme and lesson pages (live markup, v0.26) ----------
+// Markup follows subjects/show-subcategory.blade.php, subjects/partials/scheme-card.blade.php
+// and lessons/show.blade.php + lessons/lesson-part.blade.php. Kept from the PoC (agreed
+// 1 Nov 2026): same-named age-variant schemes merged into one card with an age switch,
+// lessons expanding in place on the category page, "link to a URL" categories that point
+// back into the platform followed internally, and the Stream player via wistia().
+
+// Breadcrumb card (the live page's top card)
+function crumbs(parts) {
+  const inner = parts.map((p, i) => (i ? '<i class="bi-chevron-right text-mid-purple mx-2"></i>' : '') +
+    (p.href ? `<a href="${p.href}" class="text-mid-purple">${esc(p.name)}</a>` : `<span class="text-purple">${esc(p.name)}</span>`)).join('');
+  return `<div class="row pt-4 pb-2"><div class="col"><div class="row"><div class="col-12"><div class="card shadow border-primary bg-ultra-light-purple rounded"><div class="card-body py-3"><div class="d-block d-md-flex h-100 justify-content-start align-items-center">${inner}</div></div></div></div></div><hr class="d-md-block d-none"></div></div>`;
+}
+// Lesson::getAgeRange()
+function ageText(l, withPrefix = true) {
+  if (!l.age_min && !l.age_max) return '';
+  const range = l.age_min && l.age_max && l.age_min !== l.age_max;
+  const prefix = withPrefix ? (range ? 'Ages ' : 'Age ') : '';
+  return range ? `${prefix}${l.age_min}-${l.age_max}` : `${prefix}${l.age_min || l.age_max}`;
+}
+function ageTextRange(r, withPrefix = true) { if (!r) return ''; const [a, b] = r.split('-').map(Number); return ageText({ age_min: a, age_max: b }, withPrefix); }
+// Lesson::getResourceIcon() (unseen variants)
+function lessonIcon(l) { return l.has_video ? 'bi-play-btn-fill' : l.has_audio ? 'bi-file-music-fill' : l.has_slides ? 'bi-easel-fill' : l.has_lesson_plan ? 'bi-file-earmark-ruled-fill' : l.has_downloads ? 'bi-file-arrow-down-fill' : l.has_assessment_template ? 'bi-file-pdf-fill' : 'bi-play-btn-fill'; }
+// LessonPart::getPartIcon()
+function partIcon(p) { return { Video: 'bi-camera-reels-fill', Audio: 'bi-file-music-fill', Slides: 'bi-easel-fill', Download: 'bi-file-arrow-down-fill', Image: 'bi-file-image-fill' }[p.media_type] || 'bi-file-earmark-ruled-fill'; }
+const para = (t, cls = 'text-purple') => t && String(t).trim() ? `<p class="card-text ${cls} fw-light text-6 mb-1 pe-1">${nl(t)}</p>` : '';
+// The scheme-card body text (scheme-card.blade.php media-body)
+function schemeBody(s) {
+  let h = para(s.description) + para(s.body_opening_text);
+  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`]) h += `<h5 class="text-purple">${esc(s[`body_subheading_${i}`])}</h5>${para(s[`body_subheading_${i}_text`], 'text-mid-purple')}`;
+  h += para(s.body_closing_text);
+  return h;
+}
+function upgradeHref() { return '#/upgrade'; }
 
 function pageSubcategory(subjectId, id) {
   const sc = D.subcatById[id];
@@ -283,143 +439,112 @@ function pageSubcategory(subjectId, id) {
   const subject = D.subjectById[sc.subject_id] || D.subjectById[subjectId], sg = D.subgroupById[sc.subgroup_id];
   setBg(sc.background_image_url || subject?.background_image_url);
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, { name: sc.name }].filter(Boolean));
+  html += `<div class="row"><div class="col-12 order-2 order-lg-1"><div class="row"><div class="col-sm">`;
   if (sc.is_redirect_to_url && sc.url_redirect) {
-    // Many "link to a URL" sections point back into the platform itself: follow those internally.
     const m = sc.url_redirect.match(/platform\.imoves\.com\/subjects\/(\d+)(?:\/subcategories\/(\d+))?/);
     if (m && m[2] && D.subcatById[+m[2]]) { location.replace(subcatHref(D.subcatById[+m[2]])); return; }
     if (m && !m[2] && D.subjectById[+m[1]]) { location.replace(`#/subject/${m[1]}`); return; }
-    if (/platform\.imoves\.com\/subscribe/.test(sc.url_redirect)) {
-      html += `<div class="notice">This section opens the subscription options page, which is not part of this prototype.</div>`;
-    } else {
-      const host = sc.url_redirect.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
-      const isFile = /\.(pdf|jpg|jpeg|png)(\?|$)/i.test(sc.url_redirect);
-      html += `<section class="scheme"><div class="sh">${esc(sc.name)}</div><div class="intro" style="flex-direction:column"><div class="txt">${sc.description ? `<p>${nl(sc.description)}</p>` : ''}<p><a class="btn" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'}"></i> ${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p><p class="muted" style="font-size:.9rem">Opens in a new tab.</p></div></div></section>`;
-    }
-    app.innerHTML = html; reveal(); return;
-  }
-  if (sc.is_direct_resource) {
-    const vid = sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_all;
-    html += `<section class="scheme"><div class="sh">${esc(sc.direct_resource_heading_paid || sc.direct_resource_heading_all || sc.name)}</div><div class="intro" style="flex-direction:column">` +
-      (vid ? wistia(vid) : '') + `<div class="txt"><p>${nl(sc.direct_resource_text_paid || sc.direct_resource_text_all || sc.description)}</p>` +
-      (sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<a class="btn" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener">${esc(sc.direct_resource_link_text || 'Open')}</a>` : '') + `</div></div></section>`;
+    const host = sc.url_redirect.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    const isFile = /\.(pdf|jpg|jpeg|png)(\?|$)/i.test(sc.url_redirect);
+    html += /platform\.imoves\.com\/subscribe/.test(sc.url_redirect)
+      ? `<div class="notice">This section opens the subscription options page, which arrives with Phase 2.</div>`
+      : `<div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow"><div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0"><h5 class="text-truncate text-white mr-1 mb-0">${esc(sc.name)}</h5></div></div></div></div><div class="row g-0"><div class="col px-3 pt-4 pb-3">${para(sc.description)}<p><a class="btn btn-primary" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'} me-2"></i>${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p></div></div></div>`;
+    app.innerHTML = html + `</div></div></div></div>`; reveal(); return;
   }
   const schemes = D.schemesBySubcat[id] || [];
-  // Same-named schemes in one category are age variants of one resource (a Quickbase workaround
-  // for the user age filter): present them as one card with an age switch.
+  // Age variants: same-named schemes in one category become one card with an age switch.
   const groups = []; const byName = {};
   for (const s of schemes) {
     const key = (s.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
     if (key && byName[key]) byName[key].push(s); else { const g = [s]; if (key) byName[key] = g; groups.push(g); }
   }
   for (const g of groups) {
-    const variants = g.map(s => ({ s, lessons: schemeLessons(s), ages: ageRange(schemeLessons(s)) }))
-      .sort((a, b) => (parseInt(a.ages) || 99) - (parseInt(b.ages) || 99));
-    const first = variants[0].s;
-    const allLessons = variants.flatMap(v => v.lessons);
-    const anyFree = variants.some(v => v.s.is_freemium);
-    const merged = variants.length > 1;
-    // which variant opens: the one covering "my class", else the first
+    const variants = g.map(s => ({ s, lessons: schemeLessons(s), ages: ageRange(schemeLessons(s)) })).sort((a, b) => (parseInt(a.ages) || 99) - (parseInt(b.ages) || 99));
+    const first = variants[0].s, merged = variants.length > 1;
     let sel = variants.findIndex(v => coversClass(v.ages)); if (sel < 0) sel = 0;
-    // switch labels: age range, falling back to subheading or a number when ranges repeat
-    const labels = variants.map((v, i) => v.ages ? `Ages ${v.ages}` : (v.s.subheading || `Version ${i + 1}`));
+    const labels = variants.map((v, i) => v.ages ? ageTextRange(v.ages) : (v.s.subheading || `Version ${i + 1}`));
     labels.forEach((l, i) => { if (labels.indexOf(l) !== i) labels[i] = `${l} (${i + 1})`; });
-    const single = allLessons.length === variants.length;
-    html += `<section class="scheme ${single ? 'single' : ''} ${merged ? 'merged' : ''}" id="scheme-${first.id}" data-scheme-ages="${merged ? '' : (variants[0].ages || '')}"><div class="sh">${esc(first.name)}${!merged && first.subheading ? `<small>${esc(first.subheading)}</small>` : ''}${anyFree ? '<span class="badge">Free</span>' : ''}<span class="right">${merged ? ageStripRange(ageRange(allLessons), 'lg') : `${ageStripRange(variants[0].ages, 'lg')}${single ? '' : `<span class="rt">${allLessons.length} ${esc(noun(sc, allLessons.length))}</span>`}`}</span></div>`;
-    const ageSwitch = merged ? `<div class="agerow"><span class="agesw" role="tablist" aria-label="Age version">${labels.map((l, i) => `<button type="button" role="tab" aria-selected="${i === sel}" data-variant="${i}">${esc(l)}</button>`).join('')}</span></div>` : '';
+    const sw = merged ? `<div class="btn-group btn-group-sm ms-2 age-switch" role="group" aria-label="Age version">${labels.map((l, i) => `<button type="button" class="btn ${i === sel ? 'btn-light text-primary' : 'btn-outline-light'}" data-variant="${i}">${esc(l)}</button>`).join('')}</div>` : '';
+    html += `<a id="scheme-${first.id}"></a><div class="row"><div class="col"><div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow" data-scheme="${first.id}">
+      <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0">
+        <h5 class="text-truncate text-white mr-1 mb-0">${esc(first.name)}${!merged && first.subheading ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(first.subheading)}</small>` : ''}${variants.some(v => v.s.is_freemium) ? ' <span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span>' : ''}</h5>${sw}</div></div></div></div>`;
     variants.forEach((v, i) => {
-      const s2 = v.s, lessons = v.lessons, one = lessons.length === 1, l0 = lessons[0];
-      html += `<div class="variant" data-scheme-ages="${v.ages || ''}" ${i === sel ? '' : 'hidden'}>`;
-      html += `<div class="intro"><img src="${esc(img(s2.image))}" alt="" loading="lazy"><div class="txt">${merged && s2.subheading ? `<p class="muted" style="margin-top:0">${esc(s2.subheading)}</p>` : ''}${schemeBody(s2)}</div></div>${ageSwitch}`;
-      if (one && !canAccessLesson(l0)) {
-        html += `<div class="lmini"><i class="bi-lock-fill"></i> ${esc(E.lessonMessage)}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div><div style="padding-bottom:1rem"></div>`;
-      } else if (one) {
-        html += `<div class="lmini">${lessonMeta(l0, false)}<a class="btn small outline" href="${lessonHref(l0, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
-        html += `<div class="lbc" data-lesson-body="${l0.id}" data-scheme-text="${esc((s2.body_opening_text || s2.description || '').trim().slice(0, 80))}"></div>`;
-      } else {
-        html += `<div class="lessons">` + lessons.map(l => canAccessLesson(l)
-          ? `<div class="lx" data-lesson="${l.id}"><button class="lrow" type="button" aria-expanded="false"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4>${l.description ? `<span>${esc(l.description)}</span>` : ''}</div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${l.duration ? `<span title="Around ${l.duration} minutes"><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div></button><div class="lb"><div class="lbi"><div class="lbc" data-lesson-body="${l.id}"></div></div></div></div>`
-          : `<div class="lx locked"><div class="lrow"><i class="res bi-lock-fill"></i><div class="lt"><h4>${esc(l.name)}</h4><span>${esc(E.lessonMessage)}</span></div><div class="meta">${lessonAges(l) !== v.ages ? ageStripRange(lessonAges(l)) : ''}${E.showUpgrade ? `<a class="btn small" href="#/upgrade">${esc(E.upgradeText)}</a>` : ''}</div></div></div>`).join('') + `</div>`;
-      }
-      html += `</div>`;
+      const s2 = v.s;
+      html += `<div class="variant" ${i === sel ? '' : 'hidden'}>
+        <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(s2.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(s2.name)}"><div class="media-body px-1">${merged && s2.subheading ? para(s2.subheading, 'text-mid-purple') : ''}${schemeBody(s2)}</div></div></div></div>
+        <div class="row mt-2"><div class="col"><div class="card-body pt-0 pb-4">` + v.lessons.map(l => lessonRow(l, sc, v.ages)).join('') + `</div></div></div></div>`;
     });
-    html += `</section>`;
+    html += `</div></div></div>`;
+  }
+  if (sc.is_direct_resource) {
+    const vid = sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_all;
+    const head = sc.direct_resource_heading_paid || sc.direct_resource_heading_all || sc.name;
+    html += `<div class="row"><div class="col-12"><div class="card shadow-lg border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(head)}</h5><div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block">${vid ? `<div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(vid)}</div>` : ''}<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(sc.direct_resource_text_paid || sc.direct_resource_text_all || sc.description)}</p></div></div></div></div>${sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<div class="row"><div class="col-sm"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><a class="text-primary stretched-link" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener"><i class="bi-arrow-right-circle me-2 text-primary"></i>${esc(sc.direct_resource_link_text || 'Open')}</a></p></div></div></div>` : ''}</div></div></div></div>`;
   }
   if (!schemes.length && !sc.is_direct_resource) html += '<div class="notice">This section has no live schemes at the moment.</div>';
-  app.innerHTML = html;
+  app.innerHTML = html + `</div></div></div></div>`;
   reveal();
-  // single-lesson schemes: fetch every lesson and part for the page in two requests, then fill the cards
-  const singles = [...app.querySelectorAll('.variant > [data-lesson-body]')];
-  if (singles.length) {
-    const ids = singles.map(el => el.dataset.lessonBody).join(',');
-    Promise.all([
-      rest(`lessons?id=in.(${ids})&select=*`),
-      rest(`lesson_parts?lesson_id=in.(${ids})&is_live=eq.true&is_archived=eq.false&order=lesson_id,order,index&select=*`),
-    ]).then(([ls, ps]) => {
-      const lById = index(ls), pByLesson = group(ps, 'lesson_id');
-      singles.forEach(el => renderLessonBody(el, lById[+el.dataset.lessonBody], pByLesson[+el.dataset.lessonBody] || [], sc, true));
-    }).catch(e => singles.forEach(el => { el.innerHTML = `<div class="notice">Could not load parts: ${esc(e.message)}</div>`; }));
-  }
-  // age switch on merged cards
-  app.querySelectorAll('.agesw button').forEach(b => b.addEventListener('click', () => {
-    const card = b.closest('.scheme'); const i = +b.dataset.variant;
-    card.querySelectorAll('.agesw button').forEach(x => x.setAttribute('aria-selected', +x.dataset.variant === i));
+  app.querySelectorAll('.age-switch button').forEach(b => b.addEventListener('click', () => {
+    const card = b.closest('.scheme-card'); const i = +b.dataset.variant;
+    card.querySelectorAll('.age-switch button').forEach(x => { const on = +x.dataset.variant === i; x.classList.toggle('btn-light', on); x.classList.toggle('text-primary', on); x.classList.toggle('btn-outline-light', !on); });
     card.querySelectorAll('.variant').forEach((v, j) => { v.hidden = j !== i; });
   }));
-  // multi-lesson schemes: open one lesson at a time, loading its parts on first open
-  app.querySelectorAll('.lx > .lrow').forEach(btn => btn.addEventListener('click', async () => {
-    const lx = btn.parentElement, wasOpen = lx.classList.contains('open');
-    lx.closest('.lessons').querySelectorAll('.lx.open').forEach(o => { o.classList.remove('open'); o.querySelector('.lrow').setAttribute('aria-expanded', 'false'); });
+  bindLessonRows(sc);
+}
+
+// One lesson row of the scheme card (scheme-card.blade.php accordion item), with the PoC's
+// expand-in-place body underneath.
+function lessonRow(l, sc, schemeAges) {
+  const ok = canAccessLesson(l);
+  const showAge = !classAge() && lessonAges(l) && lessonAges(l) !== schemeAges;
+  const meta = (showAge ? `<span class="lesson-icon text-truncate ms-2 my-1" title="Suitable for ages ${esc(lessonAges(l))}"><i class="bi-person text-purple mr-1"></i> <span class="d-inline d-xl-none">${esc(lessonAges(l))}yrs</span><span class="d-none d-xl-inline">${esc(ageText(l))}</span></span>` : '') +
+    (l.duration ? `<span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1" title="Around ${l.duration} minutes long"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span>` : '');
+  return `<div class="accordion list-group list-group-horizontal shadow mt-0 mb-2 ${ok ? '' : 'content-restricted'} lesson-x" data-lesson="${l.id}">
+    <div class="list-group-item list-group-item-action cursor-pointer px-3 lesson-row" role="button" aria-expanded="false"><div class="row h-100"><div class="col d-flex align-items-center">
+      <div class="d-flex justify-content-start align-items-center pe-1"><i class="${ok ? 'text-primary ' + lessonIcon(l) : 'text-mid-purple bi-lock-fill'} h5 my-0 me-2"></i></div>
+      <div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(l.name)}${l.is_freemium ? ' <small class="ms-1 scheme-badge badge-freemium"><span class="badge bg-success">Free</span></small>' : ''}</h5><span class="w-100 text-mid-purple fw-light">${ok ? esc(l.description || '') : esc(E.lessonMessage)}</span></div>
+      <div class="d-none d-md-flex flex-shrink-0 align-items-center"><small class="ms-3 d-flex flex-wrap justify-content-end text-muted text-mid-purple fw-light">${ok ? meta : (E.showUpgrade ? `<a class="btn btn-primary btn-sm" href="${upgradeHref()}">${esc(E.upgradeText)}</a>` : '')}</small></div>
+    </div></div></div>
+    <div class="list-group-item px-1 px-md-3"><div class="d-none d-md-flex flex-column h-100 justify-content-around align-items-center"><div>
+      <div class="${l.description ? 'mb-1' : ''}"><div class="lesson-icon cursor-pointer mark-as-complete" title="Mark as Complete" data-lesson-id="${l.id}"><i class="bi-circle text-mid-purple"></i></div></div>
+      <div><div class="lesson-icon cursor-pointer add-to-favourites" title="Add to Favourites" data-lesson-id="${l.id}"><i class="bi-star text-mid-purple"></i></div></div>
+    </div><div><div class="btn-outline-primary curriculum-btn" title="Add to Curriculum" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus"></i></div></div></div></div>
+  </div>
+  <div class="lesson-drawer collapse-smooth closed" data-lesson-body="${l.id}"><div></div></div>`;
+}
+function bindLessonRows(sc) {
+  app.querySelectorAll('.lesson-x:not(.content-restricted) .lesson-row').forEach(row => row.addEventListener('click', async e => {
+    if (e.target.closest('a, .lesson-icon')) return;
+    const x = row.closest('.lesson-x'), drawer = x.nextElementSibling, wasOpen = !drawer.classList.contains('closed');
+    const scope = x.closest('.card-body');
+    scope.querySelectorAll('.lesson-drawer').forEach(d => d.classList.add('closed'));
+    scope.querySelectorAll('.lesson-row').forEach(r => r.setAttribute('aria-expanded', 'false'));
     if (wasOpen) return;
-    lx.classList.add('open'); btn.setAttribute('aria-expanded', 'true');
-    const body = lx.querySelector('[data-lesson-body]');
-    if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1.5rem">Loading parts…</div>'; await fillLessonBody(body, +body.dataset.lessonBody, sc, false); }
-    setTimeout(() => btn.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
+    drawer.classList.remove('closed'); row.setAttribute('aria-expanded', 'true');
+    const body = drawer.firstElementChild;
+    if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1rem">Loading…</div>'; await fillLessonBody(body, +drawer.dataset.lessonBody, sc); }
+    setTimeout(() => x.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
   }));
+  app.querySelectorAll('.mark-as-complete, .add-to-favourites, .curriculum-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); }));
 }
-
-function lessonMeta(l, withAges = true) {
-  return [withAges ? ageStripRange(lessonAges(l), 'lg') : '', l.duration ? `<span><i class="bi-clock"></i>${l.duration} min</span>` : '', l.intensity ? `<span><i class="bi-lightning-charge"></i>${esc(l.intensity)}</span>` : '', l.location && l.location.length ? `<span><i class="bi-geo-alt"></i>${esc(l.location.join(', '))}</span>` : ''].filter(Boolean).join('');
-}
-
-// Fill a lesson drawer on the category page: the lesson's own text, then its parts.
-async function fillLessonBody(el, lessonId, sc, single) {
+async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
     rest(`lessons?id=eq.${lessonId}&select=*`),
     rest(`lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index&select=*`),
   ]);
-  renderLessonBody(el, rows[0], parts, sc, single);
-}
-function renderLessonBody(el, l, parts, sc, single) {
+  const l = rows[0];
   if (!l) { el.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
-  let h = '';
-  const holder = el.closest('.variant') || el.closest('.scheme'); const schemeAges = holder ? holder.dataset.schemeAges : '';
-  if (!single) h += `<div class="lmeta">${lessonMeta(l, lessonAges(l) !== schemeAges)}<a class="btn small outline" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen"></i> Open full screen</a></div>`;
-  const holderTxt = holder && holder.querySelector('.intro .txt');
-  const shownAbove = single ? [holderTxt ? holderTxt.textContent : ''] : [l.description];
-  let body = schemeBody(l, shownAbove);
-  const sub = l.heading_2 && !single && !(l.body_opening_text || '').trim().startsWith(l.heading_2.trim()) && !(l.description || '').trim().startsWith(l.heading_2.trim());
-  if (body && single) { const txt = (el.closest('.variant') || el.closest('.scheme')).querySelector('.intro .txt'); if (txt) txt.insertAdjacentHTML('beforeend', `<div class="ltext" style="margin:.25rem 0 0">${body}</div>`); }
-  else if (body) h += `<div class="ltext">${sub ? `<h4>${esc(l.heading_2)}</h4>` : ''}${body}</div>`;
-  h += `<div class="parts">${renderParts(parts, !single)}</div>`;
-  el.innerHTML = h; el.dataset.loaded = '1';
-  el.querySelectorAll('.part button.ph').forEach(ph => ph.addEventListener('click', () => { const open = ph.parentElement.classList.toggle('open'); ph.setAttribute('aria-expanded', open); }));
+  el.innerHTML = `<div class="card scheme-card bg-ultra-light-purple border-0 shadow mb-3 lesson-inline">
+    ${lessonText(l) ? `<div class="row g-0"><div class="col px-3 pt-3 pb-2"><div class="media-body px-1">${lessonText(l)}</div></div></div>` : ''}
+    <div class="row"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true)}</div></div></div>
+    <div class="row"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><a class="btn btn-outline-primary btn-sm" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen me-1"></i> Open full page</a></div></div></div></div>`;
+  el.dataset.loaded = '1';
+  bindParts(el);
 }
-
-// Text comparison that ignores case, punctuation and spacing - used to spot repeated copy.
-const norm = t => String(t || '').toLowerCase().replace(/<[^>]+>/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
-// Assemble a scheme's or lesson's text, dropping any paragraph that repeats one already shown
-// (staff often paste the same sentence into two fields). `already` holds text shown above it.
-function schemeBody(s, already = []) {
-  const seen = already.map(norm).filter(Boolean);
-  const fresh = t => { const k = norm(t); if (!k) return false; if (seen.some(x => x === k || (k.length > 20 && x.includes(k)))) return false; seen.push(k); return true; };
-  // a field may hold several paragraphs; keep only the ones not already shown
-  const para = t => String(t || '').split(/\n\s*\n/).map(x => x.trim()).filter(fresh).map(nl).join('<br><br>');
-  const p = t => { const x = para(t); return x ? `<p>${x}</p>` : ''; };
-  let h = '';
-  h += p(s.description);
-  h += p(s.body_opening_text);
-  for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`]) { const x = para(s[`body_subheading_${i}_text`]); if (x) h += `<h4>${esc(s[`body_subheading_${i}`])}</h4><p>${x}</p>`; }
-  h += p(s.body_closing_text);
+function lessonText(l) {
+  let h = para(l.body_opening_text);
+  for (const i of [1, 2, 3]) if (l[`body_subheading_${i}`]) h += `<h5 class="text-purple">${esc(l[`body_subheading_${i}`])}</h5>${para(l[`body_subheading_${i}_text`], 'text-mid-purple')}`;
+  h += para(l.body_closing_text);
   return h;
 }
 
@@ -431,92 +556,107 @@ async function pageLesson(id, scId) {
   ]);
   const l = rows[0];
   if (!l || !l.is_live) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
-  if (!canAccessLesson(l)) { app.innerHTML = `<div class="notice"><strong>${esc(l.name)}</strong> - ${esc(E.lessonMessage)}${E.showUpgrade ? ` <a class="btn small" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
+  if (!canAccessLesson(l)) { app.innerHTML = `<div class="notice"><strong>${esc(l.name)}</strong> - ${esc(E.lessonMessage)}${E.showUpgrade ? ` <a class="btn btn-primary btn-sm" href="${upgradeHref()}" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   const scheme = D.schemeById[l.scheme_id];
   const sc = D.subcatById[scId] || (scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]);
   const subject = sc && D.subjectById[sc.subject_id], sg = sc && D.subgroupById[sc.subgroup_id];
   setBg(l.background_image_url || sc?.background_image_url || subject?.background_image_url);
   const seq = scheme ? schemeLessons(scheme) : [l];
   const pos = seq.findIndex(x => x.id === l.id), prev = seq[pos - 1], next = seq[pos + 1];
+  const label = sc ? noun(sc, 1) : 'lesson', Label = label.charAt(0).toUpperCase() + label.slice(1), Labels = (sc ? noun(sc, 2) : 'lessons').replace(/^./, c => c.toUpperCase());
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, sc && { name: sc.name, href: subcatHref(sc) }, scheme && { name: scheme.name }].filter(Boolean));
-  html += `<div class="lesson-layout"><div>`;
-  html += `<section class="scheme"><div class="sh">${esc(l.name)}${l.heading_2 ? `<small>${esc(l.heading_2)}</small>` : ''}<span class="right">${ageStripRange(lessonAges(l), 'lg')}</span></div>`;
-  html += `<div class="intro"><img src="${esc(img(scheme?.image))}" alt="" loading="lazy"><div class="txt">${schemeBody(l, [l.heading_2])}</div></div>`;
-  html += `<div class="parts">${renderParts(parts)}</div>`;
-  if (seq.length > 1) {
-    const label = sc ? noun(sc, 1) : 'lesson';
-    html += `<div class="prevnext"><a class="btn outline ${prev ? '' : 'disabled'}" href="${prev ? lessonHref(prev, sc) : '#'}"><i class="bi-skip-backward-circle"></i> Previous ${esc(label)}</a><a class="btn ${next ? '' : 'outline disabled'}" href="${next ? lessonHref(next, sc) : '#'}">Next ${esc(label)} <i class="bi-skip-forward-circle-fill"></i></a></div>`;
-  }
-  html += `</section></div>`;
-  const rows2 = [['bi-lightning-charge', l.intensity], ['bi-bullseye', l.focus], ['bi-clock', l.duration_text], ['bi-geo-alt', (l.location || []).join(', ')], ['bi-stopwatch', l.preparation_text ? `Prep: ${l.preparation_text}` : null]].filter(r => r[1]);
-  html += `<aside class="expect"><div class="row head">What to expect…</div>` + rows2.map(r => `<div class="row"><i class="${r[0]}"></i>${esc(r[1])}</div>`).join('') + `</aside></div>`;
+  html += `<div class="row"><div class="col-12 order-2 col-lg-9 order-lg-1"><div class="row"><div class="col-sm">
+    <div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow">
+      <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0"><h5 class="text-truncate text-white mr-1 mb-0">${esc(l.name)}${l.heading_2 ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(l.heading_2)}</small>` : ''}</h5><span class="d-flex flex-wrap justify-content-end text-nowrap text-light-purple fw-light py-1">${esc(ageText(l))}</span></div></div></div></div>
+      <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(scheme?.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(l.name)}"><div class="media-body px-1">${lessonText(l)}</div></div></div></div>
+      <div class="row mt-2"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true)}</div></div></div>
+      ${seq.length > 1 ? `<div class="row mt-2"><div class="col-12"><div class="card-body py-4"><div class="d-flex w-100 justify-content-between"><a href="${prev ? lessonHref(prev, sc) : '#'}" class="btn btn-outline-primary ${prev ? '' : 'disabled'}"><i class="bi-skip-backward-circle mr-1"></i> Previous ${esc(Label)}</a><a href="${next ? lessonHref(next, sc) : '#'}" class="btn ${next ? 'btn-primary' : 'btn-outline-primary disabled'}">Next ${esc(Label)} <i class="bi-skip-forward-circle-fill ms-1"></i></a></div></div></div></div>` : ''}
+    </div></div></div></div>`;
+  // Sidebar: What To Expect card (rotated, on a splodge), History / Mark as Done, Favourites
+  const splodge = ['red', 'purple', 'mid-purple', 'orange', 'blue', 'pink'][Math.floor(Math.random() * 6)];
+  const bg = !!l.background_image_url, btn = bg ? 'btn-primary' : 'btn-outline-primary';
+  const item = (icon, text) => text ? `<div class="list-group-item text-purple text-nowrap text-truncate justify-content-center d-flex flex-column flex-fill align-middle"><div class="text-truncate"><i class="${icon} text-purple mr-1"></i> ${esc(text)}</div></div>` : '';
+  html += `<div class="col-12 order-1 col-lg-3 order-lg-2">
+    <div style="background-image: url(../live/img/splodge-${splodge}.png); background-size: contain; background-repeat: no-repeat; background-position: center center; position: relative; top: 15px; margin-bottom: 45px;"><div class="w-100 h-100 px-xl-5"><div class="card border-primary h-100 justify-content-between shadow-lg rotated-4"><div class="list-group list-group-flush h-100">
+      <div class="list-group-item active text-nowrap text-truncate justify-content-center d-flex flex-column flex-fill align-middle">What To Expect...</div>
+      ${item('bi-lightning-charge', l.intensity)}${item('bi-lightbulb', l.focus)}${item('bi-clock', l.duration ? `About ${l.duration}m long` : '')}${item('bi-building', l.location && l.location.length ? `In the ${l.location.join(', ')}` : '')}${item('bi-watch', l.preparation ? `Prep in ${l.preparation}m` : '')}
+    </div></div></div></div>
+    <hr class="d-none d-lg-block mx-lg-2 ${bg ? 'border-mid-purple' : ''}">
+    <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-lesson-id="${l.id}"><i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done</button></div>
+    <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
+    <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-lesson-id="${l.id}"><i class="bi-star me-2"></i> Add to <span class="d-none d-xl-inline">Favourite ${esc(Labels)}</span><span class="d-inline d-xl-none">Favourites</span></button></div>
+    ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div>` : ''}
+    <div class="my-4 px-2"><div class="${btn}"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}" title="Add to Curriculum"><i class="bi bi-bookmark-plus"></i></button></div></div>
+  </div></div>`;
   app.innerHTML = html;
   reveal();
-  app.querySelectorAll('.part button.ph').forEach(h => h.addEventListener('click', () => { const open = h.parentElement.classList.toggle('open'); h.setAttribute('aria-expanded', open); if (open) h.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }));
+  bindParts(app);
+  app.querySelectorAll('.mark-as-complete, .add-to-favourites, [data-thumb], .curriculum-btn').forEach(b => b.addEventListener('click', () => { b.classList.add('disabled'); b.title = 'Arrives in v0.27/v0.28'; }));
 }
 
-function partIcon(p) { return { Video: 'bi-play-btn-fill', Audio: 'bi-music-note-beamed', Slides: 'bi-easel-fill', Download: 'bi-file-earmark-arrow-down-fill', Image: 'bi-file-image-fill' }[p.media_type] || 'bi-card-text'; }
-function renderPart(p, open) {
-  const info = p.additional_info ? `<p>${nl(p.additional_info)}</p>` : '';
-  if (p.media_type === 'Download') {
-    // A download is an action, not a drawer: the whole row opens the file.
-    return `<div class="part"><a class="ph dl" href="${esc(p.s3_url)}" target="_blank" rel="noopener"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || 'Download')}</h4><span class="dlpill"><i class="bi-download"></i> Download</span></a>${info ? `<div class="pc" style="display:block;grid-template-rows:1fr;opacity:1;padding:0 1rem .8rem 4rem"><div class="pci">${info}</div></div>` : ''}</div>`;
-  }
-  let body = '';
-  switch (p.media_type) {
-    case 'Video': body = (p.wistia_id ? wistia(p.wistia_id) : '<div class="notice">No video id on this part.</div>') + info; break;
-    case 'Audio': body = `<audio controls controlsList="nodownload" preload="none" src="${esc(p.s3_url)}"></audio>` + info; break;
-    case 'Slides': body = `<div class="slides"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" allowfullscreen title="Slides"></iframe></div>` + info; break;
-    case 'Image': body = `<img class="pimg" src="${esc(p.s3_url)}" alt="${esc(p.heading)}">` + info; break;
-    default: body = info || '<p class="muted">No content.</p>';
-  }
-  return `<div class="part ${open ? 'open' : ''}"><button class="ph" type="button" aria-expanded="${open}"><i class="pi ${partIcon(p)}"></i><h4>${esc(p.heading || p.media_type)}</h4>${p.duration ? `<span class="pm"><i class="bi-stopwatch"></i> ${esc(p.duration)}</span>` : ''}<span class="chev" aria-hidden="true"></span></button><div class="pc"><div class="pci">${body}</div></div></div>`;
-}
-function renderParts(parts, autoOpen = true) {
+// Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
+function renderParts(l, parts, openFirst) {
   if (!parts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
-  // open the first part that expands (a download opens straight away, so skip those)
-  const firstOpen = autoOpen ? parts.findIndex(p => p.media_type !== 'Download') : -1;
-  return `<div class="plist">` + parts.map((p, i) => renderPart(p, i === firstOpen)).join('') + `</div>`;
+  return `<div class="accordion list-group shadow mt-0 mb-2" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
+    const show = openFirst && i === 0;
+    const info = p.additional_info && p.additional_info.trim();
+    const infoHtml = info ? para(p.additional_info) : '';
+    let card = '';
+    switch (p.media_type) {
+      case 'Video': card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start ms-1 me-3 mb-3 mb-md-0">${p.wistia_id ? wistia(p.wistia_id) : '<div class="notice">No video id on this part.</div>'}</div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
+      case 'Audio': card = `<div class="media d-block align-items-center"><div class="img-thumbnail shadow-sm img-fluid w-100 px-2 ${info ? 'mb-4' : ''}"><audio controls controlsList="nodownload" style="width:100%;" class="mt-2" preload="none"><source src="${esc(p.s3_url)}" type="audio/mpeg"></audio></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
+      case 'Download': card = `<div class="media d-block align-items-center"><div class="border border-primary bg-light-purple rounded p-2 ${info ? 'mb-4' : ''}"><a href="${esc(p.s3_url)}" download class="btn btn-primary" target="_blank" rel="noopener"><i class="bi-cloud-download me-2"></i>${esc(p.download_button || 'Download File')}</a><span class="ms-3 text-primary">${esc(p.download_info || 'Save and open this file to complete this part of the lesson.')}</span></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
+      case 'Slides': card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2"><div class="slideshow-container" style="position: relative; width: 100%; min-height: ${info ? '280px' : '560px'};"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" frameborder="0" allowfullscreen style="width: 100%; height: 100%; position:absolute; inset:0;" title="Slides"></iframe></div><small class="d-block text-mid-purple fw-light mt-2">Click the dots (<i class="text-primary bi-three-dots-vertical"></i>) to play in full-screen.</small></div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
+      case 'Image': card = `<div class="media d-block d-md-flex align-items-center"><img src="${esc(p.s3_url)}" alt="${esc(p.heading || '')}" class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2" loading="lazy"><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
+      default: card = infoHtml || '<p class="card-text text-mid-purple fw-light mb-1">No content.</p>';
+    }
+    const dur = p.duration && p.duration.trim() !== ':' ? `<span class="d-flex justify-content-end w-100 text-muted text-mid-purple fw-light"><span class="lesson-icon text-truncate ms-2 my-1"><i class="bi-stopwatch text-purple mr-1"></i> ${esc(p.duration)}</span></span>` : '';
+    return `<div class="list-group-item list-group-item-action lesson-collapse cursor-pointer px-3 lesson-part-item ${show ? 'active-part' : ''}" data-part="${p.id}">
+      <div class="row part-head" role="button" aria-expanded="${show}"><div class="col d-flex align-items-center"><div class="d-flex justify-content-start align-items-center pe-1"><i class="text-primary ${partIcon(p)} h5 mt-2 me-2"></i></div><div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(p.heading || p.media_type)}</h5></div><div class="d-none d-md-flex flex-shrink-0 flex-column align-items-center">${dur}<span class="d-flex justify-content-end w-100 text-muted text-mid-purple fw-light"><small class="ms-1 text-mid-purple">${esc(p.live_part_label || '')}</small></span></div></div></div>
+      <div class="collapse-smooth part-body ${show ? '' : 'closed'}"><div><hr><div class="col p-3">${card}</div></div></div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+function bindParts(root) {
+  root.querySelectorAll('.lesson-part-item .part-head').forEach(h => h.addEventListener('click', e => {
+    if (e.target.closest('a, audio, iframe, button')) return;
+    const item = h.closest('.lesson-part-item'), body = item.querySelector('.part-body'), wasOpen = !body.classList.contains('closed');
+    item.closest('.accordion').querySelectorAll('.part-body').forEach(b => b.classList.add('closed'));
+    item.closest('.accordion').querySelectorAll('.part-head').forEach(x => x.setAttribute('aria-expanded', 'false'));
+    if (wasOpen) return;
+    body.classList.remove('closed'); h.setAttribute('aria-expanded', 'true');
+  }));
 }
 
+// Search results (results/partials/results-list.blade.php): a title, then one panel per
+// subject holding scheme cards for the schemes with matching lessons.
 async function pageSearch(q) {
   setBg(null);
-  app.innerHTML = `<form class="searchbar" id="sf"><input id="q" type="search" placeholder="Search lessons, e.g. yoga, times tables, dance" value="${esc(q)}" autofocus><button class="btn" type="submit"><i class="bi-search"></i> Search</button></form><div id="results"></div>`;
-  document.getElementById('sf').addEventListener('submit', e => { e.preventDefault(); location.hash = `#/search?q=${encodeURIComponent(document.getElementById('q').value.trim())}`; });
-  const out = document.getElementById('results');
-  if (!q.trim()) { out.innerHTML = '<div class="notice">Type a word or phrase and press Search.</div>'; return; }
-  out.innerHTML = '<div class="loading">Searching…</div>';
+  if (!q.trim()) { app.innerHTML = '<div class="notice mt-4">Use Search in the header to find lessons by title, topic, subject or lesson ID.</div>'; return; }
+  app.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
-  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,scheme_id,age_min,age_max,duration,is_freemium,has_video,has_audio,has_downloads,has_slides&order=order&limit=300`);
-  // Only lessons the user can access are shown (schedule 3.8)
-  const live = rows.filter(l => D.lessonById[l.id] && canAccessLesson(l));
-  if (!live.length) { out.innerHTML = `<div class="notice">No lessons match "${esc(q)}".</div>`; return; }
+  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,scheme_id,is_freemium,age_min,age_max&order=order&limit=500`);
+  const live = rows.filter(l => D.lessonById[l.id] && canAccessLesson(l));   // inaccessible lessons are hidden, as live
   const bySubject = {};
   for (const l of live) {
-    const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
-    const subj = sc ? D.subjectById[sc.subject_id] : null;
-    (bySubject[subj ? subj.id : 0] ||= { subject: subj, items: [] }).items.push({ l, scheme, sc });
+    const scheme = D.schemeById[l.scheme_id]; if (!scheme) continue;
+    const sc = D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc ? D.subjectById[sc.subject_id] : null;
+    const g = (bySubject[subj ? subj.id : 0] ||= { subject: subj, schemes: {} });
+    (g.schemes[scheme.id] ||= { scheme, sc, lessons: [] }).lessons.push(l);
   }
-  let html = `<p class="muted">${live.length} ${live.length === 1 ? 'lesson' : 'lessons'} match "${esc(q)}".</p>`;
-  for (const g of Object.values(bySubject)) {
-    html += `<section class="block"><div class="bh">${esc(g.subject ? g.subject.name : 'Other')}</div><div class="bb"><div class="lessons" style="padding:0 0 1rem">` +
-      g.items.map(({ l, scheme, sc }) => `<div class="lrow"><i class="res ${lessonIcon(l)}"></i><div class="lt"><h4>${esc(l.name)}${l.is_freemium ? ' <span class="badge">Free</span>' : ''}</h4><span>${esc(scheme ? scheme.name : '')}${sc ? ' · ' + esc(sc.name) : ''}${l.description ? ' · ' + esc(l.description) : ''}</span></div><div class="meta">${ageStripRange(lessonAges(l))}${l.duration ? `<span><i class="bi-clock"></i>${l.duration}m</span>` : ''}</div><a class="cover" href="${lessonHref(l, sc)}"></a></div>`).join('') + `</div></div></section>`;
+  let html = `<div class="results-page-title d-flex flex-wrap mt-4"><div class="mt-2 heading-2 heading-xs text-primary mr-auto mb-3">Search results for "${esc(q)}"</div></div>`;
+  const groups = Object.values(bySubject);
+  if (!groups.length) html += `<div class="notice">No lessons match "${esc(q)}".</div>`;
+  for (const g of groups) {
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row">`;
+    for (const { scheme, sc, lessons } of Object.values(g.schemes)) {
+      const ages = ageRange(lessons), name = `${scheme.name}${ages ? ' (' + ageTextRange(ages) + ')' : ''}`;
+      const href = lessons.length === 1 ? lessonHref(lessons[0], sc) : (sc ? subcatHref(sc) + `#scheme-${scheme.id}` : lessonHref(lessons[0], sc));
+      html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${href}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme.image))}" class="card-img-top" alt="${esc(name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(name)}<br></small></h5></div></div></div></div></a></div>`;
+    }
+    html += `</div></div></div></div></div>`;
   }
-  out.innerHTML = html;
-  reveal();
-}
-
-function pageBrowse() {
-  setBg(null);
-  // The browse list is the user's own (Users fid 919) filtered by SubjectPolicy.
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
-  let html = '<div class="browse">';
-  for (const s of subjects) {
-    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
-    if (!sgs.length) continue;
-    html += `<section class="block"><div class="bh"><a href="#/subject/${s.id}">${esc(s.name)}</a></div><div class="bb"><ul>` + sgs.map(({ sg, subcats }) => `<li class="sg">${esc(sg.name)}</li>` + subcats.map(sc => `<li><a href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('')).join('') + `</ul></div></section>`;
-  }
-  app.innerHTML = html + '</div>';
+  app.innerHTML = html;
   reveal();
 }
 
@@ -531,10 +671,17 @@ async function startApp() {
     await Promise.all([loadTree(), loadStreamMap()]);
     renderSubjectBar();
     renderUserContext();
+    renderUserMenu();
+    renderBrowse();
+    bindSearchModal();
+    bindSubjectScroll();
+    Auth.renderUser();
     const picker = document.getElementById('classage');
-    // "My class": the stored choice, or the age range saved on the account (users.ages)
+    // "Show lessons suitable for": the user's saved filter (Users fid 569) as on the live site;
+    // a change made here is kept locally until the Phase 1 profile write lands.
+    const me = Auth.me() || {};
     let saved = null; try { saved = localStorage.getItem('imoves.classAge'); } catch (e) {}
-    if (saved === null) { const a = (Auth.me()?.ages || [])[0]; if (a) saved = String(parseInt(a)); }
+    if (saved === null && me.filter_age_min != null) saved = String(me.filter_age_min);
     try { picker.value = saved || ''; } catch (e) { picker.value = ''; }
     picker.addEventListener('change', () => { try { localStorage.setItem('imoves.classAge', picker.value); } catch (e) {} route(); });
     route();

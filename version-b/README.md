@@ -1,4 +1,6 @@
-# Version B - Cloudflare Stream videos (v0.24-B.2, 1 Nov 2026)
+# Version B - Cloudflare Stream videos (v0.26.2-B.3, 1 Nov 2026)
+
+B.3: rebuilt on v0.26.2 (live markup for category, scheme and lesson pages).
 
 B.2 (1 Nov 2026): rebuilt on v0.24, which adds the staff passcode sign-in link
 (`#/login/{userId}/{passcode}`). B.1 (30 Oct 2026) was built on v0.23.
