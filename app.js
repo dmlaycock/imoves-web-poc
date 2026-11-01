@@ -190,8 +190,8 @@ async function route() {
     if (p[0] === 'search') return pageSearch(qs.q || '');
     if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
     if (p[0] === 'favourites') return pageFavourites();
-    if (p[0] === 'curriculum') { app.innerHTML = '<div class="notice">The School Curriculum Management page arrives in v0.28.</div>'; return; }
-    if (p[0] === 'profile') { app.innerHTML = '<div class="notice">My personal profile arrives in v0.28.</div>'; return; }
+    if (p[0] === 'curriculum') return pageCurriculum();
+    if (p[0] === 'profile') return pageProfile();
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
@@ -392,7 +392,8 @@ async function loadMyLessons() {
   catch (e) { console.warn('my lessons unavailable:', e.message); }
 }
 async function restWrite(path, body, method = 'POST') {
-  const r = await restFetch(path, { method, headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: body ? JSON.stringify(body) : undefined });
+  const prefer = 'return=minimal' + (path.includes('on_conflict=') ? ',resolution=merge-duplicates' : '');
+  const r = await restFetch(path, { method, headers: { 'Content-Type': 'application/json', Prefer: prefer }, body: body ? JSON.stringify(body) : undefined });
   if (!r.ok) throw new Error(`${path.split('?')[0]}: ${r.status}`);
 }
 const uid = () => (Auth.me() || {}).id;
@@ -431,8 +432,148 @@ function paintStates() {
 function bindActions(root) {
   root.querySelectorAll('[data-fav-for]').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', async e => { e.stopPropagation(); e.preventDefault(); el.classList.add('cursor-wait'); try { await toggleFavourite(+el.dataset.favFor); } catch (x) { alert('Could not save: ' + x.message); } el.classList.remove('cursor-wait'); }); });
   root.querySelectorAll('[data-done-for]').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', async e => { e.stopPropagation(); e.preventDefault(); el.classList.add('cursor-wait'); try { await toggleDone(+el.dataset.doneFor); } catch (x) { alert('Could not save: ' + x.message); } el.classList.remove('cursor-wait'); }); });
-  root.querySelectorAll('.curriculum-btn').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); el.title = 'Curriculum arrives in v0.28'; }); });
+  root.querySelectorAll('.curriculum-btn').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); openGroupSelect(+el.dataset.lessonId); }); });
   paintStates();
+}
+
+// ---------- profile and school curriculum (v0.28) ----------
+// My personal profile (user-profile/show.blade.php). Edits go to user_profile_edits and
+// web_me() layers them over the nightly Users copy (web-poc/db/035_profile_curriculum.sql).
+async function pageProfile() {
+  setBg(null);
+  const m = Auth.me() || {};
+  let roles = []; try { roles = (await rpc('web_user_roles')).map(r => r.role); } catch (e) {}
+  const mine = new Set(m.roles || []);
+  const field = (label, id, value, auto) => `<div class="form-row mb-3"><div class="col"><label for="${id}" class="text-1">${label}</label><input type="text" class="form-control" id="${id}" name="${id}" value="${esc(value || '')}" ${auto ? `autocomplete="${auto}"` : ''}></div></div>`;
+  app.innerHTML = `<div class="profile-container form-page container-fluid pb-5"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8">
+    <div class="heading-1 text-primary">My personal profile</div>
+    <form id="user_profile_form"><div class="row"><div class="col-6">${field('First Name', 'first_name', m.first_name, 'given-name')}</div><div class="col-6">${field('Last Name', 'last_name', m.last_name, 'family-name')}</div></div>
+    ${field('Telephone', 'telephone_number', m.phone, 'tel')}${field('My Class Name', 'class_name', m.class_name)}
+    <div class="form-row mb-3"><div class="col"><label for="user_roles" class="text-1">My Role(s)</label><select multiple class="form-control form-select" id="user_roles" name="user_roles" size="${Math.min(8, Math.max(3, roles.length))}" title="Select your role(s)">${roles.map(r => `<option value="${esc(r)}" ${mine.has(r) ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div></div>
+    <div class="notice d-none" id="profile-msg" role="status"></div>
+    <button class="btn btn-primary heading-2 btn-save w-100" type="submit">Update my details</button></form></div></div></div>`;
+  reveal();
+  document.getElementById('user_profile_form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target, msg = document.getElementById('profile-msg'), btn = f.querySelector('.btn-save');
+    const body = { user_id: uid(), first_name: f.first_name.value.trim(), last_name: f.last_name.value.trim(), phone: f.telephone_number.value.trim(), class_name: f.class_name.value.trim(), roles: [...f.user_roles.selectedOptions].map(o => o.value) };
+    btn.disabled = true;
+    try {
+      await restWrite('user_profile_edits?on_conflict=user_id', body);   // upsert
+      Object.assign(Auth.me(), { first_name: body.first_name, last_name: body.last_name, phone: body.phone, class_name: body.class_name, roles: body.roles });
+      renderUserContext(); Auth.renderUser();
+      msg.textContent = 'Your details have been updated.'; msg.classList.remove('d-none');
+    } catch (x) { msg.textContent = 'Could not save: ' + x.message; msg.classList.remove('d-none'); }
+    btn.disabled = false;
+  });
+}
+
+// School Curriculum Management (resources/js/curriculum/*.vue). Tabs > groups > lessons per
+// school; everyone at the school sees it, school admins edit it when "Unlocked".
+const CUR = { tabs: [], current: null, edit: false };
+async function loadCurriculum() {
+  const [tabs, groups, gl] = await Promise.all([
+    rest('curriculum_tabs?select=*&order=order,id'), rest('curriculum_groups?select=*&order=order,id'), rest('curriculum_group_lessons?select=*&order=order,id'),
+  ]);
+  const byTab = group(groups, 'tab_id'), byGroup = group(gl, 'group_id');
+  CUR.tabs = tabs.map(t => ({ ...t, groups: (byTab[t.id] || []).map(g => ({ ...g, lessons: byGroup[g.id] || [] })) }));
+  if (!CUR.tabs.some(t => t.id === CUR.current)) CUR.current = CUR.tabs[0] ? CUR.tabs[0].id : null;
+}
+async function curriculumLessons(ids) {
+  if (!ids.length) return {};
+  const rows = await rest(`lessons?id=in.(${[...new Set(ids)].join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration`);
+  return index(rows);
+}
+function curriculumLessonCard(l, gl, edit) {
+  const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
+  const blurb = (l.description || l.body_opening_text || '').trim();
+  return `<div class="col mb-4" data-gl="${gl.id}"><a href="${edit ? '#' : lessonHref(l, sc)}" class="text-decoration-none ${edit ? 'pe-none' : ''}"><div class="card subcategory-card ${edit ? '' : 'lift'} h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy">
+    <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between">
+      ${edit ? `<div class="align-self-end mx-3 pt-2 pe-auto"><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-move="up" title="Move up"><i class="bi bi-arrow-up"></i></button><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-move="down" title="Move down"><i class="bi bi-arrow-down"></i></button><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-copy="${l.id}" title="Copy to another group"><i class="bi bi-files"></i></button><button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-gl="${gl.id}" title="Delete"><i class="bi bi-trash"></i></button></div>` : ''}
+      <div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
+      <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul>
+    </div></div></a></div>`;
+}
+async function pageCurriculum() {
+  setBg(null);
+  const admin = !!(Auth.me() || {}).is_admin;
+  try { CUR.edit = admin && localStorage.getItem('curriculumEditMode') === 'true'; } catch (e) { CUR.edit = false; }
+  app.innerHTML = '<div class="loading">Loading curriculum…</div>';
+  await loadCurriculum();
+  const lessons = await curriculumLessons(CUR.tabs.flatMap(t => t.groups.flatMap(g => g.lessons.map(x => x.lesson_id))));
+  renderCurriculum(admin, lessons);
+}
+function renderCurriculum(admin, lessons) {
+  const edit = CUR.edit;
+  let html = `<div class="container container-padded py-3 px-0">`;
+  if (admin) html += `<div class="row"><h3 class="col-12 col-md-6 text-primary">School Curriculum Management</h3><div class="col-12 col-md-4 text-end"><button class="btn btn-primary" type="button" id="cur-browse">Browse <span class="d-lg-inline d-none">to add resources</span> &gt;</button></div>
+    <div class="col-12 col-md-2 flex-row-reverse d-flex"><div class="toggle toggle-right ${edit ? 'active' : ''}"><a href="#" data-edit="1">Unlocked</a></div><div class="toggle toggle-left ${edit ? '' : 'active'}"><a href="#" data-edit="0">Locked</a></div></div></div>`;
+  html += `<ul class="nav nav-pills" role="presentation">` + CUR.tabs.map(t => `<li class="nav-item"><a href="#" class="nav-link ${t.id === CUR.current ? 'active' : ''}" data-tab="${t.id}" role="tab">${esc(t.name)}${edit ? ` <span class="dropdown d-inline"><i class="bi bi-three-dots-vertical" role="button" data-tabmenu="${t.id}"></i><ul class="dropdown-menu"><li><a class="dropdown-item" href="#" data-tab-rename="${t.id}">Rename</a></li><li><a class="dropdown-item" href="#" data-tab-clone="${t.id}">Clone</a></li><li><a class="dropdown-item" href="#" data-tab-delete="${t.id}">Delete</a></li></ul></span>` : ''}</a></li>`).join('') +
+    (edit ? `<li class="nav-item"><a class="nav-link" href="#" id="cur-newtab">+ Add New Tab</a></li>` : '') + `</ul><div class="tab-content mt-3">`;
+  const tab = CUR.tabs.find(t => t.id === CUR.current);
+  if (!tab) html += `<div class="notice">${admin ? (edit ? 'Add a tab to start building your school curriculum.' : 'No curriculum yet. Switch to Unlocked to start building one.') : 'Your school has not set up a curriculum yet. Ask your School Administrator.'}</div>`;
+  else {
+    for (const g of tab.groups) {
+      html += `<div class="row curriculum-group-row" data-group="${g.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
+        <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(g.name)}</div><div class="ms-auto">${edit ? `<span class="dropdown d-inline"><i class="bi bi-three-dots-vertical me-2" role="button" data-groupmenu="${g.id}"></i><ul class="dropdown-menu"><li><a class="dropdown-item" href="#" data-group-rename="${g.id}">Rename</a></li><li><a class="dropdown-item" href="#" data-group-clone="${g.id}">Clone</a></li><li><a class="dropdown-item" href="#" data-group-delete="${g.id}">Delete</a></li></ul></span><i class="bi bi-arrow-up me-1" role="button" title="Move up" data-group-move="up"></i><i class="bi bi-arrow-down me-2" role="button" title="Move down" data-group-move="down"></i>` : ''}<button type="button" class="subgroup-collapse" data-toggle aria-expanded="true"></button></div></h5>
+        <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">` + g.lessons.map(gl => lessons[gl.lesson_id] ? curriculumLessonCard(lessons[gl.lesson_id], gl, edit) : '').join('') + (g.lessons.length ? '' : '<div class="col-12 mb-3 text-mid-purple fw-light">No lessons in this group yet.' + (edit ? ' Use "Browse to add resources" or the bookmark icon on any lesson.' : '') + '</div>') + `</div></div></div></div></div></div></div>`;
+    }
+    if (edit) html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><div class="card-body"><a href="#" id="cur-newgroup" class="text-primary">+ Add New Group</a></div></div></div></div>`;
+  }
+  app.innerHTML = html + `</div></div>`;
+  reveal(); bindCollapses(); bindCurriculum(admin, lessons);
+}
+function bindCurriculum(admin, lessons) {
+  const refresh = async () => { await loadCurriculum(); const ls = await curriculumLessons(CUR.tabs.flatMap(t => t.groups.flatMap(g => g.lessons.map(x => x.lesson_id)))); renderCurriculum(admin, ls); };
+  const fail = e => alert('Could not save: ' + e.message);
+  app.querySelectorAll('[data-tab]').forEach(a => a.addEventListener('click', e => { if (e.target.closest('[data-tabmenu], .dropdown-menu')) return; e.preventDefault(); CUR.current = +a.dataset.tab; renderCurriculum(admin, lessons); }));
+  app.querySelectorAll('[data-edit]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); CUR.edit = a.dataset.edit === '1'; try { localStorage.setItem('curriculumEditMode', CUR.edit); } catch (x) {} renderCurriculum(admin, lessons); }));
+  app.querySelectorAll('[data-tabmenu], [data-groupmenu]').forEach(i => i.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const m = i.nextElementSibling; const open = m.classList.contains('show'); app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')); if (!open) m.classList.add('show'); }));
+  document.addEventListener('click', () => app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')), { once: true });
+  const tabOf = id => CUR.tabs.find(t => t.id === +id), groupOf = id => CUR.tabs.flatMap(t => t.groups).find(g => g.id === +id);
+  const newTab = document.getElementById('cur-newtab');
+  if (newTab) newTab.addEventListener('click', async e => { e.preventDefault(); const name = prompt('Tab Name'); if (!name) return; try { await restWrite('curriculum_tabs', { school_id: (Auth.me() || {}).school_id, name: name.trim(), order: CUR.tabs.length + 1 }); await refresh(); CUR.current = CUR.tabs[CUR.tabs.length - 1].id; renderCurriculum(admin, lessons); } catch (x) { fail(x); } });
+  const newGroup = document.getElementById('cur-newgroup');
+  if (newGroup) newGroup.addEventListener('click', async e => { e.preventDefault(); const name = prompt('Group Name'); if (!name) return; const t = tabOf(CUR.current); try { await restWrite('curriculum_groups', { tab_id: t.id, name: name.trim(), order: t.groups.length + 1 }); await refresh(); } catch (x) { fail(x); } });
+  app.querySelectorAll('[data-tab-rename]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const t = tabOf(a.dataset.tabRename); const name = prompt('Rename tab', t.name); if (!name) return; try { await restWrite(`curriculum_tabs?id=eq.${t.id}`, { name: name.trim() }, 'PATCH'); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-tab-clone]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); try { CUR.current = await rpc('web_curriculum_clone_tab', { p_tab_id: +a.dataset.tabClone }); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-tab-delete]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const t = tabOf(a.dataset.tabDelete); if (!confirm(`Delete the tab "${t.name}" and everything in it?`)) return; try { await restWrite(`curriculum_tabs?id=eq.${t.id}`, null, 'DELETE'); CUR.current = null; await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-group-rename]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const g = groupOf(a.dataset.groupRename); const name = prompt('Rename group', g.name); if (!name) return; try { await restWrite(`curriculum_groups?id=eq.${g.id}`, { name: name.trim() }, 'PATCH'); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-group-clone]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); try { await rpc('web_curriculum_clone_group', { p_group_id: +a.dataset.groupClone }); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-group-delete]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const g = groupOf(a.dataset.groupDelete); if (!confirm(`Delete the group "${g.name}"?`)) return; try { await restWrite(`curriculum_groups?id=eq.${g.id}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-group-move]').forEach(i => i.addEventListener('click', async e => { e.preventDefault(); const row = i.closest('[data-group]'); const t = tabOf(CUR.current); const idx = t.groups.findIndex(g => g.id === +row.dataset.group); const j = i.dataset.groupMove === 'up' ? idx - 1 : idx + 1; if (j < 0 || j >= t.groups.length) return; const order = t.groups.map(g => g.id); [order[idx], order[j]] = [order[j], order[idx]]; try { await Promise.all(order.map((id, k) => restWrite(`curriculum_groups?id=eq.${id}`, { order: k }, 'PATCH'))); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-del-gl]').forEach(b => b.addEventListener('click', async e => { e.preventDefault(); if (!confirm('Remove this lesson from the group?')) return; try { await restWrite(`curriculum_group_lessons?id=eq.${b.dataset.delGl}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', async e => { e.preventDefault(); const card = b.closest('[data-gl]'); const g = groupOf(card.closest('[data-group]').dataset.group); const idx = g.lessons.findIndex(x => x.id === +card.dataset.gl); const j = b.dataset.move === 'up' ? idx - 1 : idx + 1; if (j < 0 || j >= g.lessons.length) return; const order = g.lessons.map(x => x.id); [order[idx], order[j]] = [order[j], order[idx]]; try { await Promise.all(order.map((id, k) => restWrite(`curriculum_group_lessons?id=eq.${id}`, { order: k }, 'PATCH'))); await refresh(); } catch (x) { fail(x); } }));
+  app.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); openGroupSelect(+b.dataset.copy, refresh); }));
+  const browse = document.getElementById('cur-browse'); if (browse) browse.addEventListener('click', openBrowse);
+}
+
+// "Select Curriculum Group" modal (GroupSelectionModal.vue): behind every bookmark button.
+async function openGroupSelect(lessonId, after) {
+  const admin = !!(Auth.me() || {}).is_admin;
+  let m = document.getElementById('curriculumModal');
+  if (!m) { m = document.createElement('div'); m.id = 'curriculumModal'; m.className = 'modal fade'; m.tabIndex = -1; document.body.appendChild(m); }
+  let body = '';
+  if (!admin) body = `<h5>Please ask your School Administrator to add the Lesson to the Curriculum.</h5>`;
+  else {
+    await loadCurriculum();
+    const [l] = await rest(`lessons?id=eq.${lessonId}&select=id,name`);
+    const t = CUR.tabs.find(x => x.id === CUR.current) || CUR.tabs[0];
+    body = `<h3 class="px-4">${esc(l ? l.name : '')}</h3>` + (CUR.tabs.length ? `<ul class="nav nav-pills px-4" role="presentation">` + CUR.tabs.map(x => `<li class="nav-item"><a href="#" class="nav-link ${x.id === (t && t.id) ? 'active' : ''}" data-seltab="${x.id}">${esc(x.name)}</a></li>`).join('') + `</ul><div class="mt-3 px-4" id="selgroups">${t ? t.groups.map(g => `<div class="card shadow bg-light-purple border-primary mb-3"><h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(g.name)}</div><div class="ms-auto"><input type="checkbox" class="group-select" value="${g.id}" ${g.lessons.some(x => x.lesson_id === lessonId) ? 'checked' : ''}></div></h5></div>`).join('') || '<p class="text-mid-purple">This tab has no groups yet.</p>' : ''}</div>` : `<p class="text-mid-purple px-4">No curriculum tabs yet. Open Curriculum, switch to Unlocked and add a tab first.</p>`);
+  }
+  m.innerHTML = `<div class="modal-dialog modal-xl text-primary"><div class="modal-content"><div class="modal-header bg-primary text-white"><h1 class="modal-title fs-5"><i class="bi-bookmark-plus me-2"></i>Select Curriculum Group</h1><button type="button" class="btn-close" data-close aria-label="Close"></button></div><div class="modal-body">${body}</div>${admin ? `<div class="modal-footer"><span>Tick the box next to the Group name to assign.</span><button type="button" class="btn btn-primary" data-close>Confirm</button></div>` : ''}</div></div>`;
+  m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => { hideModal('curriculumModal'); if (after) after(); }));
+  m.addEventListener('click', e => { if (e.target === m) { hideModal('curriculumModal'); if (after) after(); } });
+  m.querySelectorAll('[data-seltab]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); CUR.current = +a.dataset.seltab; openGroupSelect(lessonId, after); }));
+  m.querySelectorAll('.group-select').forEach(cb => cb.addEventListener('change', async () => {
+    const g = CUR.tabs.flatMap(x => x.groups).find(x => x.id === +cb.value);
+    try {
+      if (cb.checked) await restWrite('curriculum_group_lessons', { group_id: g.id, lesson_id: lessonId, order: g.lessons.length + 1 });
+      else await restWrite(`curriculum_group_lessons?group_id=eq.${g.id}&lesson_id=eq.${lessonId}`, null, 'DELETE');
+      await loadCurriculum();
+    } catch (x) { cb.checked = !cb.checked; alert('Could not save: ' + x.message); }
+  }));
+  showModal('curriculumModal');
 }
 
 // ---------- category, scheme and lesson pages (live markup, v0.26) ----------
@@ -626,7 +767,7 @@ async function pageLesson(id, scId) {
     <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
     <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-fav-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}" data-labels="${esc(Labels)}"></button></div>
     ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div><div class="d-none d-lg-block my-4 px-2 text-primary" id="readings"></div>` : ''}
-    <div class="my-4 px-2"><div class="${btn}"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}" title="Add to Curriculum"><i class="bi bi-bookmark-plus"></i></button></div></div>
+    <div class="my-4 px-2"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus me-1"></i> Add to Curriculum</button></div>
   </div></div>`;
   app.innerHTML = html;
   reveal();
