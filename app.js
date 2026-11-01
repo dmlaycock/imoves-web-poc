@@ -153,7 +153,39 @@ function ageStrip(min, max, cls = '') {
 }
 function ageStripRange(r, cls = '') { if (!r) return ''; const [a, b] = r.split('-').map(Number); return ageStrip(a, b, cls); }
 // "My class" preference: the current site's age filter rebuilt as a browser-side preference
-function classAge() { try { const v = localStorage.getItem('imoves.classAge'); return v ? +v : null; } catch (e) { return null; } }
+// The age filter is the user's own (Users fid 569, saved to user_profile_edits as on live).
+function classAge() { const m = Auth.me() || {}; return m.filter_age_min != null ? +m.filter_age_min : null; }
+async function saveClassAge(v) {
+  const me = Auth.me() || {}; me.filter_age_min = v === '' || v == null ? null : +v;
+  try { await restWrite('user_profile_edits?on_conflict=user_id', { user_id: uid(), filter_age_min: me.filter_age_min, filter_age_set: true }); } catch (e) { /* best effort */ }
+}
+// home/partials/age-selection-modal.blade.php: shown, with no close button, to users flagged
+// force_age_selection (Users fid 567) and on subjects flagged force_age_selection, until an
+// age range is chosen.
+const AGE_LABELS = { 4: '4–5', 5: '5–6', 6: '6–7', 7: '7-8', 8: '8–9', 9: '9–10', 10: '10–11' };   // HasFilters::$AGE_FILTERS
+function maybeForceAge(subj) {
+  const me = Auth.me() || {};
+  const need = classAge() == null && ((subj && subj.force_age_selection) || me.force_age_selection);
+  let m = document.getElementById('age-selection-modal');
+  if (!need) { if (m && m.classList.contains('show')) hideModal('age-selection-modal'); return; }
+  if (!m) { m = document.createElement('div'); m.id = 'age-selection-modal'; m.className = 'modal fade'; m.tabIndex = -1; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-dialog"><div class="modal-content"><div class="modal-header bg-primary bg-gradient-primary"><h5 class="modal-title text-white"><i class="bi-person-lines-fill me-2"></i>Set Your Preferred Age Range</h5></div>
+    <div class="modal-body bg-extra-light-purple py-3"><form class="d-lg-block" id="age-selection-form"><div class="card" id="age-filter-card"><div class="card-body"><div id="age-fields" class="d-lg-block">
+      <div class="form-group pt-0 mb-0"><label for="inputModalAgeRange" class="text-primary text-center mb-0">So we can show you the most relevant lessons, please select your preferred age range from the list below.</label><hr>
+      <div class="row"><div class="col-12 col-lg-10 offset-lg-1"><select class="custom-control custom-select form-select text-purple mt-2" id="inputModalAgeRange" name="age"><option value="" selected>Select an age range...</option>${Object.entries(AGE_LABELS).map(([v, l]) => `<option value="${v}">Show lessons for ages ${l}</option>`).join('')}</select>
+      <small class="text-mid-purple d-block text-center mt-2">You can change your age range at any time via the sidebar.</small></div></div><hr></div></div>
+      <div class="form-group mt-2 mb-0 pt-2 d-flex justify-content-center"><button type="submit" class="btn btn-primary" id="ageSelectionBtn" disabled><i class="bi-check-circle text-white me-1"></i> Save and Continue</button></div></div></div></form></div></div></div>`;
+  const sel = m.querySelector('#inputModalAgeRange'), btn = m.querySelector('#ageSelectionBtn');
+  sel.addEventListener('change', () => { btn.disabled = !sel.value; });
+  m.querySelector('#age-selection-form').addEventListener('submit', async e => {
+    e.preventDefault(); if (!sel.value) return; btn.disabled = true;
+    await saveClassAge(sel.value);
+    const picker = document.getElementById('classage'); if (picker) picker.value = sel.value;
+    hideModal('age-selection-modal'); route();
+  });
+  showModal('age-selection-modal');
+  const bd = document.getElementById('poc-backdrop'); if (bd) bd.onclick = null;   // data-backdrop="static": no closing
+}
 function coversClass(range) { const a = classAge(); if (a == null || !range) return false; const [lo, hi] = range.split('-').map(Number); return lo <= a && a + 1 <= hi; }
 function noun(sc, n) { return n === 1 ? (sc.content_noun_derived_singular || 'lesson') : (sc.content_noun_derived_plural || 'lessons'); }
 function visibleSubcats(sg) {
@@ -178,6 +210,8 @@ async function route() {
   document.querySelectorAll('#scrollable-navbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
   const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
+  const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = !!(subj && subj.force_age_selection);
+  maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
   window.scrollTo(0, 0);
   try {
@@ -1097,13 +1131,11 @@ async function startApp() {
     bindSubjectScroll();
     Auth.renderUser();
     const picker = document.getElementById('classage');
-    // "Show lessons suitable for": the user's saved filter (Users fid 569) as on the live site;
-    // a change made here is kept locally until the Phase 1 profile write lands.
+    // "Show lessons suitable for": the user's saved filter (Users fid 569), written back as on live (v0.30).
     const me = Auth.me() || {};
-    let saved = null; try { saved = localStorage.getItem('imoves.classAge'); } catch (e) {}
-    if (saved === null && me.filter_age_min != null) saved = String(me.filter_age_min);
-    try { picker.value = saved || ''; } catch (e) { picker.value = ''; }
-    picker.addEventListener('change', () => { try { localStorage.setItem('imoves.classAge', picker.value); } catch (e) {} route(); });
+    try { localStorage.removeItem('imoves.classAge'); } catch (e) {}   // pre-v0.30 browser-side copy
+    try { picker.value = me.filter_age_min != null ? String(me.filter_age_min) : ''; } catch (e) { picker.value = ''; }
+    picker.addEventListener('change', () => { saveClassAge(picker.value); route(); });
     route();
   } catch (e) {
     app.innerHTML = `<div class="notice">Could not load content: ${esc(e.message)}</div>`;
