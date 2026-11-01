@@ -35,8 +35,8 @@ async function rest(path, { all = false } = {}) {
 // Call a database function (used for login logging and the single-session check).
 async function rpc(name, args) {
   const r = await restFetch(`rpc/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) });
-  if (!r.ok) throw new Error(`${name}: ${r.status}`);
   const text = await r.text();
+  if (!r.ok) { let msg = `${name}: ${r.status}`; try { const j = JSON.parse(text); if (j.message) msg = j.message; } catch (e) {} throw new Error(msg); }
   return text ? JSON.parse(text) : null;
 }
 
@@ -189,7 +189,7 @@ async function route() {
   document.querySelectorAll('#scrollable-navbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
   const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
-  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile');
+  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
   window.scrollTo(0, 0);
   try {
     if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
@@ -203,6 +203,9 @@ async function route() {
     if (p[0] === 'favourites') return pageFavourites();
     if (p[0] === 'curriculum') return pageCurriculum();
     if (p[0] === 'profile') return pageProfile();
+    if (p[0] === 'school-management' && p[1] === 'school') return pageSchoolDetails();
+    if (p[0] === 'school-management') return pageSchoolManagement();
+    if (p[0] === 'my-school') return pageMySchool();
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
@@ -476,6 +479,154 @@ async function pageProfile() {
       msg.textContent = 'Your details have been updated.'; msg.classList.remove('d-none');
     } catch (x) { msg.textContent = 'Could not save: ' + x.message; msg.classList.remove('d-none'); }
     btn.disabled = false;
+  });
+}
+
+// School management (school-management/index.blade.php + partials, resources/js/school-management.js).
+// Admins only; the lists come from the accounts copy through web_school_management().
+const QMARK = '<svg viewBox="0 0 34.02 34.02" xmlns="http://www.w3.org/2000/svg"><path d="M21.28,11.57c0.4,0.6,0.59,1.26,0.59,1.97c0,0.56-0.11,1.05-0.34,1.47c-0.23,0.42-0.5,0.78-0.81,1.09c-0.31,0.31-0.87,0.82-1.68,1.54c-0.22,0.2-0.4,0.38-0.54,0.54c-0.13,0.15-0.24,0.3-0.3,0.42c-0.06,0.13-0.12,0.26-0.15,0.38c-0.04,0.13-0.09,0.35-0.16,0.67c-0.12,0.68-0.51,1.02-1.17,1.02c-0.34,0-0.63-0.11-0.86-0.33c-0.23-0.22-0.35-0.56-0.35-1c0-0.55,0.09-1.03,0.26-1.43c0.17-0.4,0.4-0.76,0.68-1.06c0.28-0.31,0.66-0.67,1.14-1.09c0.42-0.37,0.72-0.65,0.91-0.83c0.19-0.19,0.35-0.4,0.47-0.63c0.13-0.23,0.19-0.48,0.19-0.75c0-0.53-0.2-0.97-0.59-1.33c-0.39-0.36-0.89-0.54-1.51-0.54c-0.72,0-1.25,0.18-1.6,0.55c-0.34,0.36-0.63,0.9-0.87,1.61c-0.22,0.74-0.65,1.11-1.27,1.11c-0.37,0-0.68-0.13-0.93-0.39s-0.38-0.54-0.38-0.84c0-0.62,0.2-1.26,0.6-1.9c0.4-0.64,0.99-1.17,1.75-1.59c0.77-0.42,1.67-0.63,2.69-0.63c0.95,0,1.79,0.18,2.52,0.53C20.32,10.49,20.89,10.97,21.28,11.57z M16.84,21.58c-0.42,0-0.78,0.14-1.07,0.42c-0.29,0.28-0.43,0.63-0.43,1.04c0,0.47,0.15,0.83,0.45,1.09c0.3,0.26,0.65,0.39,1.05,0.39c0.39,0,0.73-0.13,1.02-0.39c0.29-0.26,0.44-0.62,0.44-1.08c0-0.41-0.14-0.76-0.42-1.04C17.6,21.72,17.25,21.58,16.84,21.58z M28.04,28.03c-2.95,2.95-6.86,4.57-11.03,4.57c-4.17,0-8.08-1.62-11.02-4.56c-2.95-2.94-4.57-6.86-4.57-11.03S3.04,8.93,5.99,5.98c2.94-2.94,6.86-4.57,11.02-4.57c4.16,0,8.08,1.62,11.02,4.57C34.11,12.06,34.11,21.95,28.04,28.03z M26.16,7.85c-2.44-2.44-5.69-3.79-9.15-3.79c-3.46,0-6.71,1.35-9.15,3.79c-2.45,2.44-3.79,5.7-3.79,9.15s1.35,6.71,3.79,9.15c2.44,2.44,5.69,3.79,9.15,3.79c3.46,0,6.71-1.35,9.16-3.79C31.21,21.11,31.21,12.9,26.16,7.85z"/></svg>';
+const SM_HELP = {
+  approved: ['Approved users', '<p>Users listed here have full access to your school subscription. You can remove access for any of these users, by using the \'Remove access\' link.</p><p>Users with admin access can both access this page for your school, and make all the changes you can make. You can grant or remove this access using the \'Make admin\' and \'Remove admin\' links.</p><p>The system will automatically ensure that there is always at least one admin user for your school.</p>'],
+  new: ['New users', '<p>As new users join imoves, they have the option of selecting an existing school to link their account to. However, they will not have access to your school subscription unless you (or another admin) approve them here.</p><p>You can also invite new users.</p><p>When you enter their email address, this will trigger an email invite, which includes a link they can use to join, which automatically gives them access to your subscription, with no further action required by you.</p><p>You can see if and when any user that you invite has joined in this section too, and resend the invite to give them a gentle nudge to join.</p><p>All invites expire automatically after 30 days. If you do still want a new user to join and have access to your subscription after this, then you can simply reinvite them.</p>'],
+  removed: ['Removed and declined users', '<p>This section shows all users who have previously had access to your school subscription, and allows you to re-enable their access as required.</p>'],
+};
+const SM_CONFIRM = {   // resources/js/school-management.js
+  'promote-to-admin': ['Make admin?', n => `Are you sure you would like to make ${n} an admin?`],
+  'revoke-admin-access': ['Remove admin?', n => `Are you sure you would like to remove admin access for ${n}?`],
+  'revoke-access': ['Remove access?', n => `Are you sure you would like to remove access for ${n}?`],
+  'approve-user': ['Accept?', n => `Are you sure you would like to accept ${n}?`],
+  'decline-user': ['Decline?', n => `Are you sure you would like to decline ${n}?`],
+  'reactivate-and-approve': ['Reactivate and approve?', n => `Are you sure you would like to reactivate and approve ${n}?`],
+  'resend-invite': ['Resend?', n => `Are you sure you would like to send another invite to ${n}?`],
+};
+const fmtDays = n => n == null ? '' : `${Number(n).toLocaleString('en-GB')} days`;   // Users fid 112/113 ("2,159 days")
+function smModal(id, title, body, footer) {
+  let m = document.getElementById(id);
+  if (!m) { m = document.createElement('div'); m.id = id; m.className = 'modal fade'; m.tabIndex = -1; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-dialog"><div class="modal-content">${title ? `<div class="modal-header"><h5 class="modal-title">${title}</h5><button type="button" class="close" data-close aria-label="Close"><span aria-hidden="true">&times;</span></button></div>` : ''}<div class="modal-body">${body}</div><div class="modal-footer">${footer}</div></div></div>`;
+  m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => hideModal(id)));
+  showModal(id);
+  return m;
+}
+async function pageSchoolManagement() {
+  setBg(null);
+  if (!(Auth.me() || {}).is_admin) { app.innerHTML = '<div class="notice">Only users with admin rights can view this page.</div>'; return; }
+  app.innerHTML = '<div class="loading">Loading school management…</div>';
+  let d; try { d = await rpc('web_school_management'); } catch (e) { app.innerHTML = `<div class="notice">${esc(e.message)}</div>`; return; }
+  const me = d.me;
+  const nameCols = (u, name) => `<div class="pe-0 my-2 my-md-0 col-12 col-md-4 text-1"><div class="d-flex align-items-center name ellipsis pe-2">${esc(name)}</div><div class="align-items-center d-flex d-md-none mt-1 mb-2 ellipsis">${esc(u.email || '')}</div></div><div class="align-items-center p-0 d-none d-md-flex mb-2 mb-md-0 col-12 col-md-4 text-1 ellipsis">${esc(u.email || '')}</div>`;
+  const card = (u, inner, name) => `<div class="management-card row mt-4" data-user-id="${u.id}" data-name="${esc(u.full_name)}">${nameCols(u, name || u.full_name)}${inner}</div>`;
+  const heading = (title, key) => `<div class="heading-5 text-primary">${title} <span class="help-button" data-help="${key}">${QMARK}</span></div>`;
+  const approved = d.approved.map(u => card(u, u.id === me ? '' :
+    (u.access_can_be_removed ? `<div class="pb-2 pb-md-0 col-6 col-md-2 text-start text-md-right"><span class="link" data-act="revoke-access">Remove access</span></div>` : '') +
+    (u.admin_can_be_granted ? `<div class="pb-2 pb-md-0 col-6 col-md-2 text-end"><span class="link" data-act="promote-to-admin">Make admin</span></div>` : '') +
+    (u.admin_can_be_removed ? `<div class="pb-2 pb-md-0 col-6 d-md-none"></div><div class="pb-2 pb-md-0 col-6 col-md-4 text-end"><span class="link" data-act="revoke-admin-access">Remove admin</span></div>` : ''), u.name_with_admin)).join('');
+  const fresh = d.new.map(u => card(u, `<div class="pb-2 pb-md-0 col-6 col-md-2 text-start text-md-right"><span class="link" data-act="approve-user">Accept</span></div><div class="pb-2 pb-md-0 col-6 col-md-2 text-end text-md-right"><span class="link" data-act="decline-user">Decline</span></div>`)).join('');
+  const invited = d.invited.map(i => `<div class="management-card row mt-4" data-user-email="${esc(i.email)}"><div class="py-2 py-md-0 text-1 col-12 col-md-4 d-flex align-items-center">Invitation pending</div><div class="align-items-center px-3 px-md-0 mb-2 mb-md-0 col-12 col-md-4 text-1 ellipsis">${esc(i.email)}</div><div class="pb-2 pb-md-0 col-12 col-md-4 text-end"><span class="link" data-act="resend-invite">Resend invite</span></div></div>`).join('');
+  const removed = d.removed.map(u => card(u, u.id === me ? '' : `<div class="pb-2 pb-md-0 col-md-4 text-end"><span class="link" data-act="reactivate-and-approve">Reactivate &amp; approve</span></div>`)).join('');
+  const usageRows = d.approved.map(u => `<tr><td class="pl-0">${esc(u.full_name)}</td><td class="text-end">${fmtDays(u.joined_days)}</td><td class="text-end">${fmtDays(u.last_login_days)}</td><td class="text-end">${u.login_count ?? ''}</td><td class="text-end">${u.login_count_30_days ?? ''}</td></tr>`).join('');
+  const usageCards = d.approved.map(u => `<div class="management-card usage-card row mt-4" data-user-id="${u.id}"><div class="pe-0 my-2 my-md-0 col-12 col-md-4 text-1"><div class="d-flex align-items-center name ellipsis pe-2">${esc(u.full_name)}</div></div><div class="col-6">Joined imoves</div><div class="col-6 text-end">${fmtDays(u.joined_days)}</div><div class="col-6">Last login</div><div class="col-6 text-end">${fmtDays(u.last_login_days)}</div><div class="col-6">Logins</div><div class="col-6 text-end">${u.login_count ?? ''}</div><div class="col-6">Last 30 days</div><div class="col-6 text-end">${u.login_count_30_days ?? ''}</div></div>`).join('');
+  app.innerHTML = `<div class="school-management-container form-page container-fluid px-4 pb-5"><div class="row"><div class="col-12">
+    <div class="heading-1 text-primary text-center">School management</div>
+    <div class="management-sub-heading heading-2 text-highlight text-center mb-4">Control access to your subscription(s)</div>
+    <div class="text-1 text-primary">Only users with admin rights can view this page, and manage access to your school subscription</div>
+    <div class="my-4 d-flex justify-content-between school-details management-card"><div class="pe-2"><div class="heading-5 text-primary">${esc(d.school ? d.school.name : '')}</div><div class="text-1">${esc(d.school ? d.school.address : '')}</div></div><div class="d-flex"><a class="align-self-end d-inline-block d-md-none" href="#/school-management/school">Edit</a><a class="align-self-end d-none d-md-inline-block" href="#/school-management/school">Edit school details</a></div></div>
+    <div class="approved-users-container mb-4">${heading('Approved users', 'approved')}${approved}</div>
+    <div class="new-users-container mb-4">${heading('New users', 'new')}${fresh}
+      <div class="row mt-4"><div class="text-1 text-primary col-12">Your invited users are pre-approved and have immediate access to your school subscription(s)</div></div>
+      <div class="management-card invite-user-form-container row mt-4"><div class="py-2 py-md-0 text-1 col-12 col-md-4 d-flex align-items-center">Invite a new user</div><div class="pb-3 pb-md-0 col-12 col-md-5 pl-3 pl-md-0 d-flex align-items-center"><div class="form-row w-100"><div class="col"><div class="form-help"></div><input type="text" placeholder="Enter new user's email address" class="form-control" id="email_address" name="email_address" value=""></div></div></div><div class="pb-3 pb-md-0 col-12 col-md-3"><button id="invite_user_form_submit" class="btn btn-primary heading-5 w-100" type="button">Send Invitation</button></div></div>
+      ${invited}</div>
+    <div class="approved-users-container mb-4"><div class="heading-5 text-primary mb-2">Usage</div><div class="d-none d-sm-block"><table class="usage-table table text-1 text-primary"><thead><tr><th class="pl-0">Name</th><th class="text-end">Joined imoves</th><th class="text-end">Last login</th><th class="text-end">Logins</th><th class="text-end">Last 30 days</th></tr></thead><tbody>${usageRows}</tbody></table></div><div class="d-sm-none text-1">${usageCards}</div></div>
+    ${d.removed.length ? `<div class="removed-and-declined-users-container mb-4">${heading('Removed and declined users', 'removed')}${removed}</div>` : ''}
+  </div></div></div>`;
+  reveal();
+  app.querySelectorAll('[data-help]').forEach(b => b.addEventListener('click', () => { const [t, body] = SM_HELP[b.dataset.help]; smModal('sm_help_modal', t, body, '<button type="button" class="btn btn-primary" data-close>Close</button>'); }));
+  const confirmThen = (title, text, run) => {
+    const m = smModal('confirm_modal', title, esc(text), '<span class="link dismiss-link" data-close>Cancel</span><button type="button" class="btn btn-primary confirm-action">Yes</button>');
+    m.querySelector('.confirm-action').addEventListener('click', async e => {
+      e.target.disabled = true;
+      try { await run(); hideModal('confirm_modal'); pageSchoolManagement(); }
+      catch (x) { hideModal('confirm_modal'); smModal('info_modal', '', esc(x.message), '<button type="button" class="btn btn-primary" data-close>Close</button>'); }
+    });
+  };
+  app.querySelectorAll('[data-act]').forEach(el => el.addEventListener('click', () => {
+    const c = el.closest('.management-card'), act = el.dataset.act, [title, text] = SM_CONFIRM[act];
+    if (act === 'resend-invite') return confirmThen(title, text(c.dataset.userEmail), () => rpc('web_school_invite', { p_email: c.dataset.userEmail, p_resend: true }));
+    confirmThen(title, text(c.dataset.name), () => rpc('web_school_action', { p_user_id: +c.dataset.userId, p_action: act }));
+  }));
+  const inviteBtn = document.getElementById('invite_user_form_submit'), emailEl = document.getElementById('email_address');
+  inviteBtn.addEventListener('click', async () => {
+    emailEl.parentElement.querySelectorAll('.invalid-feedback').forEach(x => x.remove());
+    const email = emailEl.value.trim();
+    if (!email) { emailEl.insertAdjacentHTML('afterend', '<div class="invalid-feedback d-block">The email address field is required.</div>'); return; }
+    inviteBtn.disabled = true;
+    try {
+      const msg = await rpc('web_school_invite', { p_email: email, p_resend: false });
+      if (msg) { const m = smModal('info_modal', '', esc(msg), '<button type="button" class="btn btn-primary" data-close>Close</button>'); m.querySelector('[data-close]').addEventListener('click', () => pageSchoolManagement()); }
+      else pageSchoolManagement();
+    } catch (x) { inviteBtn.disabled = false; emailEl.insertAdjacentHTML('afterend', `<div class="invalid-feedback d-block">${esc(x.message)}</div>`); }
+  });
+}
+
+// Edit school details (school-management/school/show.blade.php + school-address-form-fields).
+function schoolAddressFields(s) {
+  const field = (label, id, value, ph) => `<div class="form-row mb-3"><div class="col"><label for="${id}" class="text-1">${label}</label><input type="text" placeholder="${ph}" class="form-control" id="${id}" name="${id}" value="${esc(value || '')}"></div></div>`;
+  return `<div class="school-address">${field('School Name', 'school_name', s.name, 'School Name')}${field('Address 1', 'address_2', s.address_1, 'Address 1')}${field('Address 2', 'address_3', s.address_2, 'Address 2')}${field('Town/City', 'town', s.town, 'Town / City')}${field('Region', 'county', s.region, 'Region')}${field('Postal/Zip Code', 'post_code', s.postcode, 'Postal / Zip code')}</div>`;
+}
+async function pageSchoolDetails() {
+  setBg(null);
+  if (!(Auth.me() || {}).is_admin) { app.innerHTML = '<div class="notice">Only users with admin rights can view this page.</div>'; return; }
+  const [s] = await rpc('web_school_details');
+  app.innerHTML = `<div class="form-page container-fluid px-4 pb-5"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8"><form id="school_form">
+    <div class="heading-1 text-primary mb-3">School details</div>${schoolAddressFields(s || {})}
+    <div class="notice d-none" id="school-msg" role="status"></div>
+    <button class="btn btn-primary btn-save heading-2 w-100" type="submit">Click to Save &amp; Continue</button></form></div></div></div>`;
+  reveal();
+  document.getElementById('school_form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target, msg = document.getElementById('school-msg');
+    try {
+      await rpc('web_school_update', { p_name: f.school_name.value, p_address_1: f.address_2.value, p_address_2: f.address_3.value, p_town: f.town.value, p_region: f.county.value, p_postcode: f.post_code.value });
+      Object.assign(Auth.me(), { school_name: f.school_name.value.trim() }); renderUserContext(); Auth.renderUser();
+      location.hash = '#/school-management';
+    } catch (x) { msg.textContent = x.message; msg.classList.remove('d-none'); }
+  });
+}
+
+// My School (user-profile-school/show.blade.php): the live page finds a UK school by
+// postcode against the Schools table and saves it, requesting access at a new school.
+async function pageMySchool() {
+  setBg(null);
+  const [s] = await rpc('web_school_details');
+  const state = s && s.membership_state;
+  const stateText = { approved: 'You have access to this school\'s subscription.', requested: 'Your request to join this school is waiting for one of its admins to approve it.', invited: 'You have been invited to this school.', declined: 'Your request to join this school was declined.', removed: 'Your access to this school was removed by one of its admins.' }[state] || '';
+  app.innerHTML = `<div class="capture-container form-page container-fluid"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8">
+    <div class="heading-2 text-primary text-center">Enter your School Name here</div>
+    ${s && s.name ? `<div class="management-card school-details my-4 p-3"><div class="heading-5 text-primary">${esc(s.name)}</div><div class="text-1">${esc([s.address_1, s.town, s.postcode].filter(Boolean).join(', '))}</div>${stateText ? `<div class="text-1 text-mid-purple mt-2">${stateText}</div>` : ''}</div>` : ''}
+    <div class="page-2 mt-3 mb-4"><div class="form-row mb-3"><div class="col"><label for="school_lookup" class="text-1">UK School Postcode or name</label><input type="text" class="form-control" id="school_lookup" placeholder="Enter your full UK School Postcode eg AB1 2CD" autocomplete="off"></div></div>
+    <button id="find_school_button" class="btn btn-primary heading-2 w-100 my-3" type="button">Find my school</button>
+    <div class="school-list mt-2 d-none"><div class="form-row mb-3"><div class="col"><label for="school_id" class="text-1">My School</label><select class="form-control form-select" id="school_id"></select></div></div>
+      <div class="text-danger my-2">Cannot find your UK based School in our database?<br><br>Just email your school name and postcode to <a href="mailto:laura@imoves.com">laura@imoves.com</a> or call <a href="tel:0114 266 1061">0114 266 1061</a> and we'll get your school details added in a flash.</div>
+      <button class="btn btn-primary btn-save heading-2 w-100" type="button" id="save_school">Click to Save &amp; Continue</button></div>
+    <div class="notice d-none mt-3" id="school-msg" role="status"></div></div></div></div></div>`;
+  reveal();
+  const msg = document.getElementById('school-msg'), list = app.querySelector('.school-list'), sel = document.getElementById('school_id');
+  document.getElementById('find_school_button').addEventListener('click', async () => {
+    const q = document.getElementById('school_lookup').value.trim();
+    msg.classList.add('d-none');
+    if (q.length < 3) { msg.textContent = 'Please enter a full UK postcode or at least three letters of the school name.'; msg.classList.remove('d-none'); return; }
+    const rows = await rpc('web_school_search', { p_q: q });
+    if (!rows.length) { list.classList.add('d-none'); msg.textContent = 'No school found for that postcode or name.'; msg.classList.remove('d-none'); return; }
+    sel.innerHTML = rows.map(r => `<option value="${r.id}" ${s && r.id === s.id ? 'selected' : ''}>${esc(r.name)}${r.address ? ' - ' + esc(r.address) : ''}</option>`).join('');
+    list.classList.remove('d-none');
+  });
+  document.getElementById('save_school').addEventListener('click', async () => {
+    try {
+      await rpc('web_school_choose', { p_school_id: +sel.value });
+      const me = await rpc('web_me'); if (me && me[0]) Object.assign(Auth.me(), me[0]);
+      renderUserContext(); Auth.renderUser(); renderUserMenu();
+      location.hash = '#/';
+    } catch (x) { msg.textContent = x.message; msg.classList.remove('d-none'); }
   });
 }
 
