@@ -726,8 +726,8 @@ function makeSortable(container, itemSel, handleSel, group, onDrop) {
     const arm = () => { item.draggable = true; };
     if (handleSel) { item.draggable = false; item.querySelectorAll(handleSel).forEach(h => { h.addEventListener('mousedown', arm); h.addEventListener('touchstart', arm, { passive: true }); }); }
     else item.draggable = true;
-    item.addEventListener('dragstart', e => { if (!item.draggable) { e.preventDefault(); return; } DND.item = item; DND.group = group; DND.from = container; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', group); } catch (x) {} setTimeout(() => item.classList.add('dnd-ghost'), 0); });
-    item.addEventListener('dragend', () => { item.classList.remove('dnd-ghost'); if (handleSel) item.draggable = false; DND.item = null; });
+    item.addEventListener('dragstart', e => { if (e.target !== item) return; if (!item.draggable) { e.preventDefault(); return; } DND.item = item; DND.group = group; DND.from = container; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', group); } catch (x) {} setTimeout(() => item.classList.add('dnd-ghost'), 0); });
+    item.addEventListener('dragend', e => { if (e.target !== item) return; item.classList.remove('dnd-ghost'); if (handleSel) item.draggable = false; DND.item = null; });
     item.addEventListener('dragover', e => {
       if (!DND.item || DND.group !== group || DND.item === item) return;
       e.preventDefault(); e.dataTransfer.dropEffect = 'move';
@@ -774,11 +774,11 @@ function bindCurriculum(admin, lessons) {
     const ids = [...to.querySelectorAll('[data-tab-item]')].map(x => +x.dataset.tabItem);
     try { await saveOrder('curriculum_tabs', ids); await refresh(); } catch (x) { fail(x); }
   });
-  makeSortable(document.getElementById('cur-groups'), '[data-group]', '.drag-handle', 'groups', async (it, from, to) => {
+  makeSortable(document.getElementById('cur-groups'), '[data-group]', '.bi-arrows-vertical.drag-handle', 'groups', async (it, from, to) => {
     const ids = [...to.querySelectorAll('[data-group]')].map(x => +x.dataset.group);
     try { await saveOrder('curriculum_groups', ids); await refresh(); } catch (x) { fail(x); }
   });
-  app.querySelectorAll('[data-lessons]').forEach(c => makeSortable(c, '[data-gl]', '.drag-handle', 'lessons-' + CUR.current, async (it, from, to) => {
+  app.querySelectorAll('[data-lessons]').forEach(c => makeSortable(c, '[data-gl]', '.bi-arrows-move.drag-handle', 'lessons-' + CUR.current, async (it, from, to) => {
     const glId = +it.dataset.gl, lessonId = +it.dataset.lessonId, toGroup = +to.dataset.lessons;
     try {
       if (from !== to) {
