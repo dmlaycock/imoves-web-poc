@@ -195,7 +195,7 @@ function subcatIsFree(sc) { return (D.schemesBySubcat[sc.id] || []).some(s => s.
 function subcatHref(sc) { return `#/subject/${sc.subject_id}/subcategory/${sc.id}`; }
 function lessonHref(l, sc) { return `#/lesson/${l.id}` + (sc ? `?sc=${sc.id}` : ''); }
 function wistia(id) { return `<div class="wistia-ratio videobox"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`; }
-function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; document.body.classList.toggle('with-bg-img', !!url); }
+function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.replace(/ /g, '%20')}')` : ''; document.body.classList.toggle('with-bg-img', !!url); document.body.classList.remove('bg-no-margin'); }
 
 // ---------- routing ----------
 const app = document.getElementById('app-page');
@@ -283,7 +283,20 @@ function renderBrowse() {
   });
   document.getElementById('browse-tabs').innerHTML = tabs.join('');
   document.getElementById('browse-panes').innerHTML = panes.join('');
+  // Below sm: the accordion (browser.blade.php "row d-sm-none" + subject-group-panels.blade.php)
+  let first = true;
+  document.getElementById('browse-mobile').innerHTML = subjects.map(s => {
+    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
+    if (!sgs.length) return '';
+    const open = first; first = false;
+    return `<li class="mb-1"><button type="button" class="text-primary w-100 btn btn-toggle d-inline-flex align-items-center rounded border-0" data-collapse="subject-${s.id}-collapse" aria-expanded="${open}">${esc(s.name)}</button>
+      <div class="collapse ${open ? 'show' : ''} mt-2" id="subject-${s.id}-collapse"><ul class="d-sm-none btn-toggle-nav list-unstyled fw-normal pb-1 small">` + sgs.map(({ sg, subcats }) =>
+        `<li class="h6 text-primary"><a class="text-primary btn-toggle d-inline-flex" href="#" data-collapse="subgroup-${sg.id}-collapse" aria-expanded="false">${esc(sg.name)}</a><ul class="list-unstyled ms-3 mt-2 collapse" id="subgroup-${sg.id}-collapse">` +
+        subcats.map(sc => `<li class="mb-1"><a class="text-mid-purple fw-light" href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('') + `</ul></li>`).join('') + `</ul></div></li>`;
+  }).join('');
   const modal = document.getElementById('subject-browse-modal');
+  modal.querySelectorAll('#browse-mobile [data-collapse]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); const t = document.getElementById(b.dataset.collapse); const on = !t.classList.contains('show'); t.classList.toggle('show', on); b.setAttribute('aria-expanded', on); }));
+  modal.querySelectorAll('#browse-mobile a[href^="#/"]').forEach(a => a.addEventListener('click', closeBrowse));
   modal.querySelectorAll('#browse-tabs a').forEach(a => a.addEventListener('click', () => {
     modal.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === a.dataset.pane));
   }));
@@ -642,40 +655,55 @@ async function pageSchoolDetails() {
   });
 }
 
-// My School (user-profile-school/show.blade.php): the live page finds a UK school by
-// postcode against the Schools table and saves it, requesting access at a new school.
+// My School (user-profile-school/show.blade.php + user-capture/partials/school-form.blade.php,
+// resources/js/user_capture_school.js): country, then the UK postcode lookup (exact postcode)
+// or, for other countries, the school address form that creates the school.
 async function pageMySchool() {
-  setBg(null);
-  const [s] = await rpc('web_school_details');
-  const state = s && s.membership_state;
-  const stateText = { approved: 'You have access to this school\'s subscription.', requested: 'Your request to join this school is waiting for one of its admins to approve it.', invited: 'You have been invited to this school.', declined: 'Your request to join this school was declined.', removed: 'Your access to this school was removed by one of its admins.' }[state] || '';
+  const [[s], countries] = await Promise.all([rpc('web_school_details'), rpc('web_countries')]);
+  setBg('live/img/sign-up-bg-1.jpeg'); document.body.classList.add('bg-no-margin'); document.body.style.backgroundImage = "linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)), url('live/img/sign-up-bg-1.jpeg')";   // layouts/default bgOpaque
+  const uk = countries.find(c => c.is_uk) || {}; const curCountry = (s && s.country_id) || uk.id || '';
+  const field = (label, id, value, ph) => `<div class="form-row mb-3"><div class="col"><label for="${id}" class="text-1">${label}</label><div class="form-help"></div><input type="text" placeholder="${ph}" class="form-control" id="${id}" name="${id}" value="${esc(value || '')}"></div></div>`;
+  const isUk = c => String(c) === String(uk.id);
   app.innerHTML = `<div class="capture-container form-page container-fluid"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8">
     <div class="heading-2 text-primary text-center">Enter your School Name here</div>
-    ${s && s.name ? `<div class="management-card school-details my-4 p-3"><div class="heading-5 text-primary">${esc(s.name)}</div><div class="text-1">${esc([s.address_1, s.town, s.postcode].filter(Boolean).join(', '))}</div>${stateText ? `<div class="text-1 text-mid-purple mt-2">${stateText}</div>` : ''}</div>` : ''}
-    <div class="page-2 mt-3 mb-4"><div class="form-row mb-3"><div class="col"><label for="school_lookup" class="text-1">UK School Postcode or name</label><input type="text" class="form-control" id="school_lookup" placeholder="Enter your full UK School Postcode eg AB1 2CD" autocomplete="off"></div></div>
-    <button id="find_school_button" class="btn btn-primary heading-2 w-100 my-3" type="button">Find my school</button>
-    <div class="school-list mt-2 d-none"><div class="form-row mb-3"><div class="col"><label for="school_id" class="text-1">My School</label><select class="form-control form-select" id="school_id"></select></div></div>
-      <div class="text-danger my-2">Cannot find your UK based School in our database?<br><br>Just email your school name and postcode to <a href="mailto:laura@imoves.com">laura@imoves.com</a> or call <a href="tel:0114 266 1061">0114 266 1061</a> and we'll get your school details added in a flash.</div>
-      <button class="btn btn-primary btn-save heading-2 w-100" type="button" id="save_school">Click to Save &amp; Continue</button></div>
-    <div class="notice d-none mt-3" id="school-msg" role="status"></div></div></div></div></div>`;
+    <form id="user_capture_form" class="${s && s.id ? '' : ''}"><div class="page-2 mt-3 mb-4">
+      <div class="form-row mb-3"><div class="col"><label for="country_id" class="text-1">Country</label><select class="form-select" id="country_id" name="country_id"><option value="">Select your country</option>${countries.map(c => `<option value="${c.id}" ${String(c.id) === String(curCountry) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div></div>
+      <div class="country-selected ${curCountry ? '' : 'd-none'}">
+        <div class="uk ${isUk(curCountry) ? '' : 'd-none'}">
+          <div class="form-row"><div class="col"><label for="post_code_lookup" class="text-1">UK School Postcode</label><div class="form-help"></div><input type="text" placeholder="Enter your full UK School Postcode eg AB1 2CD" class="form-control" id="post_code_lookup" name="post_code_lookup" value="${esc(s && isUk(curCountry) ? s.postcode || '' : '')}"></div></div>
+          <div class="no-post-code-lookup invalid-feedback my-2 d-none">Please enter a full UK postcode.</div>
+          <button id="find_school_button" class="btn btn-primary heading-2 w-100 my-3" type="button">Find my school</button>
+          <div class="school-list mt-2 d-none"><div class="form-row mb-3"><div class="col"><label for="school_id" class="text-1">My School</label><select class="form-select" id="school_id" name="school_id"></select></div></div>
+            <div class="text-danger my-2">Cannot find your UK based School in our database?<br><br>Just email your school name and postcode to <a href="mailto:laura@imoves.com">laura@imoves.com</a> or call <a href="tel:0114 266 1061">0114 266 1061</a> and we'll get your school details added in a flash.</div></div>
+        </div>
+        <div class="school-address ${isUk(curCountry) ? 'd-none' : ''}">${field('School Name', 'school_name', s && !isUk(curCountry) ? s.name : '', 'School Name')}${field('Address 1', 'address_2', s && !isUk(curCountry) ? s.address_1 : '', 'Address 1')}${field('Address 2', 'address_3', s && !isUk(curCountry) ? s.address_2 : '', 'Address 2')}${field('Town/City', 'town', s && !isUk(curCountry) ? s.town : '', 'Town / City')}${field('Region', 'county', s && !isUk(curCountry) ? s.region : '', 'Region')}${field('Postal/Zip Code', 'post_code', s && !isUk(curCountry) ? s.postcode : '', 'Postal / Zip code')}</div>
+        <button class="btn btn-primary btn-save heading-2 ${isUk(curCountry) ? 'd-none' : ''} w-100" type="button">Click to Save &amp; Continue</button>
+      </div>
+      <div class="notice d-none mt-3" id="school-msg" role="status"></div>
+    </div></form></div></div></div>`;
   reveal();
-  const msg = document.getElementById('school-msg'), list = app.querySelector('.school-list'), sel = document.getElementById('school_id');
-  document.getElementById('find_school_button').addEventListener('click', async () => {
-    const q = document.getElementById('school_lookup').value.trim();
-    msg.classList.add('d-none');
-    if (q.length < 3) { msg.textContent = 'Please enter a full UK postcode or at least three letters of the school name.'; msg.classList.remove('d-none'); return; }
-    const rows = await rpc('web_school_search', { p_q: q });
-    if (!rows.length) { list.classList.add('d-none'); msg.textContent = 'No school found for that postcode or name.'; msg.classList.remove('d-none'); return; }
-    sel.innerHTML = rows.map(r => `<option value="${r.id}" ${s && r.id === s.id ? 'selected' : ''}>${esc(r.name)}${r.address ? ' - ' + esc(r.address) : ''}</option>`).join('');
-    list.classList.remove('d-none');
-  });
-  document.getElementById('save_school').addEventListener('click', async () => {
+  const f = document.getElementById('user_capture_form'), country = f.querySelector('#country_id'), list = f.querySelector('.school-list'), sel = f.querySelector('#school_id'), save = f.querySelector('.btn-save'), msg = document.getElementById('school-msg'), find = f.querySelector('#find_school_button');
+  const resetSearch = () => { sel.innerHTML = ''; list.classList.add('d-none'); if (isUk(country.value)) save.classList.add('d-none'); };
+  const countryChanged = () => { const u = isUk(country.value); if (!u) { f.querySelector('#post_code_lookup').value = ''; resetSearch(); }
+    f.querySelector('.country-selected').classList.toggle('d-none', !country.value); f.querySelector('.uk').classList.toggle('d-none', !u); f.querySelector('.school-address').classList.toggle('d-none', u); save.classList.toggle('d-none', u); };
+  country.addEventListener('change', countryChanged);
+  const findSchool = async () => {
+    const pc = f.querySelector('#post_code_lookup').value.trim(); f.querySelector('.no-post-code-lookup').classList.toggle('d-none', pc !== ''); resetSearch(); if (!pc) return;
+    find.disabled = true; let rows = []; try { rows = await rpc('web_school_search', { p_q: pc }); } catch (e) {}
+    sel.innerHTML = `<option value="">Select your school</option>` + rows.map(r => `<option value="${r.id}" ${s && r.id === s.id ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
+    list.classList.toggle('d-none', !rows.length); save.classList.toggle('d-none', !rows.length); find.disabled = false;
+  };
+  find.addEventListener('click', e => { e.preventDefault(); findSchool(); });
+  if (isUk(curCountry) && s && s.postcode) findSchool();   // initialiseForm(): preselect the stored school
+  save.addEventListener('click', async e => {
+    e.preventDefault(); save.disabled = true; msg.classList.add('d-none');
     try {
-      await rpc('web_school_choose', { p_school_id: +sel.value });
+      if (isUk(country.value)) { if (!sel.value) throw new Error('Please select your school.'); await rpc('web_school_choose', { p_school_id: +sel.value }); }
+      else await rpc('web_school_create', { p_name: f.school_name.value, p_address_1: f.address_2.value, p_address_2: f.address_3.value, p_town: f.town.value, p_region: f.county.value, p_postcode: f.post_code.value, p_country_id: +country.value });
       const me = await rpc('web_me'); if (me && me[0]) Object.assign(Auth.me(), me[0]);
       renderUserContext(); Auth.renderUser(); renderUserMenu();
       location.hash = '#/';
-    } catch (x) { msg.textContent = x.message; msg.classList.remove('d-none'); }
+    } catch (x) { msg.textContent = x.message; msg.classList.remove('d-none'); save.disabled = false; }
   });
 }
 
