@@ -204,7 +204,6 @@ body.with-bg-img .main-content, body.with-bg-img .footer-brush-container, body.w
 .poc-badge { position: absolute; left: 50%; transform: translateX(-50%); top: 2px; background: var(--pink); color: #fff; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; z-index: 20; }
 .poc-foot { font-size: 11px; opacity: .8; margin-top: .25rem; }
 .badge.passcode { background: var(--orange); color: #2b2130; font-size: 11px; vertical-align: middle; margin-left: .4rem; }
-#scrollable-navbar .flex-even { flex: 1 1 0; min-width: 0; }
 #scrollable-navbar .subject-button.active { outline: 2px solid #fff; outline-offset: -2px; }
 #scrollable-navbar .subject-button .button-text { text-decoration: none; }
 #scrollable-navbar .subject-button.active .button-text { text-decoration: underline; }
