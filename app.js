@@ -185,11 +185,11 @@ async function route() {
     if (!p.length) return pageHome();
     if (p[0] === 'subject' && p[2] === 'subcategory') return pageSubcategory(+p[1], +p[3]);
     if (p[0] === 'subject') return pageSubject(+p[1]);
+    if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
     if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
     if (p[0] === 'favourites') return pageFavourites();
-    if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
     if (p[0] === 'curriculum') { app.innerHTML = '<div class="notice">The School Curriculum Management page arrives in v0.28.</div>'; return; }
     if (p[0] === 'profile') { app.innerHTML = '<div class="notice">My personal profile arrives in v0.28.</div>'; return; }
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
@@ -709,7 +709,7 @@ async function pageFavourites() {
     (bySubject[subj ? subj.name : 'Other'] ||= { sc, items: [] }).items.push({ l, scheme, sc });
   }
   for (const [name, g] of Object.entries(bySubject)) {
-    const n = g.items.length, lab = g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons');
+    const n = g.items.length, lab = (g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons')).toLowerCase();
     html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row">`;
     for (const { l, scheme, sc } of g.items) {
       const blurb = (l.description || l.body_opening_text || '').trim();
