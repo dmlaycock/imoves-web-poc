@@ -176,7 +176,7 @@ async function route() {
   const qs = Object.fromEntries(new URLSearchParams(query));
   const p = pathPart.split('/').filter(Boolean);
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (p[0] || 'home')));
-  document.querySelectorAll('#subjectbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
+  document.querySelectorAll('#scrollable-navbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
   const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile');
@@ -201,7 +201,7 @@ async function route() {
 function renderSubjectBar() {
   // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
   const subjects = D.subjects.filter(s => E.buttons.includes(s.id) && canViewSubject(s)).sort(byOrder);
-  document.getElementById('subjectbar').innerHTML = subjects.map(s =>
+  document.getElementById('scrollable-navbar').innerHTML = subjects.map(s =>
     `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
   document.getElementById('subjectnav').classList.toggle('hidden', subjects.length < 2);
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);

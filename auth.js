@@ -151,7 +151,7 @@ const Auth = (() => {
     const badge = document.getElementById('passcodebadge');
     if (badge) badge.remove();
     if (!session) {
-      for (const id of ['userctx', 'subjectbar', 'usermenu']) { const x = document.getElementById(id); if (x) x.innerHTML = ''; }
+      for (const id of ['userctx', 'scrollable-navbar', 'usermenu']) { const x = document.getElementById(id); if (x) x.innerHTML = ''; }
       for (const id of ['stickybanner', 'upgradebtn']) { const x = document.getElementById(id); if (x) x.classList.add('hidden'); }
       return;
     }
