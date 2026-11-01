@@ -162,7 +162,6 @@ function visibleSubcats(sg) {
 function subcatIsFree(sc) { return (D.schemesBySubcat[sc.id] || []).some(s => s.is_freemium); }
 function subcatHref(sc) { return `#/subject/${sc.subject_id}/subcategory/${sc.id}`; }
 function lessonHref(l, sc) { return `#/lesson/${l.id}` + (sc ? `?sc=${sc.id}` : ''); }
-// Version B player: Cloudflare Stream when the video has a ready Stream copy, else Wistia.
 const FORCE_WISTIA = /[?&]player=wistia\b/.test(location.search);
 function wistia(id) {
   const uid = !FORCE_WISTIA && D.streamMap && D.streamMap.get(id);
@@ -170,10 +169,8 @@ function wistia(id) {
   return `<div class="wistia-ratio videobox" data-player="wistia"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`;
 }
 async function loadStreamMap() {
-  try {
-    const rows = await rest('video_stream_map?select=wistia_id,stream_uid', { all: true });
-    D.streamMap = new Map(rows.map(r => [r.wistia_id, r.stream_uid]));
-  } catch (e) { D.streamMap = new Map(); console.warn('Stream map unavailable, using Wistia:', e.message); }
+  try { const rows = await rest('video_stream_map?select=wistia_id,stream_uid', { all: true }); D.streamMap = new Map(rows.map(r => [r.wistia_id, r.stream_uid])); }
+  catch (e) { D.streamMap = new Map(); }
   const el = document.getElementById('playerstamp');
   if (el) el.textContent = FORCE_WISTIA ? 'Videos: Wistia (forced).' : D.streamMap.size ? `Videos: Cloudflare Stream (${D.streamMap.size} mapped), Wistia fallback.` : 'Videos: Wistia (Stream map not available yet).';
 }
@@ -199,10 +196,11 @@ async function route() {
     if (!p.length) return pageHome();
     if (p[0] === 'subject' && p[2] === 'subcategory') return pageSubcategory(+p[1], +p[3]);
     if (p[0] === 'subject') return pageSubject(+p[1]);
+    if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
     if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
-    if (p[0] === 'favourites') { app.innerHTML = '<div class="notice">Favourites arrive in the next increment (v0.27).</div>'; return; }
+    if (p[0] === 'favourites') return pageFavourites();
     if (p[0] === 'curriculum') { app.innerHTML = '<div class="notice">The School Curriculum Management page arrives in v0.28.</div>'; return; }
     if (p[0] === 'profile') { app.innerHTML = '<div class="notice">My personal profile arrives in v0.28.</div>'; return; }
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
@@ -396,6 +394,58 @@ function subcatCard(sc, { heading, sub, cols } = {}) {
     <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div></a></div>`;
 }
 
+// ---------- teacher actions (v0.27) ----------
+// Favourites, mark as done, lesson views, thumb-o-meter and search logging, stored in
+// imoves-poc (web-poc/db/034_teacher_actions.sql) rather than Quickbase (decision 23 Oct).
+const MY = { fav: new Set(), done: new Set(), seen: new Set() };
+async function loadMyLessons() {
+  try { const [r] = await rpc('web_my_lessons'); MY.fav = new Set(r.favourites); MY.done = new Set(r.completed); MY.seen = new Set(r.seen); }
+  catch (e) { console.warn('my lessons unavailable:', e.message); }
+}
+async function restWrite(path, body, method = 'POST') {
+  const r = await restFetch(path, { method, headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error(`${path.split('?')[0]}: ${r.status}`);
+}
+const uid = () => (Auth.me() || {}).id;
+async function toggleFavourite(lessonId) {
+  if (MY.fav.has(lessonId)) { await restWrite(`user_favourites?user_id=eq.${uid()}&lesson_id=eq.${lessonId}`, null, 'DELETE'); MY.fav.delete(lessonId); }
+  else { await restWrite('user_favourites', { user_id: uid(), lesson_id: lessonId }); MY.fav.add(lessonId); }
+  paintStates();
+}
+// Live: "Mark as done" adds a completion each time (history lists them all); the
+// "Activity Complete" state shows while any completion exists; clicking it again removes
+// them (mark-as-incomplete).
+async function toggleDone(lessonId) {
+  if (MY.done.has(lessonId)) { await restWrite(`user_lesson_completions?user_id=eq.${uid()}&lesson_id=eq.${lessonId}`, null, 'DELETE'); MY.done.delete(lessonId); }
+  else { await restWrite('user_lesson_completions', { user_id: uid(), lesson_id: lessonId }); MY.done.add(lessonId); }
+  paintStates();
+}
+async function logView(lessonId) {
+  let c = null; try { c = localStorage.getItem('imoves.loginCookie'); } catch (e) {}
+  try { await restWrite('user_lesson_views', { user_id: uid(), lesson_id: lessonId, login_cookie: c }); MY.seen.add(lessonId); } catch (e) { /* best effort */ }
+}
+async function logSearch(term, results) { try { await restWrite('user_searches', { user_id: uid(), term, results }); } catch (e) {} }
+async function saveAssessment(lessonId, data) { await restWrite('user_assessments', { user_id: uid(), lesson_id: lessonId, ...data }); }
+// Repaint every favourite / done control on the page from MY (live swaps d-none between variants).
+function paintStates() {
+  document.querySelectorAll('[data-fav-for]').forEach(el => {
+    const on = MY.fav.has(+el.dataset.favFor); const row = el.dataset.favKind === 'icon';
+    if (row) { el.innerHTML = on ? '<i class="bi-star-fill text-warning"></i>' : '<i class="bi-star text-mid-purple"></i>'; el.title = on ? 'Remove from Favourites' : 'Add to Favourites'; }
+    else { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? `<i class="bi-star-fill text-warning me-2"></i>Favourite ${esc(el.dataset.label)}` : `<i class="bi-star me-2"></i>Add to <span class="d-none d-xl-inline">Favourite ${esc(el.dataset.labels)}</span><span class="d-inline d-xl-none">Favourites</span>`; }
+  });
+  document.querySelectorAll('[data-done-for]').forEach(el => {
+    const on = MY.done.has(+el.dataset.doneFor); const row = el.dataset.doneKind === 'icon';
+    if (row) { el.innerHTML = on ? '<i class="bi-check-circle-fill text-success"></i>' : '<i class="bi-circle text-mid-purple"></i>'; el.title = on ? 'Mark as Incomplete' : 'Mark as Complete'; }
+    else { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? `<i class="d-none d-lg-inline bi-check-circle-fill mr-1"></i> ${esc(el.dataset.label)} Complete` : `<i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done`; }
+  });
+}
+function bindActions(root) {
+  root.querySelectorAll('[data-fav-for]').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', async e => { e.stopPropagation(); e.preventDefault(); el.classList.add('cursor-wait'); try { await toggleFavourite(+el.dataset.favFor); } catch (x) { alert('Could not save: ' + x.message); } el.classList.remove('cursor-wait'); }); });
+  root.querySelectorAll('[data-done-for]').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', async e => { e.stopPropagation(); e.preventDefault(); el.classList.add('cursor-wait'); try { await toggleDone(+el.dataset.doneFor); } catch (x) { alert('Could not save: ' + x.message); } el.classList.remove('cursor-wait'); }); });
+  root.querySelectorAll('.curriculum-btn').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); el.title = 'Curriculum arrives in v0.28'; }); });
+  paintStates();
+}
+
 // ---------- category, scheme and lesson pages (live markup, v0.26) ----------
 // Markup follows subjects/show-subcategory.blade.php, subjects/partials/scheme-card.blade.php
 // and lessons/show.blade.php + lessons/lesson-part.blade.php. Kept from the PoC (agreed
@@ -501,13 +551,13 @@ function lessonRow(l, sc, schemeAges) {
     (l.duration ? `<span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1" title="Around ${l.duration} minutes long"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span>` : '');
   return `<div class="accordion list-group list-group-horizontal shadow mt-0 mb-2 ${ok ? '' : 'content-restricted'} lesson-x" data-lesson="${l.id}">
     <div class="list-group-item list-group-item-action cursor-pointer px-3 lesson-row" role="button" aria-expanded="false"><div class="row h-100"><div class="col d-flex align-items-center">
-      <div class="d-flex justify-content-start align-items-center pe-1"><i class="${ok ? 'text-primary ' + lessonIcon(l) : 'text-mid-purple bi-lock-fill'} h5 my-0 me-2"></i></div>
+      <div class="d-flex justify-content-start align-items-center pe-1"><i class="${ok ? (MY.seen.has(l.id) ? 'text-mid-purple ' + lessonIcon(l).replace('-fill', '') : 'text-primary ' + lessonIcon(l)) : 'text-mid-purple bi-lock-fill'} h5 my-0 me-2"></i></div>
       <div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(l.name)}${l.is_freemium ? ' <small class="ms-1 scheme-badge badge-freemium"><span class="badge bg-success">Free</span></small>' : ''}</h5><span class="w-100 text-mid-purple fw-light">${ok ? esc(l.description || '') : esc(E.lessonMessage)}</span></div>
       <div class="d-none d-md-flex flex-shrink-0 align-items-center"><small class="ms-3 d-flex flex-wrap justify-content-end text-muted text-mid-purple fw-light">${ok ? meta : (E.showUpgrade ? `<a class="btn btn-primary btn-sm" href="${upgradeHref()}">${esc(E.upgradeText)}</a>` : '')}</small></div>
     </div></div></div>
     <div class="list-group-item px-1 px-md-3"><div class="d-none d-md-flex flex-column h-100 justify-content-around align-items-center"><div>
-      <div class="${l.description ? 'mb-1' : ''}"><div class="lesson-icon cursor-pointer mark-as-complete" title="Mark as Complete" data-lesson-id="${l.id}"><i class="bi-circle text-mid-purple"></i></div></div>
-      <div><div class="lesson-icon cursor-pointer add-to-favourites" title="Add to Favourites" data-lesson-id="${l.id}"><i class="bi-star text-mid-purple"></i></div></div>
+      <div class="${l.description ? 'mb-1' : ''}"><div class="lesson-icon cursor-pointer mark-as-complete" data-done-for="${l.id}" data-done-kind="icon"><i class="bi-circle text-mid-purple"></i></div></div>
+      <div><div class="lesson-icon cursor-pointer add-to-favourites" data-fav-for="${l.id}" data-fav-kind="icon"><i class="bi-star text-mid-purple"></i></div></div>
     </div><div><div class="btn-outline-primary curriculum-btn" title="Add to Curriculum" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus"></i></div></div></div></div>
   </div>
   <div class="lesson-drawer collapse-smooth closed" data-lesson-body="${l.id}"><div></div></div>`;
@@ -525,7 +575,7 @@ function bindLessonRows(sc) {
     if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1rem">Loading…</div>'; await fillLessonBody(body, +drawer.dataset.lessonBody, sc); }
     setTimeout(() => x.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
   }));
-  app.querySelectorAll('.mark-as-complete, .add-to-favourites, .curriculum-btn').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); }));
+  bindActions(app);
 }
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
@@ -540,6 +590,7 @@ async function fillLessonBody(el, lessonId, sc) {
     <div class="row"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><a class="btn btn-outline-primary btn-sm" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen me-1"></i> Open full page</a></div></div></div></div>`;
   el.dataset.loaded = '1';
   bindParts(el);
+  logView(lessonId);
 }
 function lessonText(l) {
   let h = para(l.body_opening_text);
@@ -582,16 +633,103 @@ async function pageLesson(id, scId) {
       ${item('bi-lightning-charge', l.intensity)}${item('bi-lightbulb', l.focus)}${item('bi-clock', l.duration ? `About ${l.duration}m long` : '')}${item('bi-building', l.location && l.location.length ? `In the ${l.location.join(', ')}` : '')}${item('bi-watch', l.preparation ? `Prep in ${l.preparation}m` : '')}
     </div></div></div></div>
     <hr class="d-none d-lg-block mx-lg-2 ${bg ? 'border-mid-purple' : ''}">
-    <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-lesson-id="${l.id}"><i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done</button></div>
+    <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-done-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}"></button></div>
     <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
-    <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-lesson-id="${l.id}"><i class="bi-star me-2"></i> Add to <span class="d-none d-xl-inline">Favourite ${esc(Labels)}</span><span class="d-inline d-xl-none">Favourites</span></button></div>
-    ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div>` : ''}
+    <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-fav-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}" data-labels="${esc(Labels)}"></button></div>
+    ${l.show_assessment ? `<div class="my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div><div class="d-none d-lg-block my-4 px-2 text-primary" id="readings"></div>` : ''}
     <div class="my-4 px-2"><div class="${btn}"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}" title="Add to Curriculum"><i class="bi bi-bookmark-plus"></i></button></div></div>
   </div></div>`;
   app.innerHTML = html;
   reveal();
   bindParts(app);
-  app.querySelectorAll('.mark-as-complete, .add-to-favourites, [data-thumb], .curriculum-btn').forEach(b => b.addEventListener('click', () => { b.classList.add('disabled'); b.title = 'Arrives in v0.27/v0.28'; }));
+  bindActions(app);
+  logView(l.id);
+  if (l.show_assessment) { renderReadings(l.id); app.querySelector('[data-thumb]').addEventListener('click', () => openThumb(l)); }
+}
+
+// Thumb-o-meter (lessons/show.blade.php #assessmentModal) and the readings list
+async function renderReadings(lessonId) {
+  const box = document.getElementById('readings'); if (!box) return;
+  const rows = (await rpc('web_lesson_history', { p_lesson_id: lessonId })).filter(r => r.kind === 'assessment');
+  if (!rows.length) { box.innerHTML = ''; return; }
+  const block = (label, list) => list.length ? `<div>${label}</div><div class="row mb-3">` + list.slice(0, 5).map(r => `<div class="col-8 fw-light">${fmtDate(r.at)}</div><div class="col-4 fw-light">${Math.round(r.score * 100)}%</div>`).join('') + `</div>` : '';
+  box.innerHTML = `<div class="mb-3">Your thumb-o-meter readings</div>` + block('Before the activity', rows.filter(r => r.before_or_after === 'B')) + block('After the activity', rows.filter(r => r.before_or_after === 'A'));
+}
+const fmtDate = iso => new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+const fmtTime = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+function openThumb(l) {
+  let pupils = 30; try { pupils = +localStorage.getItem('imoves.pupilCount') || (Auth.me() || {}).class_pupils || 30; } catch (e) {}
+  let m = document.getElementById('assessmentModal');
+  if (!m) { m = document.createElement('div'); m.id = 'assessmentModal'; m.className = 'modal fade'; m.tabIndex = -1; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-dialog modal-lg text-primary"><div class="modal-content">
+    <div class="modal-header bg-primary text-white"><h1 class="modal-title fs-5"><i class="bi-hand-thumbs-up me-2"></i> Thumb-o-meter</h1><button type="button" class="btn-close" data-close aria-label="Close"></button></div>
+    <div class="modal-body"><div class="text-center text-primary"><h5>${esc(l.assessment_question || '')}</h5></div>
+      <div class="row p-4">${[0, 1, 2].map(i => `<div class="col"><div class="flex"><div><img class="d-block mx-auto w-50" src="../live/img/thumbometer-${i}.png" alt=""></div><div class="mt-2 text-center">${esc(l[`assessment_response_${i}`] || '')}</div></div></div>`).join('')}</div>
+      <div class="border rounded border-primary bg-light-purple p-4"><form id="form-assessment">
+        <div class="row mb-3"><label for="number_of_students" class="col-sm-4 col-form-label fw-light">Number of children present</label><div class="col-sm-3"><input type="number" min="1" value="${pupils}" class="form-control" name="pupil_count" id="number_of_students" required></div></div>
+        <div class="row mb-3"><label for="number_of_thumbsup" class="col-sm-4 col-form-label fw-light">Number of 'thumbsup'</label><div class="col-sm-3"><input type="number" class="form-control" value="0" min="0" name="thumb_count" id="number_of_thumbsup" max="${pupils * 2}" required></div></div>
+        <fieldset class="row mb-3"><legend class="col-form-label fw-light col-sm-5 pt-0">Measurement before or after activity?</legend><div class="col-sm-5">
+          <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="before_or_after" id="inlineRadio1" value="B" required><label class="form-check-label fw-light" for="inlineRadio1">Before</label></div>
+          <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="before_or_after" id="inlineRadio2" value="A"><label class="form-check-label fw-light" for="inlineRadio2">After</label></div></div></fieldset>
+        <div class="text-danger small d-none" id="assess-err"></div>
+      </form></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-primary" id="btn-submit-form-assessment"><i class="bi-hand-thumbs-up me-2"></i>Save</button><button type="button" class="btn btn-secondary" data-close>Cancel</button></div>
+  </div></div>`;
+  m.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => hideModal('assessmentModal')));
+  m.addEventListener('click', e => { if (e.target === m) hideModal('assessmentModal'); });
+  m.querySelector('#number_of_students').addEventListener('input', e => { m.querySelector('#number_of_thumbsup').max = (+e.target.value || 0) * 2; });
+  m.querySelector('#btn-submit-form-assessment').addEventListener('click', async () => {
+    const f = m.querySelector('#form-assessment'); if (!f.reportValidity()) return;
+    const d = Object.fromEntries(new FormData(f)); const err = m.querySelector('#assess-err');
+    try {
+      await saveAssessment(l.id, { pupil_count: +d.pupil_count, thumb_count: +d.thumb_count, before_or_after: d.before_or_after });
+      try { localStorage.setItem('imoves.pupilCount', d.pupil_count); } catch (e) {}
+      hideModal('assessmentModal'); renderReadings(l.id);
+    } catch (x) { err.textContent = 'Could not save: ' + x.message; err.classList.remove('d-none'); }
+  });
+  showModal('assessmentModal');
+}
+
+// Lesson history (lesson/history.blade.php)
+async function pageLessonHistory(id) {
+  app.innerHTML = '<div class="loading">Loading history…</div>';
+  const [[l], rows] = await Promise.all([rest(`lessons?id=eq.${id}&select=id,name,heading_2`), rpc('web_lesson_history', { p_lesson_id: id })]);
+  if (!l) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
+  setBg(null);
+  const table = (title, list) => `<div class="heading-2">${title}</div><table class="viewed-table table table-borderless text-1 text-primary"><thead><tr><th class="pl-0">Date</th><th class="pl-0">Time</th></tr></thead><tbody>${list.map(r => `<tr><td class="pl-0">${fmtDate(r.at)}</td><td class="pl-0">${fmtTime(r.at)}</td></tr>`).join('') || '<tr><td class="pl-0 fw-light" colspan="2">None yet</td></tr>'}</tbody></table>`;
+  app.innerHTML = `<div class="content-page-nav d-flex justify-content-center mb-3 mt-4"><div class="back d-inline-block"><a href="#/lesson/${l.id}" class="nav-button d-block text-1"><img class="arrow-img" src="../live/img/arrow_next.png" alt=""><span class="nav-text">Back</span></a></div></div>
+    <div class="lesson-history-container form-page container-fluid text-primary"><div class="row"><div class="col-12 heading-1 text-center">Lesson history</div></div><div class="row mt-3 mb-4"><div class="col-12 heading-2">${esc(l.name)}</div></div>
+    <div class="row"><div class="col-12 col-sm-6">${table('Marked as done', rows.filter(r => r.kind === 'completed'))}</div><div class="col-12 col-sm-6">${table('Viewed', rows.filter(r => r.kind === 'viewed'))}</div></div></div>`;
+  reveal();
+}
+
+// Favourites (results/show-favourites.blade.php): personal favourites grouped by subject.
+async function pageFavourites() {
+  setBg(null);
+  const ids = [...MY.fav];
+  let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
+    <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
+  if (!ids.length) {
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white"><i class="bi-star-fill mr-1 text-warning"></i> Favourite Lessons</h5><div class="card-body pb-1"><div class="row"><div class="col-12"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><span><span class="text-primary h5">You haven't favourited any lessons yet.</span> <span class="text-mid-purple ms-1">To save a lesson to your favourites, click the <i class="bi-star mx-1 text-primary"></i> icon.</span></span></p></div></div></div></div></div></div></div>`;
+    app.innerHTML = html; reveal(); return;
+  }
+  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration&order=name`);
+  const bySubject = {};
+  for (const l of lessons) {
+    const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc && D.subjectById[sc.subject_id];
+    (bySubject[subj ? subj.name : 'Other'] ||= { sc, items: [] }).items.push({ l, scheme, sc });
+  }
+  for (const [name, g] of Object.entries(bySubject)) {
+    const n = g.items.length, lab = (g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons')).toLowerCase();
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row">`;
+    for (const { l, scheme, sc } of g.items) {
+      const blurb = (l.description || l.body_opening_text || '').trim();
+      html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
+        <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul></div></div></a></div>`;
+    }
+    html += `</div></div></div></div></div>`;
+  }
+  app.innerHTML = html; reveal();
 }
 
 // Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
@@ -637,6 +775,7 @@ async function pageSearch(q) {
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
   const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,scheme_id,is_freemium,age_min,age_max&order=order&limit=500`);
   const live = rows.filter(l => D.lessonById[l.id] && canAccessLesson(l));   // inaccessible lessons are hidden, as live
+  logSearch(q.trim(), live.length);
   const bySubject = {};
   for (const l of live) {
     const scheme = D.schemeById[l.scheme_id]; if (!scheme) continue;
@@ -668,7 +807,7 @@ async function startApp() {
   try {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
     initEntitlements();
-    await Promise.all([loadTree(), loadStreamMap()]);
+    await Promise.all([loadTree(), loadMyLessons(), loadStreamMap()]);
     renderSubjectBar();
     renderUserContext();
     renderUserMenu();

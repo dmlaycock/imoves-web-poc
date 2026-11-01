@@ -5,7 +5,6 @@ const SUPABASE_KEY = 'sb_publishable_5XkVClKKeE1nbm1lRAqB5w_TAgaRNVE';
 const SUPABASE_SCHEMA = '';
 const LOADED_AT = '2026-10-23';
 const CF = 'https://d1i2jq09uv1ah.cloudfront.net/';
-// Version B: videos play from Cloudflare Stream. The Wistia id -> Stream UID map comes from
-// the read-only view public.video_stream_map (ready videos only); anything not in it plays
-// from Wistia as before. Add ?player=wistia to the address to force Wistia for comparison.
+// Version B: videos play from Cloudflare Stream (read-only view public.video_stream_map, ready
+// videos only); anything not in it plays from Wistia. ?player=wistia forces Wistia.
 const STREAM_DOMAIN = 'customer-q4gm0gw925cd2f03.cloudflarestream.com';
