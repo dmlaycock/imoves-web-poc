@@ -1264,5 +1264,7 @@ async function startApp() {
 }
 (async () => {
   document.getElementById('stamp').textContent = LOADED_AT;
+  // The footer date is the latest nightly content refresh when the log exists (041).
+  rest('content_refreshes?select=at&order=at.desc&limit=1').then(r => { if (r && r[0]) document.getElementById('stamp').textContent = new Date(r[0].at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }).catch(() => {});
   if (await Auth.init()) await startApp();
 })();
