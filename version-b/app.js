@@ -1165,8 +1165,14 @@ function resultLessonCard(l, scheme, sc) {
 function resultPanels(lessons, withCounts) {
   const bySubject = {};
   for (const l of lessons) {
-    const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc && D.subjectById[sc.subject_id];
-    (bySubject[subj ? subj.name : 'Other'] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
+    const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
+    // The lesson's own subjects (Lessons fid 944), as ResultsController does; a lesson sits under
+    // each subject it belongs to. Fallback: the subject of its first category.
+    // SubjectPolicy::search: all-content users, or the subject is in the user's subject or niche lists.
+    const canSearch = s => s && (withCounts || E.allContent || E.subjectIds.has(s.id));   // favourites: every subject (showFavourites has no policy)
+    let subjects = [...new Set(l.subject_ids || [])].map(id => D.subjectById[+id]).filter(canSearch);   // Quickbase lists a subject twice at times
+    if (!subjects.length && !(l.subject_ids || []).length) { const s = sc && D.subjectById[sc.subject_id]; if (canSearch(s)) subjects = [s]; }   // no subject data at all: the category's subject
+    for (const subj of subjects) (bySubject[subj.name] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
   let html = '';
   for (const name of Object.keys(bySubject).sort((x, y) => x.localeCompare(y))) {
@@ -1185,7 +1191,7 @@ async function pageFavourites() {
   let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
     <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
   if (!ids.length) { app.innerHTML = html + NO_FAVOURITES; reveal(); return; }
-  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration&order=name`);
+  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration,subject_ids&order=name`);
   app.innerHTML = html + resultPanels(lessons, true); reveal();
 }
 
@@ -1225,16 +1231,18 @@ function bindParts(root) {
 
 // Search results: ResultsController::search() renders results/show-favourites.blade.php with
 // no header - one panel per subject of lesson cards (lessons whose "search" text matches),
-// inaccessible lessons left out. With no match, live shows the favourites empty-state card.
+// inaccessible lessons left out. With no match: "No results found for your query."
 async function pageSearch(q) {
   setBg(null);
   if (!q.trim()) { app.innerHTML = '<div class="notice mt-4">Use Search in the header to find lessons by title, topic, subject or lesson ID.</div>'; return; }
   app.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
-  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration&order=name&limit=500`);
+  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration,subject_ids&order=name&limit=500`);
   const live = rows.filter(l => D.lessonById[l.id] && D.schemeById[l.scheme_id] && canAccessLesson(l));
   logSearch(q.trim(), live.length);
-  app.innerHTML = `<div class="my-3">${live.length ? resultPanels(live, false) : NO_FAVOURITES}</div>`;
+  // show-favourites.blade.php without the favourites header: "No results found for your query."
+  const none = `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white"></h5><div class="card-body pb-1"><div class="row"><div class="col-12"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><span><span class="text-mid-purple ms-1">No results found for your query.</span></span></p></div></div></div></div></div></div></div>`;
+  app.innerHTML = `<div class="my-3">${live.length ? resultPanels(live, false) : none}</div>`;
   reveal();
 }
 
@@ -1267,5 +1275,7 @@ async function startApp() {
 }
 (async () => {
   document.getElementById('stamp').textContent = LOADED_AT;
+  // The footer date is the latest nightly content refresh when the log exists (041).
+  rest('content_refreshes?select=at&order=at.desc&limit=1').then(r => { if (r && r[0]) document.getElementById('stamp').textContent = new Date(r[0].at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }).catch(() => {});
   if (await Auth.init()) await startApp();
 })();
