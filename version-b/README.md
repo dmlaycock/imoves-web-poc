@@ -1,4 +1,4 @@
-# Version B - Cloudflare Stream videos (v0.27.1-B.4, 1 Nov 2026)
+# Version B - Cloudflare Stream videos (v0.28-B.5, 1 Nov 2026)
 
 B.3: rebuilt on v0.26.2 (live markup for category, scheme and lesson pages).
 
