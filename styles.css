@@ -235,3 +235,6 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .navbar .navbar-logo { width: 175px; min-width: 175px; }
 .navbar .navbar-logo img { width: 175px; max-width: 175px; }
 .navbar .nav-slogan { margin-left: 1rem; }
+#subjectbar .subject-button .button-text { white-space: nowrap; }
+.user-dropdown .dropdown-menu.show { position: absolute; right: 0; left: auto; }
+.navbar-actions { position: relative; }

@@ -214,7 +214,7 @@ function renderUserMenu() {
   const item = (href, label, extra = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none" ${extra}>${label}</a>`;
   const div = '<div class="dropdown-divider"></div>';
   let html = item('#/', 'Home') + div + item('#/search', 'Search') + item('#/favourites', 'Favourites') + item('#/curriculum', 'Curriculum') + div +
-    item('#/profile', 'My Profile') + item(m.has_admin ? '#/school-management' : '#/my-school', m.has_admin ? 'School Management' : 'My School') +
+    item('#/profile', 'My Profile') + item(m.is_admin ? '#/school-management' : '#/my-school', m.is_admin ? 'School Management' : 'My School') +
     (E.showUpgrade ? item('#/upgrade', 'Upgrade') : '') + div + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div +
     `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
   const menu = document.getElementById('usermenu'); menu.innerHTML = html;
