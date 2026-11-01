@@ -8,9 +8,9 @@
 <link rel="icon" href="live/favicon.png">
 <!-- The live platform's stylesheet (resources/sass/app.scss in the imoves repo, compiled; Bootstrap 5.2.2 + imoves theme) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-<link rel="stylesheet" href="live/live.css?v=0.25.1">
+<link rel="stylesheet" href="live/live.css?v=0.25.2">
 <!-- PoC-only additions on top of the live styles (expand-in-place, badges, sign-in card) -->
-<link rel="stylesheet" href="styles.css?v=0.25.1">
+<link rel="stylesheet" href="styles.css?v=0.25.2">
 </head>
 <body>
 <div id="app">
@@ -18,6 +18,7 @@
     <!-- Header: layouts/nav.blade.php -->
     <div class="sticky-top bg-transparent" id="header">
       <nav class="navbar navbar-dark">
+        <span class="poc-badge" title="Proof of concept build">PoC v0.25.2</span>
         <div class="main-nav bg-primary w-100 px-4 pt-3 pb-2">
           <div class="container">
             <div class="row">
@@ -27,7 +28,7 @@
                 </a>
                 <div class="align-middle d-none d-md-inline-block heading-3 my-0 nav-slogan">
                   <a href="#/" class="text-white text-decoration-none" id="slogan">Active・Educational・Fun</a>
-                  <span class="poc-badge" title="Proof of concept build">PoC v0.25.1</span>
+                  
                 </div>
               </div>
               <div class="navbar-actions mx-0 col-8">
@@ -44,7 +45,7 @@
                 <div class="text-white mt-0 d-flex flex-row-reverse">
                   <div class="btn-toolbar justify-content-between my-0 my-sm-1" id="search-toolbar">
                     <div class="btn-group me-2 d-none d-lg-block" role="group"><a class="btn btn-outline-secondary" href="#/" data-nav="home">Home</a></div>
-                    <div class="btn-group me-2 d-none d-lg-block" role="group" id="searchbtn"><a class="btn btn-outline-secondary" href="#/search" data-nav="search">Search</a></div>
+                    <div class="input-group flex-fill me-2 d-block" id="searchbtn"><div class="input-group-prepend"><button class="btn btn-outline-secondary search-button rounded" type="button" id="searchopen"><span id="search-label">Search</span></button></div></div>
                     <div class="btn-group me-2 d-none d-lg-block" role="group"><a class="btn btn-outline-secondary" href="#/favourites" data-nav="favourites">Favourites</a></div>
                     <div class="btn-group me-2 d-none d-lg-block" role="group"><a class="btn btn-outline-secondary" href="#/curriculum" data-nav="curriculum">Curriculum</a></div>
                     <div class="btn-group" role="group">
@@ -70,9 +71,11 @@
     <div class="navbar-subjects bg-mid-purple d-none d-md-block" id="subjectnav">
       <div class="container-fluid bg-mid-purple pb-2">
         <div class="container position-relative p-0 nav-wrapper">
+          <div class="scroll-button d-lg-none position-absolute top-50 start-0 translate-middle-y d-none" data-scroll="left"><button type="button" aria-label="Scroll subjects left"><i class="bi bi-arrow-left-circle-fill"></i></button></div>
           <div class="container horizontal-scrollable">
             <nav id="scrollable-navbar" class="navbar bg-mid-purple pe-4 d-none d-sm-block d-lg-flex flex-nowrap"><div class="d-flex w-100" id="subjectbar"></div></nav>
           </div>
+          <div class="scroll-button d-lg-none position-absolute top-50 end-0 translate-middle-y" data-scroll="right"><button type="button" aria-label="Scroll subjects right"><i class="bi bi-arrow-right-circle-fill"></i></button></div>
         </div>
       </div>
       <div class="brush-container d-none d-sm-block" style="transform: scaleY(-100%);"><img class="brush-image second-header non-niched-header" src="live/img/brush-2.svg" alt=""></div>
@@ -115,6 +118,17 @@
 </div>
 <div id="stickybanner" class="hidden"></div>
 
+<!-- Search modal: nav/partials/search-bar.blade.php -->
+<div class="modal fade" id="search-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header bg-primary bg-gradient-primary"><h5 class="modal-title text-white"><i class="bi-search me-2"></i> Search</h5><button type="button" class="btn-close text-white" data-close aria-label="Close"></button></div>
+    <div class="modal-body bg-extra-light-purple py-3">
+      <form id="search-form"><div class="input-group"><label for="search_term" class="d-none">Search Term</label><input type="text" class="form-control search-input" id="search_term" placeholder="Search..."><div class="input-group-append"><button class="btn btn-primary" type="submit" aria-label="Search"><i class="bi-search"></i></button></div></div>
+      <small class="form-text text-mid-purple">Enter a title, topic, subject, or lesson ID</small></form>
+    </div>
+  </div></div>
+</div>
+
 <!-- Browse modal: nav/partials/browser.blade.php -->
 <div class="modal fade" id="subject-browse-modal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -125,8 +139,8 @@
   </div>
 </div>
 
-<script src="config.js?v=0.25.1"></script>
-<script src="auth.js?v=0.25.1"></script>
-<script src="app.js?v=0.25.1"></script>
+<script src="config.js?v=0.25.2"></script>
+<script src="auth.js?v=0.25.2"></script>
+<script src="app.js?v=0.25.2"></script>
 </body>
 </html>

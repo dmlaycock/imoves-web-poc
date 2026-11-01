@@ -204,6 +204,7 @@ function renderSubjectBar() {
   document.getElementById('subjectbar').innerHTML = subjects.map(s =>
     `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
   document.getElementById('subjectnav').classList.toggle('hidden', subjects.length < 2);
+  setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
 
 // Menu dropdown: nav/partials/user-info.blade.php. Items whose pages are not built yet still
@@ -253,26 +254,54 @@ function renderBrowse() {
   if (!modal.dataset.bound) {
     modal.dataset.bound = '1';
     modal.addEventListener('click', e => { if (e.target === modal) closeBrowse(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBrowse(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBrowse(); hideModal('search-modal'); } });
     document.getElementById('browsebtn').addEventListener('click', openBrowse);
   }
   document.getElementById('browsebtnwrap').classList.toggle('hidden', !tabs.length);
+}
+// Modals (live: Bootstrap). One small helper here instead of the Bootstrap JS bundle.
+function showModal(id) {
+  const m = document.getElementById(id);
+  m.style.display = 'block'; document.body.classList.add('modal-open');
+  requestAnimationFrame(() => m.classList.add('show'));
+  let bd = document.getElementById('poc-backdrop');
+  if (!bd) { bd = document.createElement('div'); bd.id = 'poc-backdrop'; bd.className = 'modal-backdrop fade show'; document.body.appendChild(bd); }
+  bd.onclick = () => hideModal(id);
+}
+function hideModal(id) {
+  const m = document.getElementById(id);
+  m.classList.remove('show'); m.style.display = 'none'; document.body.classList.remove('modal-open');
+  const bd = document.getElementById('poc-backdrop'); if (bd) bd.remove();
+}
+function bindSearchModal() {
+  const m = document.getElementById('search-modal');
+  if (m.dataset.bound) return; m.dataset.bound = '1';
+  document.getElementById('searchopen').addEventListener('click', () => { showModal('search-modal'); setTimeout(() => document.getElementById('search_term').focus(), 50); });
+  m.querySelector('[data-close]').addEventListener('click', () => hideModal('search-modal'));
+  m.addEventListener('click', e => { if (e.target === m) hideModal('search-modal'); });
+  document.getElementById('search-form').addEventListener('submit', e => {
+    e.preventDefault(); hideModal('search-modal');
+    location.hash = '#/search?q=' + encodeURIComponent(document.getElementById('search_term').value.trim());
+  });
+}
+function bindSubjectScroll() {
+  const nav = document.getElementById('scrollable-navbar'); if (!nav || nav.dataset.bound) return; nav.dataset.bound = '1';
+  document.querySelectorAll('.navbar-subjects .scroll-button').forEach(b => b.addEventListener('click', () => nav.scrollBy({ left: b.dataset.scroll === 'left' ? -150 : 150, behavior: 'smooth' })));
+  const upd = () => {
+    const max = nav.scrollWidth - nav.clientWidth;
+    document.querySelector('.scroll-button[data-scroll="left"]').classList.toggle('d-none', nav.scrollLeft <= 0);
+    document.querySelector('.scroll-button[data-scroll="right"]').classList.toggle('d-none', max <= 0 || nav.scrollLeft >= max - 1);
+  };
+  nav.addEventListener('scroll', upd); window.addEventListener('resize', upd); upd();
 }
 function openBrowse() {
   const m = document.getElementById('subject-browse-modal');
   const cur = (location.hash.match(/^#\/subject\/(\d+)/) || [])[1];
   if (cur) m.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === cur));
   if (!m.querySelector('#browse-tabs a.active')) { const f = m.querySelector('#browse-tabs a'); if (f) f.click(); }
-  m.style.display = 'block'; document.body.classList.add('modal-open');
-  requestAnimationFrame(() => m.classList.add('show'));
-  let bd = document.getElementById('poc-backdrop');
-  if (!bd) { bd = document.createElement('div'); bd.id = 'poc-backdrop'; bd.className = 'modal-backdrop fade show'; document.body.appendChild(bd); }
+  showModal('subject-browse-modal');
 }
-function closeBrowse() {
-  const m = document.getElementById('subject-browse-modal');
-  m.classList.remove('show'); m.style.display = 'none'; document.body.classList.remove('modal-open');
-  const bd = document.getElementById('poc-backdrop'); if (bd) bd.remove();
-}
+function closeBrowse() { hideModal('subject-browse-modal'); }
 function cleanIcon(i) { if (!i) return ''; const m = i.match(/class="([^"]+)"/); return (m ? m[1] : i).trim(); }
 
 function pageHome() {
@@ -602,6 +631,8 @@ async function startApp() {
     renderUserContext();
     renderUserMenu();
     renderBrowse();
+    bindSearchModal();
+    bindSubjectScroll();
     Auth.renderUser();
     const picker = document.getElementById('classage');
     // "Show lessons suitable for": the user's saved filter (Users fid 569) as on the live site;

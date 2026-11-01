@@ -201,7 +201,7 @@ body:has(#stickybanner:not(.hidden)) footer { padding-bottom: 4.5rem; }
 body.with-bg-img { background-repeat: no-repeat; background-position: center 50px; background-size: cover; background-attachment: fixed; }
 body.with-bg-img .main-content, body.with-bg-img .footer-brush-container, body.with-bg-img .brush-container, body.with-bg-img .non-niched-header, body.with-bg-img .navbar-subjects { background: transparent !important; }
 #app .main-content { background: var(--light-purple); }
-.poc-badge { display: inline-block; margin-left: .6rem; background: var(--pink); color: #fff; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 7px; border-radius: 999px; vertical-align: middle; }
+.poc-badge { position: absolute; left: 50%; transform: translateX(-50%); top: 2px; background: var(--pink); color: #fff; font-size: 10px; font-weight: 600; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; z-index: 20; }
 .poc-foot { font-size: 11px; opacity: .8; margin-top: .25rem; }
 .badge.passcode { background: var(--orange); color: #2b2130; font-size: 11px; vertical-align: middle; margin-left: .4rem; }
 #subjectbar .flex-even { flex: 1 1 0; min-width: 0; }
@@ -223,7 +223,15 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 
 /* ---------- v0.25.1 home page fixes ---------- */
 .navbar-logo img { box-shadow: none; outline: none; border: 0; background: none; }
-#subjectbar .subject-button { white-space: normal !important; }
-#subjectbar .subject-button .button-text { white-space: normal; }
-#classage { max-width: 22rem; }
+/* Live: single row, scrolls sideways below lg with round arrow buttons (nav-scroll.js). */
+#scrollable-navbar { overflow-x: auto; scrollbar-width: none; }
+#scrollable-navbar::-webkit-scrollbar { display: none; }
+#subjectbar { min-width: max-content; }
+.navbar-subjects .scroll-button button { border: 0; background: none; }
+.navbar-subjects .scroll-button i { font-size: 30px; opacity: .5; }
+#headerfilter .form-select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right .75rem center; background-size: 16px 12px; padding-right: 2.25rem; appearance: none; }
+#classage { max-width: 22rem; min-width: 12rem; }
 .navbar .btn-outline-secondary { border-radius: var(--bs-border-radius); }
+.navbar .navbar-logo { width: 175px; min-width: 175px; }
+.navbar .navbar-logo img { width: 175px; max-width: 175px; }
+.navbar .nav-slogan { margin-left: 1rem; }
