@@ -101,7 +101,7 @@ body.with-bg-img .main-content, body.with-bg-img .footer-brush-container, body.w
 #scrollable-navbar .subject-button .button-text { text-decoration: none; }
 #scrollable-navbar .subject-button.active .button-text { text-decoration: underline; }
 main { padding-bottom: 2rem; }
-#app-page.reveal { animation: reveal .28s var(--ease); }
+/* v0.32: no page reveal animation - the live site has none (the sign-in card keeps its own) */
 .collapse-smooth { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .32s var(--ease), opacity .25s; opacity: 1; }
 .collapse-smooth > div { min-height: 0; overflow: hidden; }
 .collapse-smooth.closed { grid-template-rows: 0fr; opacity: 0; }

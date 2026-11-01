@@ -199,7 +199,7 @@ function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.re
 
 // ---------- routing ----------
 const app = document.getElementById('app-page');
-function reveal() { app.classList.remove('reveal'); void app.offsetWidth; app.classList.add('reveal'); }
+function reveal() { /* v0.32: no reveal animation, as live */ }
 window.addEventListener('hashchange', route);
 async function route() {
   const hash = location.hash.slice(1) || '/';
@@ -476,24 +476,44 @@ function bindActions(root) {
 // ---------- profile and school curriculum (v0.28) ----------
 // My personal profile (user-profile/show.blade.php). Edits go to user_profile_edits and
 // web_me() layers them over the nightly Users copy (web-poc/db/035_profile_curriculum.sql).
+const USER_ROLES = ['Assistant Head Teacher', 'Deputy Head Teacher', 'Early Years Coordinator', 'Head Teacher', 'Invoicing / Accounts / Bursar', 'KS1 Coordinator', 'KS2 Coordinator', 'Lead Contact', 'Literacy Coordinator', 'Maths Coordinator', 'PE Lead', 'Primary School Parent', 'School Games Organiser', 'SEN Assistant', 'SEN Coordinator', 'Teacher', 'Teaching Assistant'];
+// A bootstrap-select (1.13) multi-select, as the live profile page renders it: the real
+// <select multiple> stays in the form, the button and menu are the picker.
+function bsSelect(id, options, selected, title) {
+  return `<div class="dropdown bootstrap-select form-control" data-bs-select="${id}"><select multiple id="${id}" name="${id}[]" title="${esc(title)}" class="selectpicker form-control" tabindex="-98">${options.map(o => `<option value="${esc(o)}" ${selected.has(o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
+    <button type="button" class="btn dropdown-toggle btn-default ${selected.size ? '' : 'bs-placeholder'}" role="combobox" aria-haspopup="listbox" aria-expanded="false" title="${esc(title)}"><div class="filter-option"><div class="filter-option-inner"><div class="filter-option-inner-inner">${esc(selected.size ? [...options].filter(o => selected.has(o)).join(', ') : title)}</div></div></div></button>
+    <div class="dropdown-menu"><div class="inner" role="listbox" aria-multiselectable="true" tabindex="-1"><ul class="dropdown-menu inner" role="presentation">${options.map((o, i) => `<li class="${selected.has(o) ? 'selected active' : ''}"><a role="option" class="dropdown-item ${selected.has(o) ? 'selected active' : ''}" tabindex="0" data-index="${i}" aria-selected="${selected.has(o)}"><span class="text">${esc(o)}</span></a></li>`).join('')}</ul></div></div></div>`;
+}
+function bindBsSelect(root) {
+  root.querySelectorAll('[data-bs-select]').forEach(w => {
+    const sel = w.querySelector('select'), btn = w.querySelector('.dropdown-toggle'), menu = w.querySelector(':scope > .dropdown-menu'), title = sel.title;
+    const paint = () => { const chosen = [...sel.options].filter(o => o.selected).map(o => o.text); btn.classList.toggle('bs-placeholder', !chosen.length); btn.querySelector('.filter-option-inner-inner').textContent = chosen.length ? chosen.join(', ') : title; };
+    const open = v => { w.classList.toggle('show', v); menu.classList.toggle('show', v); btn.setAttribute('aria-expanded', v); if (v) { const r = btn.getBoundingClientRect(); menu.style.cssText = `position:absolute;inset:auto auto auto 0;top:${btn.offsetHeight}px;min-width:${r.width}px;max-height:264px;overflow:hidden;`; menu.querySelector('.inner').style.cssText = 'max-height:246px;overflow-y:auto;'; } };
+    btn.addEventListener('click', e => { e.stopPropagation(); open(!w.classList.contains('show')); });
+    menu.querySelectorAll('a.dropdown-item').forEach(a => a.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const o = sel.options[+a.dataset.index]; o.selected = !o.selected; a.classList.toggle('selected', o.selected); a.classList.toggle('active', o.selected); a.parentElement.classList.toggle('selected', o.selected); a.setAttribute('aria-selected', o.selected); paint(); }));
+    document.addEventListener('click', () => open(false));
+  });
+}
 async function pageProfile() {
   setBg(null);
   const m = Auth.me() || {};
-  let roles = []; try { roles = (await rpc('web_user_roles')).map(r => r.role); } catch (e) {}
+  // The pick-list is the live Quickbase User Roles table (ProfileArea::getAllUserRoles(), 17 roles
+  // on 1 Nov 2026), plus any role the user already holds that is not in it.
   const mine = new Set(m.roles || []);
+  const roles = [...new Set([...USER_ROLES, ...mine])];
   const field = (label, id, value, auto) => `<div class="form-row mb-3"><div class="col"><label for="${id}" class="text-1">${label}</label><input type="text" class="form-control" id="${id}" name="${id}" value="${esc(value || '')}" ${auto ? `autocomplete="${auto}"` : ''}></div></div>`;
   app.innerHTML = `<div class="profile-container form-page container-fluid pb-5"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8">
     <div class="heading-1 text-primary">My personal profile</div>
     <form id="user_profile_form"><div class="row"><div class="col-6">${field('First Name', 'first_name', m.first_name, 'given-name')}</div><div class="col-6">${field('Last Name', 'last_name', m.last_name, 'family-name')}</div></div>
     ${field('Telephone', 'telephone_number', m.phone, 'tel')}${field('My Class Name', 'class_name', m.class_name)}
-    <div class="form-row mb-3"><div class="col"><label for="user_roles" class="text-1">My Role(s)</label><select multiple class="form-control form-select" id="user_roles" name="user_roles" size="${Math.min(8, Math.max(3, roles.length))}" title="Select your role(s)">${roles.map(r => `<option value="${esc(r)}" ${mine.has(r) ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div></div>
+    <div class="form-row mb-3"><div class="col"><label for="user_roles" class="text-1">My Role(s)</label>${bsSelect('user_roles', roles, mine, 'Select your role(s)')}</div></div>
     <div class="notice d-none" id="profile-msg" role="status"></div>
     <button class="btn btn-primary heading-2 btn-save w-100" type="submit">Update my details</button></form></div></div></div>`;
-  reveal();
+  reveal(); bindBsSelect(app);
   document.getElementById('user_profile_form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target, msg = document.getElementById('profile-msg'), btn = f.querySelector('.btn-save');
-    const body = { user_id: uid(), first_name: f.first_name.value.trim(), last_name: f.last_name.value.trim(), phone: f.telephone_number.value.trim(), class_name: f.class_name.value.trim(), roles: [...f.user_roles.selectedOptions].map(o => o.value) };
+    const body = { user_id: uid(), first_name: f.first_name.value.trim(), last_name: f.last_name.value.trim(), phone: f.telephone_number.value.trim(), class_name: f.class_name.value.trim(), roles: [...f.querySelectorAll('#user_roles option:checked')].map(o => o.value) };
     btn.disabled = true;
     try {
       await restWrite('user_profile_edits?on_conflict=user_id', body);   // upsert
