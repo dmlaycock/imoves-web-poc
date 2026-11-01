@@ -101,7 +101,7 @@ body.with-bg-img .main-content, body.with-bg-img .footer-brush-container, body.w
 #scrollable-navbar .subject-button .button-text { text-decoration: none; }
 #scrollable-navbar .subject-button.active .button-text { text-decoration: underline; }
 main { padding-bottom: 2rem; }
-#app-page.reveal { animation: reveal .28s var(--ease); }
+/* v0.32: no page reveal animation - the live site has none (the sign-in card keeps its own) */
 .collapse-smooth { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .32s var(--ease), opacity .25s; opacity: 1; }
 .collapse-smooth > div { min-height: 0; overflow: hidden; }
 .collapse-smooth.closed { grid-template-rows: 0fr; opacity: 0; }
@@ -136,3 +136,7 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .scheme-card .variant[hidden] { display: none; }
 .videobox .wistia-ratio, .wistia-ratio { position: relative; padding: 56.25% 0 0 0; }
 .wistia-ratio iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* v0.31 drag-to-reorder (SortableJS ghost look) */
+.dnd-ghost { opacity: 0.4; }
+#cur-tabs .nav-item.handle { cursor: grab; }

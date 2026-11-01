@@ -210,7 +210,7 @@ function setBg(url) { document.body.style.backgroundImage = url ? `url('${url.re
 
 // ---------- routing ----------
 const app = document.getElementById('app-page');
-function reveal() { app.classList.remove('reveal'); void app.offsetWidth; app.classList.add('reveal'); }
+function reveal() { /* v0.32: no reveal animation, as live */ }
 window.addEventListener('hashchange', route);
 async function route() {
   const hash = location.hash.slice(1) || '/';
@@ -223,7 +223,8 @@ async function route() {
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
   const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
-  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'search' || p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
   try {
     if (p[0] === 'login') { location.reload(); return; }   // a Quickbase passcode link opened in a signed-in tab: Auth.init() handles it
@@ -487,24 +488,44 @@ function bindActions(root) {
 // ---------- profile and school curriculum (v0.28) ----------
 // My personal profile (user-profile/show.blade.php). Edits go to user_profile_edits and
 // web_me() layers them over the nightly Users copy (web-poc/db/035_profile_curriculum.sql).
+const USER_ROLES = ['Assistant Head Teacher', 'Deputy Head Teacher', 'Early Years Coordinator', 'Head Teacher', 'Invoicing / Accounts / Bursar', 'KS1 Coordinator', 'KS2 Coordinator', 'Lead Contact', 'Literacy Coordinator', 'Maths Coordinator', 'PE Lead', 'Primary School Parent', 'School Games Organiser', 'SEN Assistant', 'SEN Coordinator', 'Teacher', 'Teaching Assistant'];
+// A bootstrap-select (1.13) multi-select, as the live profile page renders it: the real
+// <select multiple> stays in the form, the button and menu are the picker.
+function bsSelect(id, options, selected, title) {
+  return `<div class="dropdown bootstrap-select form-control" data-bs-select="${id}"><select multiple id="${id}" name="${id}[]" title="${esc(title)}" class="selectpicker form-control" tabindex="-98">${options.map(o => `<option value="${esc(o)}" ${selected.has(o) ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>
+    <button type="button" class="btn dropdown-toggle btn-default ${selected.size ? '' : 'bs-placeholder'}" role="combobox" aria-haspopup="listbox" aria-expanded="false" title="${esc(title)}"><div class="filter-option"><div class="filter-option-inner"><div class="filter-option-inner-inner">${esc(selected.size ? [...options].filter(o => selected.has(o)).join(', ') : title)}</div></div></div></button>
+    <div class="dropdown-menu"><div class="inner" role="listbox" aria-multiselectable="true" tabindex="-1"><ul class="dropdown-menu inner" role="presentation">${options.map((o, i) => `<li class="${selected.has(o) ? 'selected active' : ''}"><a role="option" class="dropdown-item ${selected.has(o) ? 'selected active' : ''}" tabindex="0" data-index="${i}" aria-selected="${selected.has(o)}"><span class="text">${esc(o)}</span></a></li>`).join('')}</ul></div></div></div>`;
+}
+function bindBsSelect(root) {
+  root.querySelectorAll('[data-bs-select]').forEach(w => {
+    const sel = w.querySelector('select'), btn = w.querySelector('.dropdown-toggle'), menu = w.querySelector(':scope > .dropdown-menu'), title = sel.title;
+    const paint = () => { const chosen = [...sel.options].filter(o => o.selected).map(o => o.text); btn.classList.toggle('bs-placeholder', !chosen.length); btn.querySelector('.filter-option-inner-inner').textContent = chosen.length ? chosen.join(', ') : title; };
+    const open = v => { w.classList.toggle('show', v); menu.classList.toggle('show', v); menu.querySelector('ul.inner').classList.toggle('show', v); btn.setAttribute('aria-expanded', v); if (v) { const r = btn.getBoundingClientRect(); menu.style.cssText = `position:absolute;inset:auto auto auto 0;top:${btn.offsetHeight}px;min-width:${r.width}px;max-height:264px;overflow:hidden;`; menu.querySelector('.inner').style.cssText = 'max-height:246px;overflow-y:auto;'; } };
+    btn.addEventListener('click', e => { e.stopPropagation(); open(!w.classList.contains('show')); });
+    menu.querySelectorAll('a.dropdown-item').forEach(a => a.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const o = sel.options[+a.dataset.index]; o.selected = !o.selected; a.classList.toggle('selected', o.selected); a.classList.toggle('active', o.selected); a.parentElement.classList.toggle('selected', o.selected); a.setAttribute('aria-selected', o.selected); paint(); }));
+    document.addEventListener('click', () => open(false));
+  });
+}
 async function pageProfile() {
   setBg(null);
   const m = Auth.me() || {};
-  let roles = []; try { roles = (await rpc('web_user_roles')).map(r => r.role); } catch (e) {}
+  // The pick-list is the live Quickbase User Roles table (ProfileArea::getAllUserRoles(), 17 roles
+  // on 1 Nov 2026), plus any role the user already holds that is not in it.
   const mine = new Set(m.roles || []);
+  const roles = [...new Set([...USER_ROLES, ...mine])];
   const field = (label, id, value, auto) => `<div class="form-row mb-3"><div class="col"><label for="${id}" class="text-1">${label}</label><input type="text" class="form-control" id="${id}" name="${id}" value="${esc(value || '')}" ${auto ? `autocomplete="${auto}"` : ''}></div></div>`;
   app.innerHTML = `<div class="profile-container form-page container-fluid pb-5"><div class="row justify-content-center"><div class="col-12 col-sm-10 col-lg-8">
     <div class="heading-1 text-primary">My personal profile</div>
     <form id="user_profile_form"><div class="row"><div class="col-6">${field('First Name', 'first_name', m.first_name, 'given-name')}</div><div class="col-6">${field('Last Name', 'last_name', m.last_name, 'family-name')}</div></div>
     ${field('Telephone', 'telephone_number', m.phone, 'tel')}${field('My Class Name', 'class_name', m.class_name)}
-    <div class="form-row mb-3"><div class="col"><label for="user_roles" class="text-1">My Role(s)</label><select multiple class="form-control form-select" id="user_roles" name="user_roles" size="${Math.min(8, Math.max(3, roles.length))}" title="Select your role(s)">${roles.map(r => `<option value="${esc(r)}" ${mine.has(r) ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></div></div>
+    <div class="form-row mb-3"><div class="col"><label for="user_roles" class="text-1">My Role(s)</label>${bsSelect('user_roles', roles, mine, 'Select your role(s)')}</div></div>
     <div class="notice d-none" id="profile-msg" role="status"></div>
     <button class="btn btn-primary heading-2 btn-save w-100" type="submit">Update my details</button></form></div></div></div>`;
-  reveal();
+  reveal(); bindBsSelect(app);
   document.getElementById('user_profile_form').addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target, msg = document.getElementById('profile-msg'), btn = f.querySelector('.btn-save');
-    const body = { user_id: uid(), first_name: f.first_name.value.trim(), last_name: f.last_name.value.trim(), phone: f.telephone_number.value.trim(), class_name: f.class_name.value.trim(), roles: [...f.user_roles.selectedOptions].map(o => o.value) };
+    const body = { user_id: uid(), first_name: f.first_name.value.trim(), last_name: f.last_name.value.trim(), phone: f.telephone_number.value.trim(), class_name: f.class_name.value.trim(), roles: [...f.querySelectorAll('#user_roles option:checked')].map(o => o.value) };
     btn.disabled = true;
     try {
       await restWrite('user_profile_edits?on_conflict=user_id', body);   // upsert
@@ -683,9 +704,9 @@ async function curriculumLessons(ids) {
 function curriculumLessonCard(l, gl, edit) {
   const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
   const blurb = (l.description || l.body_opening_text || '').trim();
-  return `<div class="col mb-4" data-gl="${gl.id}"><a href="${edit ? '#' : lessonHref(l, sc)}" class="text-decoration-none ${edit ? 'pe-none' : ''}"><div class="card subcategory-card ${edit ? '' : 'lift'} h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy">
+  return `<div class="col mb-4" data-gl="${gl.id}" data-lesson-id="${l.id}"><a href="${edit ? '#' : lessonHref(l, sc)}" class="text-decoration-none ${edit ? 'pe-none' : ''}"><div class="card subcategory-card ${edit ? '' : 'lift'} h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy">
     <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between">
-      ${edit ? `<div class="align-self-end mx-3 pt-2 pe-auto"><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-move="up" title="Move up"><i class="bi bi-arrow-up"></i></button><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-move="down" title="Move down"><i class="bi bi-arrow-down"></i></button><button type="button" class="btn btn-sm btn-link text-primary p-0 me-2" data-copy="${l.id}" title="Copy to another group"><i class="bi bi-files"></i></button><button type="button" class="btn btn-sm btn-link text-danger p-0" data-del-gl="${gl.id}" title="Delete"><i class="bi bi-trash"></i></button></div>` : ''}
+      ${edit ? `<div class="align-self-end mx-3 pt-2 pe-auto"><i class="drag-handle bi bi-arrows-move" style="cursor: pointer;" title="Drag to move"></i> <div class="dropdown d-inline"><i class="bi bi-three-dots-vertical" role="button" data-menu></i><ul class="dropdown-menu"><li><button type="button" class="dropdown-item" data-copy="${l.id}">Copy</button></li><li><button type="button" class="dropdown-item" data-del-gl="${gl.id}">Delete</button></li></ul></div></div>` : ''}
       <div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
       <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul>
     </div></div></a></div>`;
@@ -704,44 +725,105 @@ function renderCurriculum(admin, lessons) {
   let html = `<div class="container container-padded py-3 px-0">`;
   if (admin) html += `<div class="row"><h3 class="col-12 col-md-6 text-primary">School Curriculum Management</h3><div class="col-12 col-md-4 text-end"><button class="btn btn-primary" type="button" id="cur-browse">Browse <span class="d-lg-inline d-none">to add resources</span> &gt;</button></div>
     <div class="col-12 col-md-2 flex-row-reverse d-flex"><div class="toggle toggle-right ${edit ? 'active' : ''}"><a href="#" data-edit="1">Unlocked</a></div><div class="toggle toggle-left ${edit ? '' : 'active'}"><a href="#" data-edit="0">Locked</a></div></div></div>`;
-  html += `<ul class="nav nav-pills" role="presentation">` + CUR.tabs.map(t => `<li class="nav-item"><a href="#" class="nav-link ${t.id === CUR.current ? 'active' : ''}" data-tab="${t.id}" role="tab">${esc(t.name)}${edit ? ` <span class="dropdown d-inline"><i class="bi bi-three-dots-vertical" role="button" data-tabmenu="${t.id}"></i><ul class="dropdown-menu"><li><a class="dropdown-item" href="#" data-tab-rename="${t.id}">Rename</a></li><li><a class="dropdown-item" href="#" data-tab-clone="${t.id}">Clone</a></li><li><a class="dropdown-item" href="#" data-tab-delete="${t.id}">Delete</a></li></ul></span>` : ''}</a></li>`).join('') +
-    (edit ? `<li class="nav-item"><a class="nav-link" href="#" id="cur-newtab">+ Add New Tab</a></li>` : '') + `</ul><div class="tab-content mt-3">`;
+  // Curriculum.vue: tabs are a vuedraggable list (handle = the whole nav-item in edit mode).
+  // Menu items are buttons, not anchors: the tab menu sits inside the tab's <a>, where a nested <a> would break the markup.
+  const menu = (attr, id) => `<div class="dropdown d-inline"><i class="bi bi-three-dots-vertical" role="button" data-menu></i><ul class="dropdown-menu"><li><button type="button" class="dropdown-item" data-${attr}-rename="${id}">Rename</button></li><li><button type="button" class="dropdown-item" data-${attr}-clone="${id}">Clone</button></li><li><button type="button" class="dropdown-item" data-${attr}-delete="${id}">Delete</button></li></ul></div>`;
+  html += `<ul class="nav nav-pills" role="presentation" id="cur-tabs">` + CUR.tabs.map(t => `<li class="nav-item ${edit ? 'handle' : ''}" data-tab-item="${t.id}"><a href="#" class="nav-link ${t.id === CUR.current ? 'active' : ''}" data-tab="${t.id}" role="tab">${CUR.renameTab === t.id ? `<form data-tab-rename-form="${t.id}"><input type="text" placeholder="${esc(t.name)}" value="${esc(t.name)}" class="form-control"></form>` : `<span>${esc(t.name)}</span>` + (edit ? menu('tab', t.id) : '')}</a></li>`).join('') +
+    (edit ? `<li>${CUR.newTab ? `<form id="cur-newtab-form" class="row row-cols-lg-auto g-3 align-items-center"><div class="col-12"><input type="text" placeholder="Tab Name" class="form-control" required></div><div class="col-12"><button type="submit" class="btn btn-primary">Submit</button></div></form>` : `<a class="nav-link" href="#" id="cur-newtab">+ Add New Tab</a>`}</li>` : '') + `</ul><div class="tab-content mt-3">`;
   const tab = CUR.tabs.find(t => t.id === CUR.current);
   if (!tab) html += `<div class="notice">${admin ? (edit ? 'Add a tab to start building your school curriculum.' : 'No curriculum yet. Switch to Unlocked to start building one.') : 'Your school has not set up a curriculum yet. Ask your School Administrator.'}</div>`;
   else {
+    html += `<div id="cur-groups">`;
     for (const g of tab.groups) {
-      html += `<div class="row curriculum-group-row" data-group="${g.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
-        <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(g.name)}</div><div class="ms-auto">${edit ? `<span class="dropdown d-inline"><i class="bi bi-three-dots-vertical me-2" role="button" data-groupmenu="${g.id}"></i><ul class="dropdown-menu"><li><a class="dropdown-item" href="#" data-group-rename="${g.id}">Rename</a></li><li><a class="dropdown-item" href="#" data-group-clone="${g.id}">Clone</a></li><li><a class="dropdown-item" href="#" data-group-delete="${g.id}">Delete</a></li></ul></span><i class="bi bi-arrow-up me-1" role="button" title="Move up" data-group-move="up"></i><i class="bi bi-arrow-down me-2" role="button" title="Move down" data-group-move="down"></i>` : ''}<button type="button" class="subgroup-collapse" data-toggle aria-expanded="true"></button></div></h5>
-        <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">` + g.lessons.map(gl => lessons[gl.lesson_id] ? curriculumLessonCard(lessons[gl.lesson_id], gl, edit) : '').join('') + (g.lessons.length ? '' : '<div class="col-12 mb-3 text-mid-purple fw-light">No lessons in this group yet.' + (edit ? ' Use "Browse to add resources" or the bookmark icon on any lesson.' : '') + '</div>') + `</div></div></div></div></div></div></div>`;
+      // Group.vue: header with name (or rename input), menu, vertical-arrows drag handle, collapse.
+      html += `<div class="row curriculum-group-row item" data-group="${g.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
+        <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${CUR.renameGroup === g.id ? `<form data-group-rename-form="${g.id}"><input type="text" placeholder="${esc(g.name)}" value="${esc(g.name)}" class="form-control"></form>` : `<span>${esc(g.name)}</span>`}</div><div class="ms-auto">${edit && CUR.renameGroup !== g.id ? menu('group', g.id) + ` <i class="bi bi-arrows-vertical drag-handle" style="cursor: pointer" title="Drag to reorder"></i>` : ''}<button type="button" class="subgroup-collapse" data-toggle aria-expanded="true"></button></div></h5>
+        <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3 cur-lessons" data-lessons="${g.id}">` + g.lessons.map(gl => lessons[gl.lesson_id] ? curriculumLessonCard(lessons[gl.lesson_id], gl, edit) : '').join('') + (g.lessons.length ? '' : '<div class="col-12 mb-3 text-mid-purple fw-light cur-empty">No lessons in this group yet.' + (edit ? ' Use "Browse to add resources" or the bookmark icon on any lesson.' : '') + '</div>') + `</div></div></div></div></div></div></div>`;
     }
-    if (edit) html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><div class="card-body"><a href="#" id="cur-newgroup" class="text-primary">+ Add New Group</a></div></div></div></div>`;
+    html += `</div>`;
+    // NewGroup.vue
+    if (edit) html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><div class="card-body">${CUR.newGroup ? `<form id="cur-newgroup-form" class="row row-cols-lg-auto g-3 align-items-center"><div class="col-12"><input type="text" placeholder="Group Name" class="form-control" required></div><div class="col-12"><button type="submit" class="btn btn-primary">Submit</button></div></form>` : `<a href="#" id="cur-newgroup" class="text-primary">+ Add New Group</a>`}</div></div></div></div>`;
   }
   app.innerHTML = html + `</div></div>`;
   reveal(); bindCollapses(); bindCurriculum(admin, lessons);
+  const focus = app.querySelector('#cur-newtab-form input, #cur-newgroup-form input, [data-tab-rename-form] input, [data-group-rename-form] input'); if (focus) { focus.focus(); focus.select(); }
+}
+// Drag-to-reorder with the HTML5 drag and drop API (the live site uses vuedraggable / SortableJS).
+// Items in `container` matching `itemSel` can be dragged by their `handleSel` (or the whole item
+// when handleSel is null). Items may move between containers sharing the same `group`.
+// onDrop(item, fromContainer, toContainer) runs after the DOM has been reordered.
+const DND = { item: null, group: null };
+function makeSortable(container, itemSel, handleSel, group, onDrop) {
+  if (!container) return;
+  container.querySelectorAll(itemSel).forEach(item => {
+    const arm = () => { item.draggable = true; };
+    if (handleSel) { item.draggable = false; item.querySelectorAll(handleSel).forEach(h => { h.addEventListener('mousedown', arm); h.addEventListener('touchstart', arm, { passive: true }); }); }
+    else item.draggable = true;
+    item.addEventListener('dragstart', e => { if (e.target !== item) return; if (!item.draggable) { e.preventDefault(); return; } DND.item = item; DND.group = group; DND.from = container; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', group); } catch (x) {} setTimeout(() => item.classList.add('dnd-ghost'), 0); });
+    item.addEventListener('dragend', e => { if (e.target !== item) return; item.classList.remove('dnd-ghost'); if (handleSel) item.draggable = false; DND.item = null; });
+    item.addEventListener('dragover', e => {
+      if (!DND.item || DND.group !== group || DND.item === item) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const r = item.getBoundingClientRect(); const horizontal = getComputedStyle(container).display.includes('flex') || container.classList.contains('row');
+      const before = horizontal ? (e.clientX - r.left) / r.width < 0.5 && (e.clientY - r.top) / r.height < 1 : (e.clientY - r.top) / r.height < 0.5;
+      item.parentNode.insertBefore(DND.item, before ? item : item.nextSibling);
+    });
+  });
+  container.addEventListener('dragover', e => { if (DND.item && DND.group === group) { e.preventDefault(); if (!container.querySelector(itemSel + ':not(.dnd-ghost)') && !container.contains(DND.item)) container.appendChild(DND.item); } });
+  container.addEventListener('drop', e => { if (!DND.item || DND.group !== group) return; e.preventDefault(); const it = DND.item, from = DND.from; it.classList.remove('dnd-ghost'); onDrop(it, from, container); });
 }
 function bindCurriculum(admin, lessons) {
   const refresh = async () => { await loadCurriculum(); const ls = await curriculumLessons(CUR.tabs.flatMap(t => t.groups.flatMap(g => g.lessons.map(x => x.lesson_id)))); renderCurriculum(admin, ls); };
   const fail = e => alert('Could not save: ' + e.message);
-  app.querySelectorAll('[data-tab]').forEach(a => a.addEventListener('click', e => { if (e.target.closest('[data-tabmenu], .dropdown-menu')) return; e.preventDefault(); CUR.current = +a.dataset.tab; renderCurriculum(admin, lessons); }));
-  app.querySelectorAll('[data-edit]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); CUR.edit = a.dataset.edit === '1'; try { localStorage.setItem('curriculumEditMode', CUR.edit); } catch (x) {} renderCurriculum(admin, lessons); }));
-  app.querySelectorAll('[data-tabmenu], [data-groupmenu]').forEach(i => i.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); const m = i.nextElementSibling; const open = m.classList.contains('show'); app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')); if (!open) m.classList.add('show'); }));
-  document.addEventListener('click', () => app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')), { once: true });
+  const on = (sel, ev, fn) => app.querySelectorAll(sel).forEach(el => el.addEventListener(ev, e => fn(e, el)));
   const tabOf = id => CUR.tabs.find(t => t.id === +id), groupOf = id => CUR.tabs.flatMap(t => t.groups).find(g => g.id === +id);
-  const newTab = document.getElementById('cur-newtab');
-  if (newTab) newTab.addEventListener('click', async e => { e.preventDefault(); const name = prompt('Tab Name'); if (!name) return; try { await restWrite('curriculum_tabs', { school_id: (Auth.me() || {}).school_id, name: name.trim(), order: CUR.tabs.length + 1 }); await refresh(); CUR.current = CUR.tabs[CUR.tabs.length - 1].id; renderCurriculum(admin, lessons); } catch (x) { fail(x); } });
-  const newGroup = document.getElementById('cur-newgroup');
-  if (newGroup) newGroup.addEventListener('click', async e => { e.preventDefault(); const name = prompt('Group Name'); if (!name) return; const t = tabOf(CUR.current); try { await restWrite('curriculum_groups', { tab_id: t.id, name: name.trim(), order: t.groups.length + 1 }); await refresh(); } catch (x) { fail(x); } });
-  app.querySelectorAll('[data-tab-rename]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const t = tabOf(a.dataset.tabRename); const name = prompt('Rename tab', t.name); if (!name) return; try { await restWrite(`curriculum_tabs?id=eq.${t.id}`, { name: name.trim() }, 'PATCH'); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-tab-clone]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); try { CUR.current = await rpc('web_curriculum_clone_tab', { p_tab_id: +a.dataset.tabClone }); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-tab-delete]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const t = tabOf(a.dataset.tabDelete); if (!confirm(`Delete the tab "${t.name}" and everything in it?`)) return; try { await restWrite(`curriculum_tabs?id=eq.${t.id}`, null, 'DELETE'); CUR.current = null; await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-group-rename]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const g = groupOf(a.dataset.groupRename); const name = prompt('Rename group', g.name); if (!name) return; try { await restWrite(`curriculum_groups?id=eq.${g.id}`, { name: name.trim() }, 'PATCH'); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-group-clone]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); try { await rpc('web_curriculum_clone_group', { p_group_id: +a.dataset.groupClone }); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-group-delete]').forEach(a => a.addEventListener('click', async e => { e.preventDefault(); const g = groupOf(a.dataset.groupDelete); if (!confirm(`Delete the group "${g.name}"?`)) return; try { await restWrite(`curriculum_groups?id=eq.${g.id}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-group-move]').forEach(i => i.addEventListener('click', async e => { e.preventDefault(); const row = i.closest('[data-group]'); const t = tabOf(CUR.current); const idx = t.groups.findIndex(g => g.id === +row.dataset.group); const j = i.dataset.groupMove === 'up' ? idx - 1 : idx + 1; if (j < 0 || j >= t.groups.length) return; const order = t.groups.map(g => g.id); [order[idx], order[j]] = [order[j], order[idx]]; try { await Promise.all(order.map((id, k) => restWrite(`curriculum_groups?id=eq.${id}`, { order: k }, 'PATCH'))); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-del-gl]').forEach(b => b.addEventListener('click', async e => { e.preventDefault(); if (!confirm('Remove this lesson from the group?')) return; try { await restWrite(`curriculum_group_lessons?id=eq.${b.dataset.delGl}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-move]').forEach(b => b.addEventListener('click', async e => { e.preventDefault(); const card = b.closest('[data-gl]'); const g = groupOf(card.closest('[data-group]').dataset.group); const idx = g.lessons.findIndex(x => x.id === +card.dataset.gl); const j = b.dataset.move === 'up' ? idx - 1 : idx + 1; if (j < 0 || j >= g.lessons.length) return; const order = g.lessons.map(x => x.id); [order[idx], order[j]] = [order[j], order[idx]]; try { await Promise.all(order.map((id, k) => restWrite(`curriculum_group_lessons?id=eq.${id}`, { order: k }, 'PATCH'))); await refresh(); } catch (x) { fail(x); } }));
-  app.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); openGroupSelect(+b.dataset.copy, refresh); }));
+  const saveOrder = (table, ids) => Promise.all(ids.map((id, k) => restWrite(`${table}?id=eq.${id}`, { order: k + 1 }, 'PATCH')));
+  on('[data-tab]', 'click', (e, a) => { if (e.target.closest('[data-menu], .dropdown-menu, form')) return; e.preventDefault(); CUR.current = +a.dataset.tab; CUR.renameTab = CUR.renameGroup = null; renderCurriculum(admin, lessons); });
+  on('[data-edit]', 'click', (e, a) => { e.preventDefault(); CUR.edit = a.dataset.edit === '1'; CUR.newTab = CUR.newGroup = CUR.renameTab = CUR.renameGroup = null; try { localStorage.setItem('curriculumEditMode', CUR.edit); } catch (x) {} renderCurriculum(admin, lessons); });
+  on('[data-menu]', 'click', (e, i) => { e.preventDefault(); e.stopPropagation(); const m = i.nextElementSibling; const open = m.classList.contains('show'); app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')); if (!open) m.classList.add('show'); });
+  document.addEventListener('click', () => app.querySelectorAll('.dropdown-menu.show').forEach(x => x.classList.remove('show')), { once: true });
+  // New tab / group: inline forms (NewTab.vue, NewGroup.vue)
+  on('#cur-newtab', 'click', e => { e.preventDefault(); CUR.newTab = true; renderCurriculum(admin, lessons); });
+  on('#cur-newtab-form', 'submit', async (e, f) => { e.preventDefault(); const name = f.querySelector('input').value.trim(); if (!name) return; CUR.newTab = false; try { await restWrite('curriculum_tabs', { school_id: (Auth.me() || {}).school_id, name, order: CUR.tabs.length + 1 }); await loadCurriculum(); CUR.current = CUR.tabs[CUR.tabs.length - 1].id; renderCurriculum(admin, lessons); } catch (x) { fail(x); } });
+  on('#cur-newgroup', 'click', e => { e.preventDefault(); CUR.newGroup = true; renderCurriculum(admin, lessons); });
+  on('#cur-newgroup-form', 'submit', async (e, f) => { e.preventDefault(); const name = f.querySelector('input').value.trim(); if (!name) return; CUR.newGroup = false; const t = tabOf(CUR.current); try { await restWrite('curriculum_groups', { tab_id: t.id, name, order: t.groups.length + 1 }); await refresh(); } catch (x) { fail(x); } });
+  // Rename: inline input, saved on submit or blur (Curriculum.vue, Group.vue)
+  on('[data-tab-rename]', 'click', (e, a) => { e.preventDefault(); CUR.renameTab = +a.dataset.tabRename; renderCurriculum(admin, lessons); });
+  on('[data-group-rename]', 'click', (e, a) => { e.preventDefault(); CUR.renameGroup = +a.dataset.groupRename; renderCurriculum(admin, lessons); });
+  const renameDone = async (f, table, key, cur) => { const name = f.querySelector('input').value.trim(); const id = +f.dataset[key]; CUR[cur] = null; if (!name || name === (table === 'curriculum_tabs' ? tabOf(id) : groupOf(id)).name) { renderCurriculum(admin, lessons); return; } try { await restWrite(`${table}?id=eq.${id}`, { name }, 'PATCH'); await refresh(); } catch (x) { fail(x); } };
+  app.querySelectorAll('[data-tab-rename-form]').forEach(f => { let done = false; const go = () => { if (done) return; done = true; renameDone(f, 'curriculum_tabs', 'tabRenameForm', 'renameTab'); }; f.addEventListener('submit', e => { e.preventDefault(); go(); }); f.querySelector('input').addEventListener('blur', go); });
+  app.querySelectorAll('[data-group-rename-form]').forEach(f => { let done = false; const go = () => { if (done) return; done = true; renameDone(f, 'curriculum_groups', 'groupRenameForm', 'renameGroup'); }; f.addEventListener('submit', e => { e.preventDefault(); go(); }); f.querySelector('input').addEventListener('blur', go); });
+  // Clone and delete (live confirm texts)
+  on('[data-tab-clone]', 'click', async (e, a) => { e.preventDefault(); try { CUR.current = await rpc('web_curriculum_clone_tab', { p_tab_id: +a.dataset.tabClone }); await refresh(); } catch (x) { fail(x); } });
+  on('[data-tab-delete]', 'click', async (e, a) => { e.preventDefault(); if (!confirm('Are you sure you want to delete this Tab?')) return; try { await restWrite(`curriculum_tabs?id=eq.${a.dataset.tabDelete}`, null, 'DELETE'); CUR.current = null; await refresh(); } catch (x) { fail(x); } });
+  on('[data-group-clone]', 'click', async (e, a) => { e.preventDefault(); try { await rpc('web_curriculum_clone_group', { p_group_id: +a.dataset.groupClone }); await refresh(); } catch (x) { fail(x); } });
+  on('[data-group-delete]', 'click', async (e, a) => { e.preventDefault(); if (!confirm('Are you sure you want to delete this group?')) return; try { await restWrite(`curriculum_groups?id=eq.${a.dataset.groupDelete}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } });
+  on('[data-del-gl]', 'click', async (e, b) => { e.preventDefault(); if (!confirm('Are you sure you want to delete this lesson from the group?')) return; try { await restWrite(`curriculum_group_lessons?id=eq.${b.dataset.delGl}`, null, 'DELETE'); await refresh(); } catch (x) { fail(x); } });
+  on('[data-copy]', 'click', (e, b) => { e.preventDefault(); openGroupSelect(+b.dataset.copy, refresh); });
   const browse = document.getElementById('cur-browse'); if (browse) browse.addEventListener('click', openBrowse);
+  if (!CUR.edit) return;
+  // Drag to reorder: tabs, groups, and lessons (within and between the tab's groups)
+  makeSortable(document.getElementById('cur-tabs'), '[data-tab-item]', null, 'tabs', async (it, from, to) => {
+    const ids = [...to.querySelectorAll('[data-tab-item]')].map(x => +x.dataset.tabItem);
+    try { await saveOrder('curriculum_tabs', ids); await refresh(); } catch (x) { fail(x); }
+  });
+  makeSortable(document.getElementById('cur-groups'), '[data-group]', '.bi-arrows-vertical.drag-handle', 'groups', async (it, from, to) => {
+    const ids = [...to.querySelectorAll('[data-group]')].map(x => +x.dataset.group);
+    try { await saveOrder('curriculum_groups', ids); await refresh(); } catch (x) { fail(x); }
+  });
+  app.querySelectorAll('[data-lessons]').forEach(c => makeSortable(c, '[data-gl]', '.bi-arrows-move.drag-handle', 'lessons-' + CUR.current, async (it, from, to) => {
+    const glId = +it.dataset.gl, lessonId = +it.dataset.lessonId, toGroup = +to.dataset.lessons;
+    try {
+      if (from !== to) {
+        const g = groupOf(toGroup);
+        if (g.lessons.some(x => x.lesson_id === lessonId)) { await restWrite(`curriculum_group_lessons?id=eq.${glId}`, null, 'DELETE'); }   // already there: live drops the duplicate
+        else await restWrite(`curriculum_group_lessons?id=eq.${glId}`, { group_id: toGroup }, 'PATCH');
+        const fromIds = [...from.querySelectorAll('[data-gl]')].map(x => +x.dataset.gl); await saveOrder('curriculum_group_lessons', fromIds);
+      }
+      const ids = [...to.querySelectorAll('[data-gl]')].map(x => +x.dataset.gl); await saveOrder('curriculum_group_lessons', ids);
+      await refresh();
+    } catch (x) { fail(x); }
+  }));
 }
 
 // "Select Curriculum Group" modal (GroupSelectionModal.vue): behind every bookmark button.
@@ -1022,13 +1104,15 @@ async function pageLessonHistory(id) {
   const [[l], rows] = await Promise.all([rest(`lessons?id=eq.${id}&select=id,name,heading_2`), rpc('web_lesson_history', { p_lesson_id: id })]);
   if (!l) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
   setBg(null);
-  const table = (title, list) => `<div class="heading-2">${title}</div><table class="viewed-table table table-borderless text-1 text-primary"><thead><tr><th class="pl-0">Date</th><th class="pl-0">Time</th></tr></thead><tbody>${list.map(r => `<tr><td class="pl-0">${fmtDate(r.at)}</td><td class="pl-0">${fmtTime(r.at)}</td></tr>`).join('') || '<tr><td class="pl-0 fw-light" colspan="2">None yet</td></tr>'}</tbody></table>`;
-  app.innerHTML = `<div class="content-page-nav d-flex justify-content-center mb-3 mt-4"><div class="back d-inline-block"><a href="#/lesson/${l.id}" class="nav-button d-block text-1"><img class="arrow-img" src="../live/img/arrow_next.png" alt=""><span class="nav-text">Back</span></a></div></div>
+  const table = (title, list) => `<div class="heading-2">${title}</div><table class="viewed-table table table-borderless text-1 text-primary"><thead><tr><th class="pl-0">Date</th><th class="pl-0">Time</th></tr></thead><tbody>${list.map(r => `<tr><td class="pl-0">${fmtDate(r.at)}</td><td class="pl-0">${fmtTime(r.at)}</td></tr>`).join('')}</tbody></table>`;
+  app.innerHTML = `<div class="content-page-nav d-flex justify-content-center mb-3"><div class="back d-inline-block"><a href="#/lesson/${l.id}" class="nav-button d-block text-1"><img class="arrow-img" src="../live/img/arrow_next.png" alt=""> <span class="nav-text">Back</span></a></div></div>
     <div class="lesson-history-container form-page container-fluid text-primary"><div class="row"><div class="col-12 heading-1 text-center">Lesson history</div></div><div class="row mt-3 mb-4"><div class="col-12 heading-2">${esc(l.name)}</div></div>
     <div class="row"><div class="col-12 col-sm-6">${table('Marked as done', rows.filter(r => r.kind === 'completed'))}</div><div class="col-12 col-sm-6">${table('Viewed', rows.filter(r => r.kind === 'viewed'))}</div></div></div>`;
   reveal();
 }
 
+// ResultsController groups results under "<i class=\"{icon} text-white mr-1\"></i> {name}".
+function subjectIcon(s) { return s && s.icon ? `<i class="${esc(s.icon)} text-white mr-1"></i> ` : ''; }
 // Favourites (results/show-favourites.blade.php): personal favourites grouped by subject.
 async function pageFavourites() {
   setBg(null);
@@ -1043,11 +1127,11 @@ async function pageFavourites() {
   const bySubject = {};
   for (const l of lessons) {
     const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]; const subj = sc && D.subjectById[sc.subject_id];
-    (bySubject[subj ? subj.name : 'Other'] ||= { sc, items: [] }).items.push({ l, scheme, sc });
+    (bySubject[subj ? subj.name : 'Other'] ||= { sc, subj, items: [] }).items.push({ l, scheme, sc });
   }
   for (const [name, g] of Object.entries(bySubject)) {
     const n = g.items.length, lab = (g.sc ? noun(g.sc, n) : (n === 1 ? 'lesson' : 'lessons')).toLowerCase();
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row">`;
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subj)}${esc(name)} <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${n} favourite ${esc(lab)}</small></h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
     for (const { l, scheme, sc } of g.items) {
       const blurb = (l.description || l.body_opening_text || '').trim();
       html += `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
@@ -1113,7 +1197,7 @@ async function pageSearch(q) {
   const groups = Object.values(bySubject);
   if (!groups.length) html += `<div class="notice">No lessons match "${esc(q)}".</div>`;
   for (const g of groups) {
-    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row">`;
+    html += `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${subjectIcon(g.subject)}${esc(g.subject ? g.subject.name : 'Other')}</h5><div class="card-body pb-1"><div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3">`;
     for (const { scheme, sc, lessons } of Object.values(g.schemes)) {
       const ages = ageRange(lessons), name = `${scheme.name}${ages ? ' (' + ageTextRange(ages) + ')' : ''}`;
       const href = lessons.length === 1 ? lessonHref(lessons[0], sc) : (sc ? subcatHref(sc) + `#scheme-${scheme.id}` : lessonHref(lessons[0], sc));
