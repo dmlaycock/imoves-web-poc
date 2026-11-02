@@ -1354,53 +1354,24 @@ function docFile(p) {
   const ext = ((f && f.filename) || url.split('?')[0]).match(/\.([a-z0-9]{2,4})$/i);
   return { url, filename: f && f.filename, bytes: f && f.bytes, pages: f && f.pages, type: ext ? ext[1].toUpperCase() : '' };
 }
-function docMeta(d) {
-  const bits = [];
-  if (d.type) bits.push(d.type);
-  if (d.pages) bits.push(`${d.pages} page${d.pages === 1 ? '' : 's'}`);
-  if (d.bytes) bits.push(d.bytes >= 1048576 ? `${(d.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(d.bytes / 1024))} KB`);
-  return bits.join(' · ');
-}
 function docIcon(d) { return { PDF: 'bi-file-earmark-pdf-fill', DOC: 'bi-file-earmark-word-fill', DOCX: 'bi-file-earmark-word-fill', PPT: 'bi-file-earmark-slides-fill', PPTX: 'bi-file-earmark-slides-fill', XLS: 'bi-file-earmark-spreadsheet-fill', XLSX: 'bi-file-earmark-spreadsheet-fill', JPG: 'bi-file-earmark-image-fill', JPEG: 'bi-file-earmark-image-fill', PNG: 'bi-file-earmark-image-fill', MP3: 'bi-file-earmark-music-fill', ZIP: 'bi-file-earmark-zip-fill' }[d.type] || 'bi-file-earmark-arrow-down-fill'; }
-function docButtons(d, small) {
+function docButton(d) {
   if (!d.url) return '<span class="text-mid-purple fw-light">File not available</span>';
-  const sz = small ? ' btn-sm' : '';
-  return `<a class="btn btn-primary${sz} doc-open" href="${esc(d.url)}" target="_blank" rel="noopener"><i class="bi-eye me-1"></i>Open</a>
-    <a class="btn btn-outline-primary${sz} doc-download" href="${esc(d.url)}" data-filename="${esc(d.filename || '')}" target="_blank" rel="noopener"><i class="bi-download me-1"></i>Download</a>`;
+  return `<a class="btn btn-primary btn-sm doc-open" href="${esc(d.url)}" target="_blank" rel="noopener"><i class="bi-eye me-1"></i>Open</a>`;
 }
+// v0.44.2 (David): one Open button, no file details, icons the size of the part icons.
 function renderDocs(l, docs) {
   if (!docs.length) return '';
   const plans = docs.filter(isPlanPart), others = docs.filter(p => !isPlanPart(p));
-  const plan = p => { const d = docFile(p); return `<div class="doc-plan" data-part="${p.id}">
-      <div class="doc-plan-icon"><i class="${docIcon(d)}"></i></div>
-      <div class="doc-plan-text"><div class="doc-plan-title">${esc(plans.length > 1 ? p.heading : 'Lesson plan')}</div><div class="doc-meta">${esc(docMeta(d))}${docMeta(d) ? ' · ' : ''}to read, save or print</div></div>
-      <div class="doc-actions">${docButtons(d)}</div></div>`; };
-  const item = p => { const d = docFile(p); return `<li class="doc-item" data-part="${p.id}">
-      <i class="${docIcon(d)} doc-item-icon"></i>
-      <div class="doc-item-text"><div class="doc-item-title">${esc(p.heading || 'Download')}</div>${docMeta(d) ? `<div class="doc-meta">${esc(docMeta(d))}</div>` : ''}</div>
-      <div class="doc-actions">${docButtons(d, true)}</div></li>`; };
+  const row = (p, title) => { const d = docFile(p); return `<div class="doc-row" data-part="${p.id}">
+      <i class="text-primary ${docIcon(d)} h5 mb-0 doc-icon"></i>
+      <div class="doc-title">${esc(title)}</div>
+      ${docButton(d)}</div>`; };
   return `<div class="lesson-docs mb-3">
-    ${plans.map(plan).join('')}
-    ${others.length ? `<div class="doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div><ul class="doc-list">${others.map(item).join('')}</ul></div>` : ''}
+    ${plans.map(p => `<div class="doc-plan">${row(p, plans.length > 1 ? p.heading : 'Lesson plan')}</div>`).join('')}
+    ${others.length ? `<div class="doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div>${others.map(p => row(p, p.heading || 'Download')).join('')}</div>` : ''}
   </div>`;
 }
-// Download saves under the readable name. The copies sit on another host, where a plain
-// download link is ignored by the browser, so fetch the file and save it; if that is refused,
-// open it instead (the browser's viewer has its own save and print).
-function bindDocs(root) {
-  root.querySelectorAll('.doc-download').forEach(a => a.addEventListener('click', async e => {
-    if (!a.dataset.filename) return;
-    e.preventDefault();
-    try {
-      const r = await fetch(a.href, { mode: 'cors' });
-      if (!r.ok) throw new Error(r.status);
-      const u = URL.createObjectURL(await r.blob());
-      const t = document.createElement('a'); t.href = u; t.download = a.dataset.filename; document.body.appendChild(t); t.click(); t.remove();
-      setTimeout(() => URL.revokeObjectURL(u), 10000);
-    } catch (err) { window.open(a.href, '_blank', 'noopener'); }
-  }));
-}
-
 function renderParts(l, allParts, openFirst) {
   if (!allParts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
   // v0.44: downloads leave the sequence and sit above it as documents (renderDocs); the parts
@@ -1434,7 +1405,6 @@ function renderParts(l, allParts, openFirst) {
 }
 function bindParts(root) {
   bindSlidePlayers(root);
-  bindDocs(root);
   root.querySelectorAll('.lesson-part-item .part-head').forEach(h => h.addEventListener('click', e => {
     if (e.target.closest('a, audio, iframe, button, .slide-player')) return;
     const item = h.closest('.lesson-part-item'), body = item.querySelector('.part-body'), wasOpen = !body.classList.contains('closed');
