@@ -1101,7 +1101,7 @@ function bindLessonRows(sc) {
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
     rest(`lessons?id=eq.${lessonId}&select=*`),
-    rest(`lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index&select=*`),
+    lessonParts(lessonId),
   ]);
   const l = rows[0];
   if (!l) { el.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
@@ -1124,7 +1124,7 @@ async function pageLesson(id, scId) {
   app.innerHTML = '<div class="loading">Opening lesson…</div>';
   const [rows, parts] = await Promise.all([
     rest(`lessons?id=eq.${id}&select=*`),
-    rest(`lesson_parts?lesson_id=eq.${id}&is_live=eq.true&is_archived=eq.false&order=order,index&select=*`),
+    lessonParts(id),
   ]);
   const l = rows[0];
   if (!l || !l.is_live) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
@@ -1335,9 +1335,80 @@ function bindSlidePlayers(root) {
 }
 
 // Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
-function renderParts(l, parts, openFirst) {
-  if (!parts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
-  return `<div class="accordion list-group shadow mt-0 mb-2" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
+// ---------- lesson documents (v0.44) ----------
+// Decision (David, 2 Nov 2026): anything not played or shown to the class on screen - every
+// Download part - leaves the "Part X of Y" sequence. The lesson plan gets its own card; the
+// other downloads (assessment sheets, flashcards, worksheets ...) are listed as Printables.
+// Files come from the R2 copies (files-migration/copy.js, public.lesson_files) under readable
+// names; a part not yet copied falls back to its original file.
+const isDocPart = p => p.media_type === 'Download';
+const isPlanPart = p => /lesson\s*plans?\b/i.test(p.heading || '');
+async function lessonParts(lessonId) {
+  const q = `lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index`;
+  try { return await rest(`${q}&select=*,lesson_files(url,filename,bytes,pages,content_type)`); }
+  catch (e) { return rest(`${q}&select=*`); }   // copies table not there yet
+}
+function docFile(p) {
+  const f = Array.isArray(p.lesson_files) ? p.lesson_files[0] : p.lesson_files;
+  const url = (f && f.url) || p.download_url_override || p.s3_url || '';
+  const ext = ((f && f.filename) || url.split('?')[0]).match(/\.([a-z0-9]{2,4})$/i);
+  return { url, filename: f && f.filename, bytes: f && f.bytes, pages: f && f.pages, type: ext ? ext[1].toUpperCase() : '' };
+}
+function docMeta(d) {
+  const bits = [];
+  if (d.type) bits.push(d.type);
+  if (d.pages) bits.push(`${d.pages} page${d.pages === 1 ? '' : 's'}`);
+  if (d.bytes) bits.push(d.bytes >= 1048576 ? `${(d.bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(d.bytes / 1024))} KB`);
+  return bits.join(' · ');
+}
+function docIcon(d) { return { PDF: 'bi-file-earmark-pdf-fill', DOC: 'bi-file-earmark-word-fill', DOCX: 'bi-file-earmark-word-fill', PPT: 'bi-file-earmark-slides-fill', PPTX: 'bi-file-earmark-slides-fill', XLS: 'bi-file-earmark-spreadsheet-fill', XLSX: 'bi-file-earmark-spreadsheet-fill', JPG: 'bi-file-earmark-image-fill', JPEG: 'bi-file-earmark-image-fill', PNG: 'bi-file-earmark-image-fill', MP3: 'bi-file-earmark-music-fill', ZIP: 'bi-file-earmark-zip-fill' }[d.type] || 'bi-file-earmark-arrow-down-fill'; }
+function docButtons(d, small) {
+  if (!d.url) return '<span class="text-mid-purple fw-light">File not available</span>';
+  const sz = small ? ' btn-sm' : '';
+  return `<a class="btn btn-primary${sz} doc-open" href="${esc(d.url)}" target="_blank" rel="noopener"><i class="bi-eye me-1"></i>Open</a>
+    <a class="btn btn-outline-primary${sz} doc-download" href="${esc(d.url)}" data-filename="${esc(d.filename || '')}" target="_blank" rel="noopener"><i class="bi-download me-1"></i>Download</a>`;
+}
+function renderDocs(l, docs) {
+  if (!docs.length) return '';
+  const plans = docs.filter(isPlanPart), others = docs.filter(p => !isPlanPart(p));
+  const plan = p => { const d = docFile(p); return `<div class="doc-plan" data-part="${p.id}">
+      <div class="doc-plan-icon"><i class="${docIcon(d)}"></i></div>
+      <div class="doc-plan-text"><div class="doc-plan-title">${esc(plans.length > 1 ? p.heading : 'Lesson plan')}</div><div class="doc-meta">${esc(docMeta(d))}${docMeta(d) ? ' · ' : ''}to read, save or print</div></div>
+      <div class="doc-actions">${docButtons(d)}</div></div>`; };
+  const item = p => { const d = docFile(p); return `<li class="doc-item" data-part="${p.id}">
+      <i class="${docIcon(d)} doc-item-icon"></i>
+      <div class="doc-item-text"><div class="doc-item-title">${esc(p.heading || 'Download')}</div>${docMeta(d) ? `<div class="doc-meta">${esc(docMeta(d))}</div>` : ''}</div>
+      <div class="doc-actions">${docButtons(d, true)}</div></li>`; };
+  return `<div class="lesson-docs mb-3">
+    ${plans.map(plan).join('')}
+    ${others.length ? `<div class="doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div><ul class="doc-list">${others.map(item).join('')}</ul></div>` : ''}
+  </div>`;
+}
+// Download saves under the readable name. The copies sit on another host, where a plain
+// download link is ignored by the browser, so fetch the file and save it; if that is refused,
+// open it instead (the browser's viewer has its own save and print).
+function bindDocs(root) {
+  root.querySelectorAll('.doc-download').forEach(a => a.addEventListener('click', async e => {
+    if (!a.dataset.filename) return;
+    e.preventDefault();
+    try {
+      const r = await fetch(a.href, { mode: 'cors' });
+      if (!r.ok) throw new Error(r.status);
+      const u = URL.createObjectURL(await r.blob());
+      const t = document.createElement('a'); t.href = u; t.download = a.dataset.filename; document.body.appendChild(t); t.click(); t.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 10000);
+    } catch (err) { window.open(a.href, '_blank', 'noopener'); }
+  }));
+}
+
+function renderParts(l, allParts, openFirst) {
+  if (!allParts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
+  // v0.44: downloads leave the sequence and sit above it as documents (renderDocs); the parts
+  // played or shown to the class are numbered among themselves.
+  const docs = allParts.filter(isDocPart), parts = allParts.filter(p => !isDocPart(p));
+  const docsHtml = renderDocs(l, docs);
+  if (!parts.length) return docsHtml;
+  return docsHtml + `<div class="accordion list-group shadow mt-0 mb-2" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
     const show = openFirst && i === 0;
     const info = p.additional_info && p.additional_info.trim();
     const infoHtml = info ? para(p.additional_info) : '';
@@ -1356,13 +1427,14 @@ function renderParts(l, parts, openFirst) {
     }
     const dur = p.duration && p.duration.trim() !== ':' ? `<span class="d-flex justify-content-end w-100 text-muted text-mid-purple fw-light"><span class="lesson-icon text-truncate ms-2 my-1"><i class="bi-stopwatch text-purple mr-1"></i> ${esc(p.duration)}</span></span>` : '';
     return `<div class="list-group-item list-group-item-action lesson-collapse cursor-pointer px-3 lesson-part-item ${show ? 'active-part' : ''}" data-part="${p.id}">
-      <div class="row part-head" role="button" aria-expanded="${show}"><div class="col d-flex align-items-center"><div class="d-flex justify-content-start align-items-center pe-1"><i class="text-primary ${partIcon(p)} h5 mt-2 me-2"></i></div><div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(p.heading || p.media_type)}</h5></div><div class="d-none d-md-flex flex-shrink-0 flex-column align-items-center">${dur}<span class="d-flex justify-content-end w-100 text-muted text-mid-purple fw-light"><small class="ms-1 text-mid-purple">${esc(p.live_part_label || '')}</small></span></div></div></div>
+      <div class="row part-head" role="button" aria-expanded="${show}"><div class="col d-flex align-items-center"><div class="d-flex justify-content-start align-items-center pe-1"><i class="text-primary ${partIcon(p)} h5 mt-2 me-2"></i></div><div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(p.heading || p.media_type)}</h5></div><div class="d-none d-md-flex flex-shrink-0 flex-column align-items-center">${dur}<span class="d-flex justify-content-end w-100 text-muted text-mid-purple fw-light"><small class="ms-1 text-mid-purple">${parts.length > 1 ? `Part ${i + 1} of ${parts.length}` : ''}</small></span></div></div></div>
       <div class="collapse-smooth part-body ${show ? '' : 'closed'}"><div><hr><div class="col p-3">${card}</div></div></div>
     </div>`;
   }).join('') + `</div>`;
 }
 function bindParts(root) {
   bindSlidePlayers(root);
+  bindDocs(root);
   root.querySelectorAll('.lesson-part-item .part-head').forEach(h => h.addEventListener('click', e => {
     if (e.target.closest('a, audio, iframe, button, .slide-player')) return;
     const item = h.closest('.lesson-part-item'), body = item.querySelector('.part-body'), wasOpen = !body.classList.contains('closed');
