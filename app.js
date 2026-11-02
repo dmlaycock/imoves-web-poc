@@ -168,9 +168,12 @@ function subcatLessons(sc, filtered = true) { return subcatSchemes(sc, filtered)
 function subgroupSubcats(sg, filtered = true) {
   return (D.subcatsBySubgroup[sg.id] || []).filter(sc => !sc.is_schemes || subcatSchemes(sc, filtered).length > 0).sort(byOrder);
 }
-// Subject::subgroups: live, with at least one of those categories.
-function subjectSubgroups(subjectId, filtered = true) {
-  return (D.subgroupsBySubject[subjectId] || []).filter(sg => subgroupSubcats(sg, filtered).length > 0).sort(byOrder);
+// Subject::subgroups. Its whereHas reads as "with at least one of those categories", but the ungrouped
+// orWhere(is_schemes = false) in Subgroup::subcategories escapes the join to the group, so one live
+// non-scheme category anywhere passes every group. In effect: all the subject's live groups. So an age
+// filter never empties this list, and the browse menu can show a group heading with nothing under it.
+function subjectSubgroups(subjectId) {
+  return (D.subgroupsBySubject[subjectId] || []).slice().sort(byOrder);
 }
 // subgroup-card.blade.php: the cards on a subject page.
 function visibleSubcats(sg) { return subgroupSubcats(sg).filter(sc => canView(sc) && sc.is_visible_on_homepage); }
@@ -354,11 +357,11 @@ function renderUserMenu() {
 
 // Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
 function renderBrowse() {
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id, false).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
   const tabs = [], panes = [];
   subjects.forEach((s, i) => {
     // NavComposer ignores the age filter; subject-group-panels.blade.php checks the group's policy but lists every category.
-    const sgs = subjectSubgroups(s.id, false).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
+    const sgs = subjectSubgroups(s.id).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
     const on = tabs.length === 0 ? ' active' : '';
     tabs.push(`<a class="list-group-item list-group-item-action cursor-pointer text-truncate${on}" data-pane="${s.id}" role="tab"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')} text-primary me-2 d-none d-sm-inline"></i> ${esc(s.name)}</a>`);
     panes.push(`<div class="tab-pane py-4 px-3${on}" data-pane="${s.id}" role="tabpanel">
@@ -372,7 +375,7 @@ function renderBrowse() {
   // Below sm: the accordion (browser.blade.php "row d-sm-none" + subject-group-panels.blade.php)
   let first = true;
   document.getElementById('browse-mobile').innerHTML = subjects.map(s => {
-    const sgs = subjectSubgroups(s.id, false).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
+    const sgs = subjectSubgroups(s.id).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
     const open = first; first = false;
     return `<li class="mb-1"><button type="button" class="text-primary w-100 btn btn-toggle d-inline-flex align-items-center rounded border-0" data-collapse="subject-${s.id}-collapse" aria-expanded="${open}">${esc(s.name)}</button>
       <div class="collapse ${open ? 'show' : ''} mt-2" id="subject-${s.id}-collapse"><ul class="d-sm-none btn-toggle-nav list-unstyled fw-normal pb-1 small">` + sgs.map(({ sg, subcats }) =>
