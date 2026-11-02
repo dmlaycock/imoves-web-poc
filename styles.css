@@ -244,3 +244,17 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
    with nothing under the title drop their empty body in app.js (subcatCard). */
 @media (max-width: 575.98px) { #agefilter > label.col { margin-left: -12px; } }
 .dropdown-item { transition: background-color .15s ease-in-out, color .15s ease-in-out; }
+
+/* ---------- v0.45.4 expanded lesson on the category page: one block, one owner ----------
+   David (2 Nov, evening): with a lesson open it was not obvious that the text, documents
+   and parts below belonged to it. Now the open row becomes the block's header (purple,
+   white text) and the drawer continues it inside the same 2px purple frame, on the
+   ultra-light tint, with the inner blocks stepped down to a 1px mid-purple line. */
+.lesson-x.open { border: 2px solid var(--purple); border-bottom: 0; border-radius: var(--bs-card-border-radius, 5px) var(--bs-card-border-radius, 5px) 0 0; margin-bottom: 0 !important; overflow: hidden; }
+.lesson-x.open > .list-group-item { border-left: 0; border-right: 0; border-top: 0; }
+.lesson-x.open .lesson-row, .lesson-x.open .lesson-row:hover { background-color: var(--purple) !important; color: #fff; }
+.lesson-x.open .lesson-row .text-primary, .lesson-x.open .lesson-row .text-purple, .lesson-x.open .lesson-row .text-mid-purple, .lesson-x.open .lesson-row h5 { color: #fff !important; }
+.lesson-x.open .lesson-row .fw-light { color: var(--light-purple) !important; }
+.lesson-x.open + .lesson-drawer > div > .lesson-inline { margin-top: 0; border: 2px solid var(--purple) !important; border-top: 0 !important; border-radius: 0 0 var(--bs-card-border-radius, 5px) var(--bs-card-border-radius, 5px); background: var(--ultra-purple); }
+.lesson-inline .lesson-block { border-width: 1px; border-color: var(--mid-purple); box-shadow: 0 .25rem .75rem rgba(0,0,0,.08); }
+.lesson-inline .lesson-block .list-group-item.active-part, .lesson-inline .lesson-collapse.active { border-color: var(--xlight-purple) !important; }

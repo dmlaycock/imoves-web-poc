@@ -1090,8 +1090,9 @@ function bindLessonRows(sc) {
     const scope = x.closest('.card-body');
     scope.querySelectorAll('.lesson-drawer').forEach(d => d.classList.add('closed'));
     scope.querySelectorAll('.lesson-row').forEach(r => r.setAttribute('aria-expanded', 'false'));
+    scope.querySelectorAll('.lesson-x.open').forEach(o => o.classList.remove('open'));   // v0.45.4: open row + drawer read as one framed block
     if (wasOpen) return;
-    drawer.classList.remove('closed'); row.setAttribute('aria-expanded', 'true');
+    drawer.classList.remove('closed'); row.setAttribute('aria-expanded', 'true'); x.classList.add('open');
     const body = drawer.firstElementChild;
     if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1rem">Loading…</div>'; await fillLessonBody(body, +drawer.dataset.lessonBody, sc); }
     setTimeout(() => x.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
