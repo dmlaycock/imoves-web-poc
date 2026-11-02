@@ -79,7 +79,8 @@ async function loadTree() {
 }
 const index = rows => Object.fromEntries(rows.map(r => [r.id, r]));
 function group(rows, key) { const g = {}; for (const r of rows) (g[r[key]] ||= []).push(r); return g; }
-const byOrder = (a, b) => (a.order ?? -1e12) - (b.order ?? -1e12) ||   // OrderScope in MySQL: an empty order sorts first String(a.name || '').localeCompare(String(b.name || ''));
+// OrderScope in MySQL: an empty order sorts first.
+const byOrder = (a, b) => (a.order ?? -1e12) - (b.order ?? -1e12) || String(a.name || '').localeCompare(String(b.name || ''));
 
 // ---------- visibility and access (v0.40) ----------
 // A port of the live rules, not a deduction from what the pages show. Project doc:
