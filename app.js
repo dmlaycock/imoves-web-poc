@@ -58,9 +58,13 @@ async function loadTree() {
   D.lessons = lessons.filter(l => l.is_live);
   D.subjectById = index(D.subjects); D.subgroupById = index(D.subgroups); D.subcatById = index(D.subcategories);
   D.schemeById = index(D.schemes); D.lessonById = index(D.lessons);
+  D.lessons.sort((a, b) => (a.order ?? -1e12) - (b.order ?? -1e12) || a.id - b.id);
   D.lessonsByScheme = group(D.lessons, 'scheme_id');
   D.schemesBySubcat = {}; D.subcatsByScheme = {};
   for (const l of links) {
+    // Scheme::qbRelationMap reads three category fields (527, 537, 544). The shared table also holds
+    // the CMS PoC's links from fields 702-704 (positions 4-6), which the live platform never reads.
+    if (l.position > 3) continue;
     const s = D.schemeById[l.scheme_id]; if (!s) continue;
     (D.schemesBySubcat[l.subcategory_id] ||= []).push(s);
     (D.subcatsByScheme[l.scheme_id] ||= []).push(l.subcategory_id);
@@ -75,7 +79,7 @@ async function loadTree() {
 }
 const index = rows => Object.fromEntries(rows.map(r => [r.id, r]));
 function group(rows, key) { const g = {}; for (const r of rows) (g[r[key]] ||= []).push(r); return g; }
-const byOrder = (a, b) => (a.order ?? 1e12) - (b.order ?? 1e12) || String(a.name || '').localeCompare(String(b.name || ''));
+const byOrder = (a, b) => (a.order ?? -1e12) - (b.order ?? -1e12) ||   // OrderScope in MySQL: an empty order sorts first String(a.name || '').localeCompare(String(b.name || ''));
 
 // ---------- visibility and access (v0.40) ----------
 // A port of the live rules, not a deduction from what the pages show. Project doc:
@@ -349,7 +353,7 @@ function renderUserMenu() {
 
 // Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
 function renderBrowse() {
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id, false).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id, false).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
   const tabs = [], panes = [];
   subjects.forEach((s, i) => {
     // NavComposer ignores the age filter; subject-group-panels.blade.php checks the group's policy but lists every category.
