@@ -42,15 +42,16 @@ async function rpc(name, args) {
 
 const D = {}; // in-memory copy of the tree
 async function loadTree() {
-  const [subjects, subgroups, subcategories, schemes, links, lessons] = await Promise.all([
+  const [subjects, subgroups, subcategories, schemes, links, lessons, subjectLinks] = await Promise.all([
     rest('subjects?select=*&order=order', { all: true }),
     rest('subgroups?select=*&order=order', { all: true }),
-    rest('subcategories?select=id,name,order,homepage_order,image,background_image_url,description,subheading,is_live,is_schemes,is_direct_resource,is_redirect_to_category,is_redirect_to_lesson,is_redirect_to_url,direct_resource_heading_all,direct_resource_heading_paid,direct_resource_text_all,direct_resource_text_paid,direct_resource_wistia_id_all,direct_resource_wistia_id_paid,direct_resource_wistia_duration_all,direct_resource_wistia_duration_paid,is_direct_resource_linked,direct_resource_link_text,direct_resource_link_url,subject_id,subgroup_id,subcategory_redirect_id,lesson_redirect_id,url_redirect,content_noun_derived_plural,content_noun_derived_singular,is_visible_on_homepage&order=order', { all: true }),
+    rest('subcategories?select=id,name,order,homepage_order,image,background_image_url,description,subheading,is_live,is_schemes,is_direct_resource,is_redirect_to_category,is_redirect_to_lesson,is_redirect_to_url,is_direct_resource_different_for_free,direct_resource_heading_all,direct_resource_heading_free,direct_resource_heading_paid,direct_resource_text_all,direct_resource_text_free,direct_resource_text_paid,direct_resource_wistia_id_all,direct_resource_wistia_id_free,direct_resource_wistia_id_paid,direct_resource_wistia_duration_all,direct_resource_wistia_duration_free,direct_resource_wistia_duration_paid,is_direct_resource_linked,direct_resource_link_text,direct_resource_link_url,subject_id,subgroup_id,subcategory_redirect_id,lesson_redirect_id,url_redirect,content_noun_derived_plural,content_noun_derived_singular,is_visible_on_homepage,show_all,show_free,show_trial,show_paying&order=order', { all: true }),
     rest('schemes?select=id,name,subheading,description,body_opening_text,body_closing_text,body_subheading_1,body_subheading_1_text,body_subheading_2,body_subheading_2_text,body_subheading_3,body_subheading_3_text,is_live,is_freemium,image,order', { all: true }),
     rest('scheme_subcategories?select=*', { all: true }),
-    rest('lessons?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template&order=order', { all: true }),
+    rest('lessons?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template,subject_ids&order=order', { all: true }),
+    rest('scheme_subjects?select=scheme_id,subject_id', { all: true }),
   ]);
-  D.subjects = subjects.filter(s => s.is_live);
+  D.subjects = subjects.filter(s => s.is_live && (!E.niched || E.nicheIds.has(s.id)));   // LiveScope + NicheScope
   D.subgroups = subgroups.filter(s => s.is_live);
   D.subcategories = subcategories.filter(s => s.is_live);
   D.schemes = schemes.filter(s => s.is_live);
@@ -65,6 +66,9 @@ async function loadTree() {
     (D.subcatsByScheme[l.scheme_id] ||= []).push(l.subcategory_id);
   }
   for (const k in D.schemesBySubcat) D.schemesBySubcat[k].sort(byOrder);
+  D.subjectsByScheme = {};
+  for (const l of subjectLinks) (D.subjectsByScheme[l.scheme_id] ||= []).push(l.subject_id);
+  D.ageKeys = null;
   D.subgroupsBySubject = group(D.subgroups, 'subject_id');
   D.subcatsBySubgroup = group(D.subcategories, 'subgroup_id');
   D.loadedAt = new Date();
@@ -73,18 +77,23 @@ const index = rows => Object.fromEntries(rows.map(r => [r.id, r]));
 function group(rows, key) { const g = {}; for (const r of rows) (g[r[key]] ||= []).push(r); return g; }
 const byOrder = (a, b) => (a.order ?? 1e12) - (b.order ?? 1e12) || String(a.name || '').localeCompare(String(b.name || ''));
 
-// ---------- entitlements (Phase 1 increment 2) ----------
-// Mirrors the live platform's SubjectPolicy and LessonPolicy (app/Subjects/Policies,
-// app/Lessons/Policies) using the per-user fields from web_me(). Applied client-side
-// for now; API-level enforcement comes at cutover, when anon read of the content
-// tables (which the CMS PoC still relies on) is withdrawn.
+// ---------- visibility and access (v0.40) ----------
+// A port of the live rules, not a deduction from what the pages show. Project doc:
+// web-frontend/visibility-rules-v0.1.md. Sources are named against each function.
+// Applied client-side for now; API-level enforcement comes at cutover, when anon read of the
+// content tables (which the CMS PoC still relies on) is withdrawn.
 const E = {};
 function initEntitlements() {
   const m = Auth.me() || {};
   E.allContent = !!m.all_content; E.allSubjects = !!m.all_subjects;
   E.allAges = !!m.all_ages; E.ageRights = m.age_rights || [];
-  E.subjectIds = new Set([...(m.subject_ids || []), ...(m.niche_subject_ids || [])]);
+  E.userSubjects = new Set(m.subject_ids || []);                                    // $user->subjects (fid 152)
+  E.subjectIds = new Set([...(m.subject_ids || []), ...(m.niche_subject_ids || [])]);   // plus $user->nicheSubjects
+  E.niched = !!m.is_niched && (m.niche_subject_ids || []).length > 0;               // Nichable::isNiched
+  E.nicheIds = new Set(m.niche_subject_ids || []);
   E.freeAll = !!m.free_all; E.trialAll = !!m.trial_all; E.payingAll = !!m.paying_all;
+  E.complementary = !!m.has_complementary_access;
+  E.showBrowseMenu = m.show_browse_menu !== false;
   E.homepage = m.homepage_subject_id || null;
   E.buttons = m.subject_button_ids || []; E.browse = m.browse_menu_ids || [];
   E.homeSections = m.home_section_ids || [];
@@ -92,20 +101,93 @@ function initEntitlements() {
   E.upgradeText = m.lesson_upgrade_button_text || 'Upgrade';
   E.showUpgrade = !!m.show_upgrade_button;
 }
-// SubjectPolicy::view
-function canViewSubject(s) {
-  return !!(s.show_all || (s.show_free && E.freeAll) || (s.show_trial && E.trialAll) || (s.show_paying && E.payingAll));
+// SubjectPolicy::view, SubgroupPolicy::view and SubcategoryPolicy::view are the same test.
+// Show lists and buttons only: nothing on the live site blocks opening a subject or category page.
+function canView(x) {
+  return !!(x.show_all || (x.show_free && E.freeAll) || (x.show_trial && E.trialAll) || (x.show_paying && E.payingAll));
 }
+const canViewSubject = canView;
+// User::canAccessSubject
+function canAccessSubject(s) { return E.allContent || E.allSubjects || (!!s && E.userSubjects.has(s.id)); }
+// Lesson::subjects: the lesson's own subjects (Lessons fid 944), through Subject's LiveScope and NicheScope.
 function lessonSubjects(l) {
-  return (D.subcatsByScheme[l.scheme_id] || []).map(id => D.subcatById[id] && D.subcatById[id].subject_id).filter(Boolean);
+  return [...new Set((l.subject_ids || []).map(Number))].filter(id => D.subjectById[id]);
 }
-// LessonPolicy::access (with age filters)
-function canAccessLesson(l) {
+// LessonPolicy::access. withAge false is LessonPolicy::withoutAgeFilters(), which search uses.
+function canAccessLesson(l, withAge = true) {
   if (l.is_freemium || E.allContent) return true;
   if (!E.allSubjects && !lessonSubjects(l).some(id => E.subjectIds.has(id))) return false;
-  if (E.allAges) return true;
+  if (!withAge || E.allAges) return true;
   if (l.age_min == null) return false;
   return E.ageRights.some((on, k) => on && l.age_min <= 4 + k && l.age_max >= 5 + k);
+}
+// Scheme::isViewable. Greys the scheme card and removes its Add to Curriculum button.
+function schemeViewable(s) {
+  if (s.is_freemium || E.allContent) return true;
+  return (D.subjectsByScheme[s.id] || []).some(id => D.subjectById[id] && E.userSubjects.has(id));
+}
+// FilterScope, a global scope on Lesson. "Show lessons suitable for" removes lessons from every
+// query, and everything above a lesson needs a lesson to exist (Scheme, Subcategory and Subgroup
+// relations all use whereHas), so a category or group with no lesson for the age disappears.
+// Filterable::scopeAgeRange only applies the age when it is in HasSubjectFilters::ageFilters()
+// for the subject in the URL; with no subject in the URL it is HasFilters::$AGE_FILTERS.
+let ROUTE_SUBJECT = null;
+const STATIC_AGE_KEYS = new Set([4, 5, 6, 7, 8, 9, 10]);
+function ageKeys(subjectId) {
+  if (!subjectId) return STATIC_AGE_KEYS;
+  if (!D.ageKeys) {
+    D.ageKeys = {};
+    for (const l of D.lessons) for (const id of new Set((l.subject_ids || []).map(Number))) {
+      const keys = (D.ageKeys[id] ||= new Set());
+      // Same loop as ageFilters(): includes age_max itself, and runs once when age_max is empty.
+      let i = l.age_min;
+      do { if (i != null) keys.add(i); i = i == null ? 1 : i + 1; } while (l.age_max != null && i <= l.age_max);
+    }
+  }
+  return D.ageKeys[subjectId] || new Set();
+}
+function passesAgeFilter(l, subjectId = ROUTE_SUBJECT) {
+  const a = classAge();
+  if (a == null || !ageKeys(subjectId).has(a)) return true;
+  return l.age_min != null && l.age_max != null && l.age_min <= a && l.age_max >= a + 1;
+}
+// filtered false is FilterScope::ignore(), which the browse menu and curriculum use.
+function schemeLessons(scheme, filtered = true) {
+  const all = D.lessonsByScheme[scheme.id] || [];
+  return filtered ? all.filter(l => passesAgeFilter(l)) : all;
+}
+// Subcategory::schemes: live schemes with at least one lesson.
+function subcatSchemes(sc, filtered = true) { return (D.schemesBySubcat[sc.id] || []).filter(s => schemeLessons(s, filtered).length > 0); }
+function subcatLessons(sc, filtered = true) { return subcatSchemes(sc, filtered).flatMap(s => schemeLessons(s, filtered)); }
+// Subgroup::subcategories: live, and either has schemes or is not a scheme-based category.
+function subgroupSubcats(sg, filtered = true) {
+  return (D.subcatsBySubgroup[sg.id] || []).filter(sc => !sc.is_schemes || subcatSchemes(sc, filtered).length > 0).sort(byOrder);
+}
+// Subject::subgroups: live, with at least one of those categories.
+function subjectSubgroups(subjectId, filtered = true) {
+  return (D.subgroupsBySubject[subjectId] || []).filter(sg => subgroupSubcats(sg, filtered).length > 0).sort(byOrder);
+}
+// subgroup-card.blade.php: the cards on a subject page.
+function visibleSubcats(sg) { return subgroupSubcats(sg).filter(sc => canView(sc) && sc.is_visible_on_homepage); }
+// Subcategory::directResourceVideo: which version of a category's video this user gets.
+function directResource(sc) {
+  if (!sc.is_direct_resource || !(sc.direct_resource_wistia_id_all || sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_free)) return null;
+  const v = sc.is_direct_resource_different_for_free ? (canAccessSubject(D.subjectById[sc.subject_id]) && !E.complementary ? 'paid' : 'free') : 'all';
+  return { id: sc[`direct_resource_wistia_id_${v}`], heading: sc[`direct_resource_heading_${v}`], text: sc[`direct_resource_text_${v}`], duration: sc[`direct_resource_wistia_duration_${v}`] };
+}
+// Subject::featuredVideo.
+function featuredVideo(s) {
+  if (!s.is_featuring_video || (s.force_age_selection && !classAge())) return null;
+  const a = classAge();
+  const v = canAccessSubject(s) ? (a && a <= 6 ? 'paid_ks1' : 'paid_ks2') : 'free';   // User::isKeyStage1: ages 4-5, 5-6 and 6-7
+  const id = s[`featured_video_wistia_id_${v}`];
+  return id ? { id, heading: s[`featured_video_heading_${v}`], sub: s[`featured_video_subheading_${v}`], desc: s[`featured_video_description_${v}`] } : null;
+}
+// filters/filtered-out-notice.blade.php with total 0.
+const AGE_NOTICE = `<div class="d-flex align-items-center justify-content-center"><div class="filtered-out-notice alert alert-primary border-primary mt-3" role="alert"><h4 class="alert-heading text-primary mt-2">Remove Age Filter for More <i class="bi-exclamation-circle ms-2 text-danger float-end"></i></h4><hr><button type="button" class="btn btn-primary filter-clear-btn filter-clear-age my-2" id="clearage">&times; Click here to remove your age filter</button></div></div>`;
+function bindClearAge() {
+  const b = document.getElementById('clearage'); if (!b) return;
+  b.addEventListener('click', () => { saveClassAge(''); const p = document.getElementById('classage'); if (p) p.value = ''; route(); });
 }
 const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
 // The strip next to the logo (school and class name, as the live header), the orange
@@ -134,11 +216,10 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const nl = s => esc(s).trim()
   .replace(/&lt;i class=&quot;((?:bi )?bi-[a-z0-9-]+)&quot;&gt;\s*&lt;\/i&gt;/g, '<i class="$1"></i>')
   .replace(/&lt;(\/?)(b|strong|em)&gt;/g, '<$1$2>')
-  .replace(/&lt;br ?\/?&gt;/g, '<br>');
+  .replace(/&lt;br ?\/?&gt;/g, '<br>')
+  .replace(/\r?\n/g, '<br>');   // nl2br, as the live templates
 const img = p => p ? (p.startsWith('http') ? p : CF + p) : CF + 'defaultimages/default_s.png';
 const limit = (s, n) => (s && s.length > n) ? s.slice(0, n - 1) + '…' : (s || '');
-function schemeLessons(scheme) { return (D.lessonsByScheme[scheme.id] || []); }
-function subcatLessons(sc) { return (D.schemesBySubcat[sc.id] || []).flatMap(schemeLessons); }
 function ageRange(lessons) {
   const mins = lessons.map(l => l.age_min).filter(Number.isFinite), maxs = lessons.map(l => l.age_max).filter(Number.isFinite);
   if (!mins.length) return null; return `${Math.min(...mins)}-${Math.max(...maxs)}`;
@@ -188,10 +269,8 @@ function maybeForceAge(subj) {
 }
 function coversClass(range) { const a = classAge(); if (a == null || !range) return false; const [lo, hi] = range.split('-').map(Number); return lo <= a && a + 1 <= hi; }
 function noun(sc, n) { return n === 1 ? (sc.content_noun_derived_singular || 'lesson') : (sc.content_noun_derived_plural || 'lessons'); }
-function visibleSubcats(sg) {
-  return (D.subcatsBySubgroup[sg.id] || []).filter(sc => sc.is_visible_on_homepage && ((D.schemesBySubcat[sc.id] || []).length > 0 || !sc.is_schemes)).sort(byOrder);
-}
-function subcatIsFree(sc) { return (D.schemesBySubcat[sc.id] || []).some(s => s.is_freemium); }
+// Subcategory::isFreemium
+function subcatIsFree(sc) { return subcatSchemes(sc).some(s => s.is_freemium); }
 function subcatHref(sc) { return `#/subject/${sc.subject_id}/subcategory/${sc.id}`; }
 function lessonHref(l, sc) { return `#/lesson/${l.id}` + (sc ? `?sc=${sc.id}` : ''); }
 function wistia(id) { return `<div class="wistia-ratio videobox"><iframe src="https://fast.wistia.net/embed/iframe/${esc(id)}?videoFoam=true" allow="autoplay; fullscreen" allowfullscreen title="Video"></iframe></div>`; }
@@ -209,6 +288,7 @@ async function route() {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('active', a.dataset.nav === (p[0] || 'home')));
   document.querySelectorAll('#scrollable-navbar .subject-button').forEach(a => a.classList.toggle('active', p[0] === 'subject' && a.dataset.id === p[1]));
   const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
+  ROUTE_SUBJECT = p[0] === 'subject' ? +p[1] : null;   // Filterable::subjectContext
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
   const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
@@ -238,10 +318,11 @@ async function route() {
 // ---------- pages ----------
 function renderSubjectBar() {
   // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
-  const subjects = D.subjects.filter(s => E.buttons.includes(s.id) && canViewSubject(s)).sort(byOrder);
+  const listed = D.subjects.filter(s => E.buttons.includes(s.id)).sort(byOrder);
+  const subjects = listed.filter(canViewSubject);
   document.getElementById('scrollable-navbar').innerHTML = subjects.map(s =>
     `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
-  document.getElementById('subjectnav').classList.toggle('hidden', subjects.length < 2);
+  document.getElementById('subjectnav').classList.toggle('hidden', listed.length < 2);   // $subjectList->count() > 1, counted before the policy
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
 
@@ -268,11 +349,11 @@ function renderUserMenu() {
 
 // Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
 function renderBrowse() {
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s)).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
+  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id, false).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? 999) - (b.browse_order ?? 999));
   const tabs = [], panes = [];
   subjects.forEach((s, i) => {
-    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
-    if (!sgs.length) return;
+    // NavComposer ignores the age filter; subject-group-panels.blade.php checks the group's policy but lists every category.
+    const sgs = subjectSubgroups(s.id, false).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
     const on = tabs.length === 0 ? ' active' : '';
     tabs.push(`<a class="list-group-item list-group-item-action cursor-pointer text-truncate${on}" data-pane="${s.id}" role="tab"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')} text-primary me-2 d-none d-sm-inline"></i> ${esc(s.name)}</a>`);
     panes.push(`<div class="tab-pane py-4 px-3${on}" data-pane="${s.id}" role="tabpanel">
@@ -286,8 +367,7 @@ function renderBrowse() {
   // Below sm: the accordion (browser.blade.php "row d-sm-none" + subject-group-panels.blade.php)
   let first = true;
   document.getElementById('browse-mobile').innerHTML = subjects.map(s => {
-    const sgs = (D.subgroupsBySubject[s.id] || []).sort(byOrder).map(sg => ({ sg, subcats: visibleSubcats(sg) })).filter(x => x.subcats.length);
-    if (!sgs.length) return '';
+    const sgs = subjectSubgroups(s.id, false).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
     const open = first; first = false;
     return `<li class="mb-1"><button type="button" class="text-primary w-100 btn btn-toggle d-inline-flex align-items-center rounded border-0" data-collapse="subject-${s.id}-collapse" aria-expanded="${open}">${esc(s.name)}</button>
       <div class="collapse ${open ? 'show' : ''} mt-2" id="subject-${s.id}-collapse"><ul class="d-sm-none btn-toggle-nav list-unstyled fw-normal pb-1 small">` + sgs.map(({ sg, subcats }) =>
@@ -308,7 +388,7 @@ function renderBrowse() {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBrowse(); hideModal('search-modal'); } });
     document.getElementById('browsebtn').addEventListener('click', openBrowse);
   }
-  document.getElementById('browsebtnwrap').classList.toggle('hidden', !tabs.length);
+  document.getElementById('browsebtnwrap').classList.toggle('hidden', !E.showBrowseMenu);
 }
 // Modals (live: Bootstrap). One small helper here instead of the Bootstrap JS bundle.
 function showModal(id) {
@@ -360,8 +440,7 @@ function pageHome() {
   // subject's page - nearly everyone - so the carousel home below is the fallback.
   if (E.homepage && D.subjectById[E.homepage]) { location.replace(`#/subject/${E.homepage}`); return; }
   setBg(null);
-  const subjects = D.subjects.filter(s => s.is_carouselable && canViewSubject(s) &&
-    (!E.homeSections.length || E.homeSections.includes(s.id))).sort((a, b) => (a.homepage_order ?? 999) - (b.homepage_order ?? 999));
+  const subjects = D.subjects.filter(s => s.is_carouselable && E.homeSections.includes(s.id)).sort((a, b) => (a.homepage_order ?? 999) - (b.homepage_order ?? 999));
   let html = '';
   for (const s of subjects) {
     const feats = [1, 2, 3, 4].map(i => ({ sc: D.subcatById[s[`featured_subcategory_id_${i}`]], heading: s[`featured_heading_${i}`], sub: s[`featured_subheading_${i}`] })).filter(f => f.sc);
@@ -379,11 +458,8 @@ function pageHome() {
 function pageSubject(id) {
   const s = D.subjectById[id];
   if (!s) { app.innerHTML = '<div class="notice">Subject not found.</div>'; return; }
-  if (!canViewSubject(s)) { app.innerHTML = `<div class="notice">${esc(s.name)} isn’t part of your subscription.${E.showUpgrade ? ` <a class="btn btn-primary btn-sm" href="#/upgrade" style="margin-left:.6rem">${esc(E.upgradeText)}</a>` : ''}</div>`; return; }
   setBg(s.background_image_url);
-  const video = s.is_featuring_video && (s.featured_video_wistia_id_paid_ks2 || s.featured_video_wistia_id_free);
-  const vHead = s.featured_video_heading_paid_ks2 || s.featured_video_heading_free, vSub = s.featured_video_subheading_paid_ks2 || s.featured_video_subheading_free;
-  const vDesc = s.featured_video_description_paid_ks2 || s.featured_video_description_free || '';
+  const fv = featuredVideo(s), video = fv && fv.id, vHead = fv && fv.heading, vSub = fv && fv.sub, vDesc = (fv && fv.desc) || '';
   let html = `<div class="row pt-4 pb-2 d-none d-sm-block"><div class="col"><div class="card shadow border-primary bg-ultra-light-purple rounded">
     <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(s.name)}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide"></button></div></h5>
     ${s.description ? `<div class="collapse-smooth"><div><div class="card-body"><p class="fw-light text-primary h6 mb-0">${nl(s.description)}</p></div></div></div>` : ''}</div><hr></div></div>`;
@@ -391,21 +467,21 @@ function pageSubject(id) {
     <h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(vHead || 'Featured')}${vSub ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(vSub)}</small>` : ''}<small class="float-end"><span class="badge bg-warning"><i class="bi-star-fill mr-1 mt-1"></i> <span style="position: relative; top: 1px;">Featured</span></span></small></h5>
     <div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block"><div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(video)}</div>
     ${vDesc ? `<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(vDesc)}</p></div>` : ''}</div></div></div></div></div></div></div>`;
-  const subgroups = (D.subgroupsBySubject[id] || []).sort(byOrder);
-  let any = false;
-  for (const sg of subgroups) {
+  const subgroups = subjectSubgroups(id);
+  if (!subgroups.length && classAge() != null) html += AGE_NOTICE;
+  for (const sg of subgroups.filter(canView)) {
     const subcats = visibleSubcats(sg);
-    if (!subcats.length) continue; any = true;
+    if (!subcats.length) continue;
     html += `<div class="row" id="parent-subgroup-${sg.id}"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5">
       <h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(sg.name)}${sg.description ? ` <small class="text-light-purple ml-0 ml-sm-3 d-block d-sm-inline fw-light i-small">${esc(sg.description)}</small>` : ''}</div><div class="ms-auto"><button type="button" class="subgroup-collapse" data-toggle aria-expanded="true" aria-label="Show or hide ${esc(sg.name)}"></button></div></h5>
       <div class="collapse-smooth"><div><div class="card-body pb-1"><div class="row">`;
     for (const sc of subcats) html += subcatCard(sc, {});
     html += `</div></div></div></div></div></div></div>`;
   }
-  if (!any) html += '<div class="notice">This subject has no live content at the moment.</div>';
   app.innerHTML = html;
   reveal();
   bindCollapses();
+  bindClearAge();
 }
 
 // Collapsible panels (live: Bootstrap collapse + subcategory_display_state.js remembering the
@@ -419,11 +495,10 @@ function bindCollapses() {
 
 // A subcategory card: subjects/partials/subcategory-card.blade.php (desktop variant).
 function subcatCard(sc, { heading, sub, cols } = {}) {
-  const lessons = subcatLessons(sc), ages = ageRange(lessons);
-  const vid = sc.is_direct_resource && (sc.direct_resource_wistia_duration_paid || sc.direct_resource_wistia_duration_all);
+  const lessons = subcatLessons(sc), dr = directResource(sc), vid = dr && dr.duration;
   const subheading = sub || sc.subheading;
-  const meta = (ages ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><i class="bi-person-lines-fill text-primary me-1"></i> Ages ${esc(ages)}</li>` : '') +
-    (lessons.length ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-collection-play text-primary me-1"></i> ${lessons.length} ${esc(noun(sc, lessons.length))}</span></li>` : '') +
+  // Subcategories have no age range of their own, so live's "Ages" item never appears on a card.
+  const meta = (lessons.length ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-collection-play text-primary me-1"></i> ${lessons.length} ${esc(noun(sc, lessons.length))}</span></li>` : '') +
     (vid ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="text-primary"><i class="bi-film text-primary me-1"></i> ${esc(vid)} video</span></li>` : '') +
     (subcatIsFree(sc) ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-end align-items-center"><span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span></li>` : '');
   // Mobile variant (below md): image left, title right, fw-light meta - the "<!-- mobile -->" card in the partial.
@@ -914,9 +989,12 @@ function upgradeHref() { return '#/upgrade'; }
 function pageSubcategory(subjectId, id) {
   const sc = D.subcatById[id];
   if (!sc) { app.innerHTML = '<div class="notice">Section not found.</div>'; return; }
-  if (sc.is_redirect_to_category && sc.subcategory_redirect_id) { location.replace(subcatHref(D.subcatById[sc.subcategory_redirect_id] || sc)); return; }
-  if (sc.is_redirect_to_lesson && sc.lesson_redirect_id) { location.replace(`#/lesson/${sc.lesson_redirect_id}?sc=${sc.id}`); return; }
-  const subject = D.subjectById[sc.subject_id] || D.subjectById[subjectId], sg = D.subgroupById[sc.subgroup_id];
+  const subject = D.subjectById[subjectId], sg = D.subgroupById[sc.subgroup_id];
+  if (!subject) { app.innerHTML = '<div class="notice">Section not found.</div>'; return; }
+  // Subcategory::routeUrl: a redirect whose target is not live falls back to this category's own page.
+  const toCat = sc.is_redirect_to_category && D.subcatById[sc.subcategory_redirect_id];
+  if (toCat && D.subjectById[sc.subject_id] && toCat.id !== sc.id) { location.replace(`#/subject/${sc.subject_id}/subcategory/${toCat.id}`); return; }
+  if (sc.is_redirect_to_lesson && D.lessonById[sc.lesson_redirect_id]) { location.replace(`#/lesson/${sc.lesson_redirect_id}?sc=${sc.id}`); return; }
   setBg(sc.background_image_url || subject?.background_image_url);
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, { name: sc.name }].filter(Boolean));
   html += `<div class="row"><div class="col-12 order-2 order-lg-1"><div class="row"><div class="col-sm">`;
@@ -931,7 +1009,8 @@ function pageSubcategory(subjectId, id) {
       : `<div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow"><div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0"><h5 class="text-truncate text-white mr-1 mb-0">${esc(sc.name)}</h5></div></div></div></div><div class="row g-0"><div class="col px-3 pt-4 pb-3">${para(sc.description)}<p><a class="btn btn-primary" href="${esc(sc.url_redirect)}" target="_blank" rel="noopener"><i class="${isFile ? 'bi-file-earmark-arrow-down' : 'bi-box-arrow-up-right'} me-2"></i>${isFile ? 'Open the file' : 'Open ' + esc(host)}</a></p></div></div></div>`;
     app.innerHTML = html + `</div></div></div></div>`; reveal(); return;
   }
-  const schemes = D.schemesBySubcat[id] || [];
+  const schemes = subcatSchemes(sc);
+  if (!schemes.length && sc.is_schemes && classAge() != null) html += AGE_NOTICE;
   // Age variants: same-named schemes in one category become one card with an age switch.
   const groups = []; const byName = {};
   for (const s of schemes) {
@@ -942,57 +1021,61 @@ function pageSubcategory(subjectId, id) {
     const variants = g.map(s => ({ s, lessons: schemeLessons(s), ages: ageRange(schemeLessons(s)) })).sort((a, b) => (parseInt(a.ages) || 99) - (parseInt(b.ages) || 99));
     const first = variants[0].s, merged = variants.length > 1;
     let sel = variants.findIndex(v => coversClass(v.ages)); if (sel < 0) sel = 0;
+    const restricted = !schemeViewable(variants[sel].s);
     const labels = variants.map((v, i) => v.ages ? ageTextRange(v.ages) : (v.s.subheading || `Version ${i + 1}`));
     labels.forEach((l, i) => { if (labels.indexOf(l) !== i) labels[i] = `${l} (${i + 1})`; });
     const sw = merged ? `<div class="btn-group btn-group-sm ms-2 age-switch" role="group" aria-label="Age version">${labels.map((l, i) => `<button type="button" class="btn ${i === sel ? 'btn-light text-primary' : 'btn-outline-light'}" data-variant="${i}">${esc(l)}</button>`).join('')}</div>` : '';
-    html += `<a id="scheme-${first.id}"></a><div class="row"><div class="col"><div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow" data-scheme="${first.id}">
+    html += `<a id="scheme-${first.id}"></a><div class="row"><div class="col"><div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow ${restricted ? 'content-restricted' : ''}" data-scheme="${first.id}">
       <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0">
         <h5 class="text-truncate text-white mr-1 mb-0">${esc(first.name)}${!merged && first.subheading ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(first.subheading)}</small>` : ''}${variants.some(v => v.s.is_freemium) ? ' <span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span>' : ''}</h5>${sw}</div></div></div></div>`;
     variants.forEach((v, i) => {
       const s2 = v.s;
-      html += `<div class="variant" ${i === sel ? '' : 'hidden'}>
+      html += `<div class="variant" data-viewable="${schemeViewable(s2) ? 1 : 0}" ${i === sel ? '' : 'hidden'}>
         <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(s2.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(s2.name)}"><div class="media-body px-1">${merged && s2.subheading ? para(s2.subheading, 'text-mid-purple') : ''}${schemeBody(s2)}</div></div></div></div>
-        <div class="row mt-2"><div class="col"><div class="card-body pt-0 pb-4">` + v.lessons.map(l => lessonRow(l, sc, v.ages)).join('') + `</div></div></div></div>`;
+        <div class="row mt-2"><div class="col"><div class="card-body pt-0 pb-4">` + v.lessons.map(l => lessonRow(l, sc, v.ages, schemeViewable(s2))).join('') + `</div></div></div></div>`;
     });
     html += `</div></div></div>`;
   }
   if (sc.is_direct_resource) {
-    const vid = sc.direct_resource_wistia_id_paid || sc.direct_resource_wistia_id_all;
-    const head = sc.direct_resource_heading_paid || sc.direct_resource_heading_all || sc.name;
-    html += `<div class="row"><div class="col-12"><div class="card shadow-lg border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(head)}</h5><div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block">${vid ? `<div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(vid)}</div>` : ''}<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(sc.direct_resource_text_paid || sc.direct_resource_text_all || sc.description)}</p></div></div></div></div>${sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<div class="row"><div class="col-sm"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><a class="text-primary stretched-link" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener"><i class="bi-arrow-right-circle me-2 text-primary"></i>${esc(sc.direct_resource_link_text || 'Open')}</a></p></div></div></div>` : ''}</div></div></div></div>`;
+    const dr = directResource(sc), vid = dr && dr.id;
+    const head = (dr && dr.heading) || sc.name, drText = dr ? dr.text : sc.description;
+    html += `<div class="row"><div class="col-12"><div class="card shadow-lg border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white">${esc(head)}</h5><div class="card-body pb-1"><div class="row"><div class="col-12 mb-3"><div class="media d-block">${vid ? `<div class="img-thumbnail shadow-lg img-fluid scheme-thumbnail w-100 d-block border-primary border-dashed p-2">${wistia(vid)}</div>` : ''}<div class="media-body px-1 pt-4"><p class="card-text text-purple fw-light lead mb-0">${nl(drText)}</p></div></div></div></div>${sc.is_direct_resource_linked && sc.direct_resource_link_url ? `<div class="row"><div class="col-sm"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><a class="text-primary stretched-link" href="${esc(sc.direct_resource_link_url)}" target="_blank" rel="noopener"><i class="bi-arrow-right-circle me-2 text-primary"></i>${esc(sc.direct_resource_link_text || 'Open')}</a></p></div></div></div>` : ''}</div></div></div></div>`;
   }
-  if (!schemes.length && !sc.is_direct_resource) html += '<div class="notice">This section has no live schemes at the moment.</div>';
+  if (!sc.is_schemes && !sc.is_direct_resource) html += '<div class="notice">This section has no live schemes at the moment.</div>';
   app.innerHTML = html + `</div></div></div></div>`;
   reveal();
   app.querySelectorAll('.age-switch button').forEach(b => b.addEventListener('click', () => {
     const card = b.closest('.scheme-card'); const i = +b.dataset.variant;
     card.querySelectorAll('.age-switch button').forEach(x => { const on = +x.dataset.variant === i; x.classList.toggle('btn-light', on); x.classList.toggle('text-primary', on); x.classList.toggle('btn-outline-light', !on); });
-    card.querySelectorAll('.variant').forEach((v, j) => { v.hidden = j !== i; });
+    card.querySelectorAll('.variant').forEach((v, j) => { v.hidden = j !== i; if (j === i) card.classList.toggle('content-restricted', v.dataset.viewable === '0'); });
   }));
+  bindClearAge();
   bindLessonRows(sc);
 }
 
 // One lesson row of the scheme card (scheme-card.blade.php accordion item), with the PoC's
 // expand-in-place body underneath.
-function lessonRow(l, sc, schemeAges) {
+function lessonRow(l, sc, schemeAges, viewable = true) {
   const ok = canAccessLesson(l);
   const showAge = !classAge() && lessonAges(l) && lessonAges(l) !== schemeAges;
   const meta = (showAge ? `<span class="lesson-icon text-truncate ms-2 my-1" title="Suitable for ages ${esc(lessonAges(l))}"><i class="bi-person text-purple mr-1"></i> <span class="d-inline d-xl-none">${esc(lessonAges(l))}yrs</span><span class="d-none d-xl-inline">${esc(ageText(l))}</span></span>` : '') +
     (l.duration ? `<span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1" title="Around ${l.duration} minutes long"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span>` : '');
   return `<div class="accordion list-group list-group-horizontal shadow mt-0 mb-2 ${ok ? '' : 'content-restricted'} lesson-x" data-lesson="${l.id}">
     <div class="list-group-item list-group-item-action cursor-pointer px-3 lesson-row" role="button" aria-expanded="false"><div class="row h-100"><div class="col d-flex align-items-center">
-      <div class="d-flex justify-content-start align-items-center pe-1"><i class="${ok ? (MY.seen.has(l.id) ? 'text-mid-purple ' + lessonIcon(l).replace('-fill', '') : 'text-primary ' + lessonIcon(l)) : 'text-mid-purple bi-lock-fill'} h5 my-0 me-2"></i></div>
-      <div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(l.name)}${l.is_freemium ? ' <small class="ms-1 scheme-badge badge-freemium"><span class="badge bg-success">Free</span></small>' : ''}</h5><span class="w-100 text-mid-purple fw-light">${ok ? esc(l.description || '') : esc(E.lessonMessage)}</span></div>
-      <div class="d-none d-md-flex flex-shrink-0 align-items-center"><small class="ms-3 d-flex flex-wrap justify-content-end text-muted text-mid-purple fw-light">${ok ? meta : (E.showUpgrade ? `<a class="btn btn-primary btn-sm" href="${upgradeHref()}">${esc(E.upgradeText)}</a>` : '')}</small></div>
+      <div class="d-flex justify-content-start align-items-center pe-1"><i class="${MY.seen.has(l.id) ? 'text-mid-purple ' + lessonIcon(l).replace('-fill', '') : 'text-primary ' + lessonIcon(l)} h5 my-0 me-2"></i></div>
+      <div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(l.name)}${l.is_freemium ? ' <small class="ms-1 scheme-badge badge-freemium"><span class="badge bg-success">Free</span></small>' : ''}</h5><span class="w-100 text-mid-purple fw-light">${esc(l.description || '')}</span></div>
+      <div class="d-none d-md-flex flex-shrink-0 align-items-center"><small class="ms-3 d-flex flex-wrap justify-content-end text-muted text-mid-purple fw-light">${meta}</small></div>
     </div></div></div>
     <div class="list-group-item px-1 px-md-3"><div class="d-none d-md-flex flex-column h-100 justify-content-around align-items-center"><div>
       <div class="${l.description ? 'mb-1' : ''}"><div class="lesson-icon cursor-pointer mark-as-complete" data-done-for="${l.id}" data-done-kind="icon"><i class="bi-circle text-mid-purple"></i></div></div>
       <div><div class="lesson-icon cursor-pointer add-to-favourites" data-fav-for="${l.id}" data-fav-kind="icon"><i class="bi-star text-mid-purple"></i></div></div>
-    </div><div><div class="btn-outline-primary curriculum-btn" title="Add to Curriculum" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus"></i></div></div></div></div>
+    </div>${viewable ? `<div><div class="btn-outline-primary curriculum-btn" title="Add to Curriculum" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus"></i></div></div>` : ''}</div></div>
   </div>
   <div class="lesson-drawer collapse-smooth closed" data-lesson-body="${l.id}"><div></div></div>`;
 }
 function bindLessonRows(sc) {
+  // scheme-card.blade.php: a lesson the user cannot access links to the subscribe options page.
+  app.querySelectorAll('.lesson-x.content-restricted .lesson-row').forEach(row => row.addEventListener('click', e => { if (!e.target.closest('a, .lesson-icon')) location.hash = upgradeHref(); }));
   app.querySelectorAll('.lesson-x:not(.content-restricted) .lesson-row').forEach(row => row.addEventListener('click', async e => {
     if (e.target.closest('a, .lesson-icon')) return;
     const x = row.closest('.lesson-x'), drawer = x.nextElementSibling, wasOpen = !drawer.classList.contains('closed');
@@ -1041,9 +1124,11 @@ async function pageLesson(id, scId) {
   const scheme = D.schemeById[l.scheme_id];
   const sc = D.subcatById[scId] || (scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]]);
   const subject = sc && D.subjectById[sc.subject_id], sg = sc && D.subgroupById[sc.subgroup_id];
+  if (sc && !subject) { app.innerHTML = '<div class="notice">You do not have access to this page.</div>'; return; }   // LessonController: 403 when the category's subject is out of scope
   setBg(l.background_image_url || sc?.background_image_url || subject?.background_image_url);
   const seq = scheme ? schemeLessons(scheme) : [l];
-  const pos = seq.findIndex(x => x.id === l.id), prev = seq[pos - 1], next = seq[pos + 1];
+  // Lesson::previousLesson / nextLesson: by order among the scheme's lessons, age filter applied.
+  const next = seq.find(x => x.order > l.order), prev = [...seq].reverse().find(x => x.order < l.order);
   const label = sc ? noun(sc, 1) : 'lesson', Label = label.charAt(0).toUpperCase() + label.slice(1), Labels = (sc ? noun(sc, 2) : 'lessons').replace(/^./, c => c.toUpperCase());
   let html = crumbs([subject && { name: subject.name, href: `#/subject/${subject.id}` }, sg && { name: sg.name, href: `#/subject/${subject?.id}` }, sc && { name: sc.name, href: subcatHref(sc) }, scheme && { name: scheme.name }].filter(Boolean));
   html += `<div class="row"><div class="col-12 order-2 col-lg-9 order-lg-1"><div class="row"><div class="col-sm">
@@ -1180,7 +1265,7 @@ async function pageFavourites() {
   let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
     <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
   if (!ids.length) { app.innerHTML = html + NO_FAVOURITES; reveal(); return; }
-  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration,subject_ids&order=name`);
+  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&is_live=eq.true&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration,subject_ids&order=name`);
   app.innerHTML = html + resultPanels(lessons, true); reveal();
 }
 
@@ -1289,7 +1374,8 @@ async function pageSearch(q) {
   app.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
   const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration,subject_ids&order=name&limit=500`);
-  const live = rows.filter(l => D.lessonById[l.id] && D.schemeById[l.scheme_id] && canAccessLesson(l));
+  // ResultsController::search: the age filter applies (FilterScope, no subject in the URL); the policy check ignores age rights.
+  const live = rows.filter(l => D.lessonById[l.id] && D.schemeById[l.scheme_id] && passesAgeFilter(l, null) && canAccessLesson(l, false));
   logSearch(q.trim(), live.length);
   // show-favourites.blade.php without the favourites header: "No results found for your query."
   const none = `<div class="row"><div class="col-12"><div class="card shadow bg-light-purple border-primary mb-5"><h5 class="card-header bg-primary bg-gradient-primary text-white"></h5><div class="card-body pb-1"><div class="row"><div class="col-12"><div class="filtered-out-notice alert d-block alert-primary bg-extra-light-purple border-primary mb-4" role="alert"><p class="text-primary my-0 d-flex justify-content-between align-items-center"><span><span class="text-mid-purple ms-1">No results found for your query.</span></span></p></div></div></div></div></div></div></div>`;
