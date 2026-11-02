@@ -1363,13 +1363,14 @@ function docButton(d) {
 function renderDocs(l, docs) {
   if (!docs.length) return '';
   const plans = docs.filter(isPlanPart), others = docs.filter(p => !isPlanPart(p));
-  const row = (p, title) => { const d = docFile(p); return `<div class="doc-row" data-part="${p.id}">
-      <i class="text-primary ${docIcon(d)} h5 mb-0 doc-icon"></i>
-      <div class="doc-title">${esc(title)}</div>
-      ${docButton(d)}</div>`; };
-  return `<div class="lesson-docs mb-3">
-    ${plans.map(p => `<div class="doc-plan">${row(p, plans.length > 1 ? p.heading : 'Lesson plan')}</div>`).join('')}
-    ${others.length ? `<div class="doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div>${others.map(p => row(p, p.heading || 'Download')).join('')}</div>` : ''}
+  // v0.44.3: document rows use the parts rows' own markup (icon, h5 title, right-hand block),
+  // so the three blocks - lesson plan, Printables, parts - share one frame, row height and type.
+  const row = (p, title) => { const d = docFile(p); return `<div class="list-group-item px-3 doc-row" data-part="${p.id}">
+      <div class="row part-head"><div class="col d-flex align-items-center"><div class="d-flex justify-content-start align-items-center pe-1"><i class="text-primary ${docIcon(d)} h5 mt-2 me-2"></i></div><div class="d-flex flex-grow-1 flex-wrap align-items-center mt-2 mb-1"><h5 class="w-100 text-primary mb-0">${esc(title)}</h5></div><div class="d-flex flex-shrink-0 align-items-center ms-2">${docButton(d)}</div></div></div>
+    </div>`; };
+  return `<div class="lesson-docs">
+    ${plans.length ? `<div class="list-group lesson-block doc-plan">${plans.map(p => row(p, plans.length > 1 ? p.heading : 'Lesson plan')).join('')}</div>` : ''}
+    ${others.length ? `<div class="list-group lesson-block doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div>${others.map(p => row(p, p.heading || 'Download')).join('')}</div>` : ''}
   </div>`;
 }
 function renderParts(l, allParts, openFirst) {
@@ -1379,7 +1380,7 @@ function renderParts(l, allParts, openFirst) {
   const docs = allParts.filter(isDocPart), parts = allParts.filter(p => !isDocPart(p));
   const docsHtml = renderDocs(l, docs);
   if (!parts.length) return docsHtml;
-  return docsHtml + `<div class="accordion list-group shadow mt-0 mb-2" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
+  return docsHtml + `<div class="accordion list-group lesson-block lesson-parts mt-0" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
     const show = openFirst && i === 0;
     const info = p.additional_info && p.additional_info.trim();
     const infoHtml = info ? para(p.additional_info) : '';

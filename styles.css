@@ -163,16 +163,14 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .slide-player.is-full .slide-stage { flex: 1; padding-top: 0 !important; }
 .slide-player.is-full .slide-bar { flex: none; }
 
-/* lesson documents (v0.44.2): lesson plan card and Printables list above the parts accordion,
-   outside the "Part X of Y" sequence. One Open button per file; icons match the part icons. */
+/* lesson blocks (v0.44.3): the lesson plan, Printables and parts blocks share one frame -
+   2px purple border, the card radius, one shadow, purple row dividers - and document rows
+   reuse the parts rows' markup so heights, icons and titles line up. */
 .lesson-docs { display: flex; flex-direction: column; gap: .75rem; }
-.doc-row { display: flex; align-items: center; gap: .6rem; padding: .7rem 1rem; }
-.doc-icon { flex: 0 0 auto; }
-.doc-title { flex: 1 1 auto; min-width: 0; color: var(--purple); font-weight: 600; font-size: 1.25rem; line-height: 1.2; overflow-wrap: anywhere; }
-.doc-row .btn { flex: 0 0 auto; white-space: nowrap; }
-.doc-plan { background: var(--white); border: 2px solid var(--purple); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
-.doc-plan .doc-title { font-weight: 700; }
-.doc-printables { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; }
-.doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 700; padding: .55rem 1rem; }
-.doc-printables .doc-row + .doc-row, .doc-printables-head + .doc-row { border-top: 1px solid var(--xlight-purple); }
-.doc-printables .doc-title { font-size: 1.05rem; }
+.lesson-docs:not(:empty) { margin-bottom: .75rem; }
+.lesson-block { background: var(--white); border: 2px solid var(--purple); border-radius: var(--bs-card-border-radius, 5px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1); overflow: hidden; }
+.lesson-block > .list-group-item { border-left: 0; border-right: 0; border-top: 1px solid var(--xlight-purple); border-bottom: 0; }
+.lesson-block > .list-group-item:first-child, .doc-printables-head + .list-group-item { border-top: 0; }
+.doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 600; padding: .45rem 1rem; }
+.doc-row .part-head { cursor: default; }
+.doc-row .btn { white-space: nowrap; }
