@@ -1095,9 +1095,21 @@ function bindLessonRows(sc) {
     drawer.classList.remove('closed'); row.setAttribute('aria-expanded', 'true'); x.classList.add('open');
     const body = drawer.firstElementChild;
     if (!body.dataset.loaded) { body.innerHTML = '<div class="loading" style="padding:1rem">Loading…</div>'; await fillLessonBody(body, +drawer.dataset.lessonBody, sc); }
-    setTimeout(() => x.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
+    scrollToTop(x);
   }));
   bindActions(app);
+}
+// v0.45.5 (David): whatever has just been opened sits at the top of the window, just under the
+// sticky header. Scrolled once the content is in, and again when the drawer has finished
+// growing, so the row ends up at the top rather than wherever the layout was mid-animation.
+function scrollToTop(el) {
+  const go = () => {
+    const header = document.getElementById('header');
+    const top = el.getBoundingClientRect().top + window.scrollY - ((header ? header.offsetHeight : 0) + 8);
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+  requestAnimationFrame(go);
+  setTimeout(go, 380);   // after the .32s open transition
 }
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
@@ -1427,6 +1439,7 @@ function bindParts(root) {
     item.closest('.accordion').querySelectorAll('.part-head').forEach(x => x.setAttribute('aria-expanded', 'false'));
     if (wasOpen) return;
     body.classList.remove('closed'); h.setAttribute('aria-expanded', 'true');
+    scrollToTop(item);
   }));
 }
 
