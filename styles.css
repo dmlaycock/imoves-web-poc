@@ -199,12 +199,12 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 /* rows that expand or open (lesson rows on category pages, parts, documents): tint eases in,
    the leading icon nudges right, the whole row never jumps */
 .list-group-item-action, .lesson-part-item, .lesson-row { transition: background-color .15s ease-in-out, border-color .15s ease-in-out; }
-.list-group-item-action .lesson-icon i, .part-head > .col > div:first-child i, .lesson-row .lesson-icon:first-child i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
-.list-group-item-action:hover > .row > .col > div:first-child i, .lesson-part-item .part-head:hover > .col > div:first-child i { transform: translateX(2px); }
+.lesson-row > .row > .col > div:first-child i, .part-head > .col > div:first-child i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
+.lesson-row:hover > .row > .col > div:first-child i, .lesson-part-item .part-head:hover > .col > div:first-child i { transform: translateX(2px); }
 
 /* lesson row action icons (done, favourite, curriculum): grow slightly under the pointer */
-.lesson-icon.cursor-pointer i, [data-fav-for] i, [data-done-for] i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
-.lesson-icon.cursor-pointer:hover i, .btn[data-fav-for]:hover i { transform: scale(1.18); }
+.lesson-icon.cursor-pointer i, [data-fav-for] i, [data-done-for] i, .curriculum-btn i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
+.lesson-icon.cursor-pointer:hover i, .btn[data-fav-for]:hover i, .curriculum-btn:hover i { transform: scale(1.18); }
 .lesson-icon.cursor-pointer:active i { transform: scale(1); transition-duration: .06s; }
 
 /* panel chevrons (Main Homepage, subject groups, curriculum groups) turn instead of swapping glyphs */
