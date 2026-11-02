@@ -1184,6 +1184,63 @@ async function pageFavourites() {
   app.innerHTML = html + resultPanels(lessons, true); reveal();
 }
 
+// ---------- slide player (v0.39) ----------
+// Decks captured from Google Slides (slides-migration/capture.js, public.lesson_slides) play
+// here as images: previous/next, counter, keyboard, pen with colours, erase all, laser pointer,
+// full screen. Ink is kept per slide for the page's lifetime. Decks not yet captured keep the
+// Google iframe (the Slides case above).
+async function loadSlides() {
+  try { const rows = await rest('lesson_slides?select=google_slide_id,slide_count,width,height,base_url&state=eq.ready', { all: true }); D.slides = new Map(rows.map(r => [r.google_slide_id, r])); }
+  catch (e) { D.slides = new Map(); }
+}
+const PEN_COLOURS = [['#d93025', 'Red'], ['#1a73e8', 'Blue'], ['#188038', 'Green'], ['#f9ab00', 'Yellow'], ['#202124', 'Black']];
+function slidePlayer(deck) {
+  const ratio = deck.width && deck.height ? (deck.height / deck.width * 100).toFixed(3) : '56.25';
+  return `<div class="slide-player" data-deck="${esc(deck.google_slide_id)}" data-count="${deck.slide_count}" data-base="${esc(deck.base_url)}" tabindex="0" aria-label="Slideshow">
+    <div class="slide-stage" style="padding-top:${ratio}%"><img class="slide-img" src="${esc(deck.base_url)}/1.png" alt="Slide 1" draggable="false"><canvas class="slide-ink"></canvas><div class="slide-laser"></div></div>
+    <div class="slide-bar">
+      <button type="button" class="sp-btn" data-sp="prev" title="Previous slide (Left)"><i class="bi-chevron-left"></i></button>
+      <span class="sp-counter"><span class="sp-n">1</span> / ${deck.slide_count}</span>
+      <button type="button" class="sp-btn" data-sp="next" title="Next slide (Right)"><i class="bi-chevron-right"></i></button>
+      <span class="sp-gap"></span>
+      <button type="button" class="sp-btn" data-sp="pen" title="Pen (P)"><i class="bi-pencil-fill"></i></button>
+      <span class="sp-colours">${PEN_COLOURS.map(([c, n], i) => `<button type="button" class="sp-colour ${i === 0 ? 'active' : ''}" data-colour="${c}" style="background:${c}" title="${n}" aria-label="${n} pen"></button>`).join('')}</span>
+      <button type="button" class="sp-btn" data-sp="erase" title="Erase all on this slide (Shift+A)"><i class="bi-eraser-fill"></i></button>
+      <button type="button" class="sp-btn" data-sp="laser" title="Laser pointer (L)"><i class="bi-record-circle"></i></button>
+      <span class="sp-gap"></span>
+      <button type="button" class="sp-btn" data-sp="full" title="Full screen (F)"><i class="bi-arrows-fullscreen"></i></button>
+    </div></div>`;
+}
+function bindSlidePlayers(root) {
+  root.querySelectorAll('.slide-player').forEach(sp => {
+    if (sp.dataset.bound) return; sp.dataset.bound = '1';
+    const count = +sp.dataset.count, base = sp.dataset.base, img = sp.querySelector('.slide-img'), canvas = sp.querySelector('.slide-ink'), ctx = canvas.getContext('2d'), laser = sp.querySelector('.slide-laser'), stage = sp.querySelector('.slide-stage');
+    const ink = new Map();   // slide index -> strokes [{c, w, pts:[[x,y]...]}] in 0..1 coordinates
+    let n = 1, pen = false, laserOn = false, colour = PEN_COLOURS[0][0], drawing = null;
+    const fit = () => { const r = stage.getBoundingClientRect(); canvas.width = Math.round(r.width * devicePixelRatio); canvas.height = Math.round(r.height * devicePixelRatio); redraw(); };
+    const redraw = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); for (const s of ink.get(n) || []) stroke(s); };
+    const stroke = s => { if (s.pts.length < 1) return; ctx.strokeStyle = s.c; ctx.lineWidth = s.w * canvas.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); s.pts.forEach(([x, y], i) => i ? ctx.lineTo(x * canvas.width, y * canvas.height) : ctx.moveTo(x * canvas.width, y * canvas.height)); if (s.pts.length === 1) ctx.lineTo(s.pts[0][0] * canvas.width + 0.1, s.pts[0][1] * canvas.height); ctx.stroke(); };
+    const go = k => { if (k < 1 || k > count) return; n = k; img.src = `${base}/${n}.png`; img.alt = `Slide ${n}`; sp.querySelector('.sp-n').textContent = n; redraw(); const pre = new Image(); if (n < count) pre.src = `${base}/${n + 1}.png`; };
+    const pos = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
+    const setPen = v => { pen = v; sp.classList.toggle('pen-on', pen); sp.querySelector('[data-sp="pen"]').classList.toggle('active', pen); if (pen) setLaser(false); };
+    const setLaser = v => { laserOn = v; sp.classList.toggle('laser-on', laserOn); sp.querySelector('[data-sp="laser"]').classList.toggle('active', laserOn); laser.style.display = laserOn ? '' : 'none'; if (laserOn) setPen(false); };
+    sp.querySelectorAll('[data-sp]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const k = b.dataset.sp;
+      if (k === 'prev') go(n - 1); else if (k === 'next') go(n + 1); else if (k === 'pen') setPen(!pen); else if (k === 'laser') setLaser(!laserOn);
+      else if (k === 'erase') { ink.delete(n); redraw(); }
+      else if (k === 'full') { if (document.fullscreenElement === sp) document.exitFullscreen(); else (sp.requestFullscreen ? sp.requestFullscreen() : sp.webkitRequestFullscreen && sp.webkitRequestFullscreen()); }
+      sp.focus(); }));
+    sp.querySelectorAll('.sp-colour').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); colour = b.dataset.colour; sp.querySelectorAll('.sp-colour').forEach(x => x.classList.toggle('active', x === b)); setPen(true); sp.focus(); }));
+    stage.addEventListener('pointerdown', e => { if (!pen) return; e.preventDefault(); stage.setPointerCapture(e.pointerId); drawing = { c: colour, w: 0.004, pts: [pos(e)] }; (ink.get(n) || ink.set(n, []).get(n)).push(drawing); redraw(); });
+    stage.addEventListener('pointermove', e => { if (laserOn) { const r = stage.getBoundingClientRect(); laser.style.left = (e.clientX - r.left) + 'px'; laser.style.top = (e.clientY - r.top) + 'px'; } if (drawing) { drawing.pts.push(pos(e)); redraw(); } });
+    const up = () => { drawing = null; }; stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+    stage.addEventListener('click', e => { if (pen || laserOn) return; const r = stage.getBoundingClientRect(); go((e.clientX - r.left) / r.width < 0.3 ? n - 1 : n + 1); });
+    let tx = null; stage.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true }); stage.addEventListener('touchend', e => { if (tx == null || pen) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 40) go(dx < 0 ? n + 1 : n - 1); tx = null; });
+    sp.addEventListener('keydown', e => { const k = e.key; if (k === 'ArrowRight' || k === ' ' || k === 'PageDown') { e.preventDefault(); go(n + 1); } else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); go(n - 1); } else if (k === 'Home') go(1); else if (k === 'End') go(count); else if (k === 'p' || k === 'P') setPen(!pen); else if (k === 'l' || k === 'L') setLaser(!laserOn); else if (k === 'A' && e.shiftKey) { ink.delete(n); redraw(); } else if (k === 'f' || k === 'F') sp.querySelector('[data-sp="full"]').click(); });
+    document.addEventListener('fullscreenchange', () => { sp.classList.toggle('is-full', document.fullscreenElement === sp); setTimeout(fit, 50); });
+    new ResizeObserver(fit).observe(stage); fit();
+  });
+}
+
 // Lesson parts accordion (lessons/lesson-part.blade.php + the per-type cards). One open at a time.
 function renderParts(l, parts, openFirst) {
   if (!parts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
@@ -1196,7 +1253,11 @@ function renderParts(l, parts, openFirst) {
       case 'Video': card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start ms-1 me-3 mb-3 mb-md-0">${p.wistia_id ? wistia(p.wistia_id) : '<div class="notice">No video id on this part.</div>'}</div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
       case 'Audio': card = `<div class="media d-block align-items-center"><div class="img-thumbnail shadow-sm img-fluid w-100 px-2 ${info ? 'mb-4' : ''}"><audio controls controlsList="nodownload" style="width:100%;" class="mt-2" preload="none"><source src="${esc(p.s3_url)}" type="audio/mpeg"></audio></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
       case 'Download': card = `<div class="media d-block align-items-center"><div class="border border-primary bg-light-purple rounded p-2 ${info ? 'mb-4' : ''}"><a href="${esc(p.s3_url)}" download class="btn btn-primary" target="_blank" rel="noopener"><i class="bi-cloud-download me-2"></i>${esc(p.download_button || 'Download File')}</a><span class="ms-3 text-primary">${esc(p.download_info || 'Save and open this file to complete this part of the lesson.')}</span></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
-      case 'Slides': card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2"><div class="slideshow-container" style="position: relative; width: 100%; min-height: ${info ? '280px' : '560px'};"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" frameborder="0" allowfullscreen style="width: 100%; height: 100%; position:absolute; inset:0;" title="Slides"></iframe></div><small class="d-block text-mid-purple fw-light mt-2">Click the dots (<i class="text-primary bi-three-dots-vertical"></i>) to play in full-screen.</small></div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
+      case 'Slides': {
+        const deck = D.slides && D.slides.get(p.google_slide_id);
+        const show = deck ? slidePlayer(deck) : `<div class="slideshow-container" style="position: relative; width: 100%; min-height: ${info ? '280px' : '560px'};"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" frameborder="0" allowfullscreen style="width: 100%; height: 100%; position:absolute; inset:0;" title="Slides"></iframe></div><small class="d-block text-mid-purple fw-light mt-2">Click the dots (<i class="text-primary bi-three-dots-vertical"></i>) to play in full-screen.</small>`;
+        card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2">${show}</div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
+      }
       case 'Image': card = `<div class="media d-block d-md-flex align-items-center"><img src="${esc(p.s3_url)}" alt="${esc(p.heading || '')}" class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2" loading="lazy"><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
       default: card = infoHtml || '<p class="card-text text-mid-purple fw-light mb-1">No content.</p>';
     }
@@ -1208,8 +1269,9 @@ function renderParts(l, parts, openFirst) {
   }).join('') + `</div>`;
 }
 function bindParts(root) {
+  bindSlidePlayers(root);
   root.querySelectorAll('.lesson-part-item .part-head').forEach(h => h.addEventListener('click', e => {
-    if (e.target.closest('a, audio, iframe, button')) return;
+    if (e.target.closest('a, audio, iframe, button, .slide-player')) return;
     const item = h.closest('.lesson-part-item'), body = item.querySelector('.part-body'), wasOpen = !body.classList.contains('closed');
     item.closest('.accordion').querySelectorAll('.part-body').forEach(b => b.classList.add('closed'));
     item.closest('.accordion').querySelectorAll('.part-head').forEach(x => x.setAttribute('aria-expanded', 'false'));
@@ -1243,7 +1305,7 @@ async function startApp() {
   try {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
     initEntitlements();
-    await Promise.all([loadTree(), loadMyLessons()]);
+    await Promise.all([loadTree(), loadMyLessons(), loadSlides()]);
     renderSubjectBar();
     renderUserContext();
     renderUserMenu();

@@ -140,3 +140,25 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 /* v0.31 drag-to-reorder (SortableJS ghost look) */
 .dnd-ghost { opacity: 0.4; }
 #cur-tabs .nav-item.handle { cursor: grab; }
+
+/* v0.39 slide player (replaces the Google Slides iframe for captured decks) */
+.slide-player { position: relative; background: #111; border-radius: 4px; outline: none; user-select: none; }
+.slide-player:focus-visible { box-shadow: 0 0 0 3px rgba(115, 48, 136, .5); }
+.slide-stage { position: relative; width: 100%; background: #000; overflow: hidden; cursor: pointer; }
+.slide-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+.slide-ink { position: absolute; inset: 0; width: 100%; height: 100%; }
+.slide-player.pen-on .slide-stage { cursor: crosshair; }
+.slide-player.laser-on .slide-stage { cursor: none; }
+.slide-laser { display: none; position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: rgba(255, 0, 0, .85); box-shadow: 0 0 12px 4px rgba(255, 0, 0, .55); pointer-events: none; }
+.slide-bar { display: flex; align-items: center; gap: 4px; padding: 6px 8px; background: #212529; color: #fff; flex-wrap: wrap; }
+.slide-bar .sp-gap { flex: 1; }
+.slide-bar .sp-counter { min-width: 64px; text-align: center; font-size: .9rem; }
+.sp-btn { background: transparent; border: 0; color: #fff; width: 34px; height: 34px; border-radius: 4px; font-size: 1.05rem; line-height: 1; }
+.sp-btn:hover { background: rgba(255, 255, 255, .12); }
+.sp-btn.active { background: #733088; }
+.sp-colours { display: inline-flex; gap: 4px; margin: 0 4px; }
+.sp-colour { width: 20px; height: 20px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+.sp-colour.active { border-color: #fff; }
+.slide-player.is-full { display: flex; flex-direction: column; width: 100vw; height: 100vh; border-radius: 0; }
+.slide-player.is-full .slide-stage { flex: 1; padding-top: 0 !important; }
+.slide-player.is-full .slide-bar { flex: none; }
