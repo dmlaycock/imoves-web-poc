@@ -172,5 +172,5 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .lesson-block > .list-group-item { border-left: 0; border-right: 0; border-top: 1px solid var(--xlight-purple); border-bottom: 0; }
 .lesson-block > .list-group-item:first-child, .doc-printables-head + .list-group-item { border-top: 0; }
 .doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 600; padding: .45rem 1rem; }
-.doc-row .part-head { cursor: default; }
+.doc-row .part-head { cursor: default; min-height: 4.3rem; }   /* = a parts row (duration + Part x of y lines) */
 .doc-row .btn { white-space: nowrap; }
