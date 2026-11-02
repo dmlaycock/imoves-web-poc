@@ -1342,7 +1342,7 @@ function bindSlidePlayers(root) {
 // Files come from the R2 copies (files-migration/copy.js, public.lesson_files) under readable
 // names; a part not yet copied falls back to its original file.
 const isDocPart = p => p.media_type === 'Download';
-const isPlanPart = p => /lesson\s*plans?\b/i.test(p.heading || '');
+const isPlanPart = p => /\b(lesson|session)\s*plans?\b/i.test(p.heading || '');
 async function lessonParts(lessonId) {
   const q = `lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index`;
   try { return await rest(`${q}&select=*,lesson_files(url,filename,bytes,pages,content_type)`); }
