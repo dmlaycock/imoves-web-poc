@@ -171,6 +171,70 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .lesson-block { background: var(--white); border: 2px solid var(--purple); border-radius: var(--bs-card-border-radius, 5px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1); overflow: hidden; }
 .lesson-block > .list-group-item { border-left: 0; border-right: 0; border-top: 1px solid var(--xlight-purple); border-bottom: 0; }
 .lesson-block > .list-group-item:first-child, .doc-printables-head + .list-group-item { border-top: 0; }
-.doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 600; padding: .45rem 1rem; }
-.doc-row .part-head { cursor: default; min-height: 4.3rem; }   /* = a parts row (duration + Part x of y lines) */
+.doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 600; font-size: .95rem; padding: .5rem 1rem; display: flex; align-items: center; }
+.doc-row .part-head { cursor: default; }
+@media (min-width: 768px) { .doc-row .part-head { min-height: 4.3rem; } }   /* = a parts row with its duration and Part x of y lines (md up; below md those lines are hidden) */
 .doc-row .btn { white-space: nowrap; }
+
+/* ---------- v0.45 polish pass (2-3 Nov 2026) ----------
+   No wording or structure changes. One consistent set of touches for everything clickable,
+   matched to the lift the live site already gives its resource cards (.lift: -3px, .25s):
+   buttons lift 1px and press down; rows tint and their icon nudges; subject and nav buttons
+   lift; links and icons ease their colour; chevrons turn. All off under reduce-motion
+   (global rule at the top). Line thickness and dividers unified on the purple tint. */
+:root { --fx: .18s var(--ease); --lift-shadow: 0 .5rem 1rem rgba(0,0,0,.15); }
+
+/* buttons: every .btn except close crosses, slide-player controls and disabled ones */
+.btn:not(.btn-close):not(.sp-btn):not(.sp-colour) { transition: transform var(--fx), box-shadow var(--fx), background-color .15s ease-in-out, border-color .15s ease-in-out, color .15s ease-in-out; }
+.btn:not(.btn-close):not(.sp-btn):not(.sp-colour):not(:disabled):not(.disabled):hover { transform: translateY(-1px); box-shadow: var(--lift-shadow) !important; }
+.btn:not(.btn-close):not(.sp-btn):not(.sp-colour):not(:disabled):not(.disabled):active { transform: translateY(0) scale(.98); box-shadow: 0 .125rem .25rem rgba(0,0,0,.1) !important; transition-duration: .06s; }
+
+/* subject bar and header nav buttons */
+#scrollable-navbar .subject-button { transition: transform var(--fx), box-shadow var(--fx), filter var(--fx); }
+#scrollable-navbar .subject-button:hover { transform: translateY(-1px); box-shadow: 0 .35rem .8rem rgba(0,0,0,.2); filter: brightness(1.06); }
+#scrollable-navbar .subject-button:active { transform: translateY(0); filter: brightness(.97); transition-duration: .06s; }
+.navbar-subjects .scroll-button { transition: opacity var(--fx); }
+.navbar-subjects .scroll-button:hover i { opacity: .9; }
+
+/* rows that expand or open (lesson rows on category pages, parts, documents): tint eases in,
+   the leading icon nudges right, the whole row never jumps */
+.list-group-item-action, .lesson-part-item, .lesson-row { transition: background-color .15s ease-in-out, border-color .15s ease-in-out; }
+.list-group-item-action .lesson-icon i, .part-head > .col > div:first-child i, .lesson-row .lesson-icon:first-child i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
+.list-group-item-action:hover > .row > .col > div:first-child i, .lesson-part-item .part-head:hover > .col > div:first-child i { transform: translateX(2px); }
+
+/* lesson row action icons (done, favourite, curriculum): grow slightly under the pointer */
+.lesson-icon.cursor-pointer i, [data-fav-for] i, [data-done-for] i { transition: transform var(--fx), color .15s ease-in-out; display: inline-block; }
+.lesson-icon.cursor-pointer:hover i, .btn[data-fav-for]:hover i { transform: scale(1.18); }
+.lesson-icon.cursor-pointer:active i { transform: scale(1); transition-duration: .06s; }
+
+/* panel chevrons (Main Homepage, subject groups, curriculum groups) turn instead of swapping glyphs */
+.subgroup-collapse { transition: transform var(--fx); }
+.subgroup-collapse::after, .subgroup-collapse.collapsed::after { content: "\25BC"; display: inline-block; transition: transform .25s var(--ease); }
+.subgroup-collapse.collapsed::after { transform: rotate(90deg); }   /* points left, as the live glyph does */
+
+/* links: colour and underline ease rather than snap; breadcrumb and footer included */
+a { transition: color .15s ease-in-out, text-decoration-color .15s ease-in-out; }
+.breadcrumb-item a:hover, footer a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* cards the live site lifts (.lift) keep that; cards without it that are links get the same */
+a > .card.subcategory-card:not(.lift) { transition: box-shadow .25s ease, transform .25s ease; }
+a > .card.subcategory-card:not(.lift):hover { transform: translate3d(0, -3px, 0); }
+.card.subcategory-card .card-img-top { transition: transform .35s var(--ease); }
+.card.subcategory-card { overflow: hidden; }
+.lift:hover .card-img-top, a > .card.subcategory-card:hover .card-img-top { transform: scale(1.03); }
+
+/* dividers and borders on one tint: 1px xlight-purple between rows, purple frames around blocks */
+.scheme-card .list-group-item, .card .list-group-flush > .list-group-item { border-color: var(--xlight-purple); }
+
+/* images: lazy thumbnails fade in once loaded instead of popping (class set by app.js) */
+img.fx-wait { opacity: 0; }
+img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
+
+/* phone: the Thumb-o-meter row keeps its link on one line, centred under the button */
+@media (max-width: 991.98px) {
+  #past-readings { white-space: nowrap; }
+  .d-lg-none.px-2.mb-3.row > .col:has(#past-readings) { justify-content: center; }
+}
+
+/* form controls: a soft purple focus ring everywhere, matching the sign-in fields */
+.form-control:focus, .form-select:focus { border-color: var(--mid-purple); box-shadow: 0 0 0 .2rem rgba(115, 48, 136, .15); }

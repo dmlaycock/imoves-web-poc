@@ -1282,6 +1282,19 @@ async function pageFavourites() {
 // here as images: previous/next, counter, keyboard, pen with colours, erase all, laser pointer,
 // full screen. Ink is kept per slide for the page's lifetime. Decks not yet captured keep the
 // Google iframe (the Slides case above).
+// v0.45: images that are still loading when they reach the page fade in once they arrive
+// (cached ones show at once). Covers every page render through one observer on #app.
+function watchImages() {
+  const seen = img => {
+    if (img.dataset.fx) return; img.dataset.fx = '1';
+    if (img.complete && img.naturalWidth) return;
+    img.classList.add('fx-wait');
+    const show = () => { img.classList.remove('fx-wait'); img.classList.add('fx-in'); };
+    img.addEventListener('load', show, { once: true }); img.addEventListener('error', show, { once: true });
+  };
+  app.querySelectorAll('img').forEach(seen);
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType !== 1) return; if (n.tagName === 'IMG') seen(n); else n.querySelectorAll && n.querySelectorAll('img').forEach(seen); }))).observe(app, { childList: true, subtree: true });
+}
 async function loadSlides() {
   try { const rows = await rest('lesson_slides?select=google_slide_id,slide_count,width,height,base_url&state=eq.ready', { all: true }); D.slides = new Map(rows.map(r => [r.google_slide_id, r])); }
   catch (e) { D.slides = new Map(); }
@@ -1443,6 +1456,7 @@ async function startApp() {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
     initEntitlements();
     await Promise.all([loadTree(), loadMyLessons(), loadSlides()]);
+    watchImages();   // v0.45: lazy images fade in
     renderSubjectBar();
     renderUserContext();
     renderUserMenu();
