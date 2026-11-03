@@ -355,7 +355,7 @@ async function route() {
     if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null, qs.part ? +qs.part : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
-    if (p[0] === 'browse') { if (browseTreeOn()) { BT.pendingOpen = qs.s ? { s: +qs.s, g: +qs.g || null, c: +qs.c || null, k: +qs.k || null, l: +qs.l || null } : {}; location.replace(location.pathname + location.search + '#/'); return; } history.replaceState(null, '', location.pathname + location.search + '#/'); openBrowse(); return; }
+    if (p[0] === 'browse') { BT.pendingOpen = qs.s ? { s: +qs.s, g: +qs.g || null, c: +qs.c || null, k: +qs.k || null, l: +qs.l || null } : {}; location.replace(location.pathname + location.search + '#/'); return; }
     if (p[0] === 'favourites') return pageFavourites();
     if (p[0] === 'curriculum') return pageCurriculum();
     if (p[0] === 'profile') return pageProfile();
@@ -414,9 +414,7 @@ function renderMobileDrawer(menuHtml) {
   const ctx = document.getElementById('userctx'); document.getElementById('m-drawer-ctx').innerHTML = ctx ? ctx.innerHTML : '';
   document.getElementById('m-drawer-ctx').querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
   document.getElementById('m-browse').classList.toggle('hidden', !E.showBrowseMenu);
-  const sw = document.getElementById('m-browse-switch'); if (sw) { sw.classList.toggle('hidden', !E.showBrowseMenu); sw.querySelector('input').checked = browseTreeOn(); }
   if (d.dataset.bound) return; d.dataset.bound = '1';
-  if (sw) sw.querySelector('input').addEventListener('change', e => { setBrowseTree(e.target.checked); closeBrowseTree(); });
   document.getElementById('m-burger').addEventListener('click', openMobileDrawer);
   document.getElementById('m-drawer-close').addEventListener('click', closeMobileDrawer);
   document.getElementById('m-drawer-backdrop').addEventListener('click', closeMobileDrawer);
@@ -476,48 +474,13 @@ function renderUserMenu() {
 }
 
 // Browse modal: nav/partials/browser.blade.php + subject-group-panels.blade.php.
+// v0.62 (David, 3 Nov, 18:38): the old Browse pop-up (browser.blade.php tabs and panes) is gone;
+// the Browse button opens the columns panel (openBrowseTree). Only the button's visibility remains here.
 function renderBrowse() {
-  const subjects = D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
-  const tabs = [], panes = [];
-  subjects.forEach((s, i) => {
-    // NavComposer ignores the age filter; subject-group-panels.blade.php checks the group's policy but lists every category.
-    const sgs = subjectSubgroups(s.id).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
-    const on = tabs.length === 0 ? ' active' : '';
-    tabs.push(`<a class="list-group-item list-group-item-action cursor-pointer text-truncate${on}" data-pane="${s.id}" role="tab"><i class="${esc(cleanIcon(s.icon) || 'bi-flag')} text-primary me-2 d-none d-sm-inline"></i> ${esc(s.name)}</a>`);
-    panes.push(`<div class="tab-pane py-4 px-3${on}" data-pane="${s.id}" role="tabpanel">
-      <div class="row"><div class="col-12 title"><a class="h4 text-primary" href="#/subject/${s.id}">${esc(s.name)}</a><button type="button" class="btn-close float-end text-primary" data-close aria-label="Close"></button><hr class="mt-2"></div></div>
-      <div class="card-columns subject-subgroup-columns">` + sgs.map(({ sg, subcats }) =>
-        `<div class="card w-100 d-inline-block bg-transparent border-0 my-2"><div class="card-body p-0"><ul class="list-unstyled"><li class="h6 text-primary"><a class="text-primary" href="#/subject/${s.id}">${esc(sg.name)}</a></li>` +
-        subcats.map(sc => `<li class="mb-1"><a class="text-mid-purple fw-light" href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('') + `</ul></div></div>`).join('') + `</div></div>`);
-  });
-  document.getElementById('browse-tabs').innerHTML = tabs.join('');
-  document.getElementById('browse-panes').innerHTML = panes.join('');
-  // Below sm: the accordion (browser.blade.php "row d-sm-none" + subject-group-panels.blade.php)
-  let first = true;
-  document.getElementById('browse-mobile').innerHTML = subjects.map(s => {
-    const sgs = subjectSubgroups(s.id).filter(canView).map(sg => ({ sg, subcats: subgroupSubcats(sg, false) }));
-    const open = first; first = false;
-    return `<li class="mb-1"><button type="button" class="text-primary w-100 btn btn-toggle d-inline-flex align-items-center rounded border-0" data-collapse="subject-${s.id}-collapse" aria-expanded="${open}">${esc(s.name)}</button>
-      <div class="collapse ${open ? 'show' : ''} mt-2" id="subject-${s.id}-collapse"><ul class="d-sm-none btn-toggle-nav list-unstyled fw-normal pb-1 small">` + sgs.map(({ sg, subcats }) =>
-        `<li class="h6 text-primary"><a class="text-primary btn-toggle d-inline-flex" href="#" data-collapse="subgroup-${sg.id}-collapse" aria-expanded="false">${esc(sg.name)}</a><ul class="list-unstyled ms-3 mt-2 collapse" id="subgroup-${sg.id}-collapse">` +
-        subcats.map(sc => `<li class="mb-1"><a class="text-mid-purple fw-light" href="${subcatHref(sc)}">${esc(sc.name)}</a></li>`).join('') + `</ul></li>`).join('') + `</ul></div></li>`;
-  }).join('');
-  const modal = document.getElementById('subject-browse-modal');
-  modal.querySelectorAll('#browse-mobile [data-collapse]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); const t = document.getElementById(b.dataset.collapse); const on = !t.classList.contains('show'); t.classList.toggle('show', on); b.setAttribute('aria-expanded', on); }));
-  modal.querySelectorAll('#browse-mobile a[href^="#/"]').forEach(a => a.addEventListener('click', closeBrowse));
-  modal.querySelectorAll('#browse-tabs a').forEach(a => a.addEventListener('click', () => {
-    modal.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === a.dataset.pane));
-  }));
-  modal.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeBrowse));
-  modal.querySelectorAll('#browse-panes a[href]').forEach(a => a.addEventListener('click', closeBrowse));
-  if (!modal.dataset.bound) {
-    modal.dataset.bound = '1';
-    modal.addEventListener('click', e => { if (e.target === modal) closeBrowse(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeBrowse(); hideModal('search-modal'); } });
-    document.getElementById('browsebtn').addEventListener('click', openBrowse);
-  }
+  const btn = document.getElementById('browsebtn');
+  if (btn && !btn.dataset.bound) { btn.dataset.bound = '1'; btn.addEventListener('click', openBrowse); document.addEventListener('keydown', e => { if (e.key === 'Escape') hideModal('search-modal'); }); }
   document.getElementById('browsebtnwrap').classList.toggle('hidden', !E.showBrowseMenu);
-  document.getElementById('browsebtn').classList.toggle('hidden', !E.showBrowseMenu);
+  if (btn) btn.classList.toggle('hidden', !E.showBrowseMenu);
 }
 // Modals (live: Bootstrap). One small helper here instead of the Bootstrap JS bundle.
 function showModal(id) {
@@ -554,15 +517,7 @@ function bindSubjectScroll() {
   };
   nav.addEventListener('scroll', upd); window.addEventListener('resize', upd); upd();
 }
-function openBrowse() {
-  if (browseTreeOn()) { openBrowseTree(); return; }   // v0.60/0.61: the tree pop-over
-  const m = document.getElementById('subject-browse-modal');
-  const cur = (location.hash.match(/^#\/subject\/(\d+)/) || [])[1];
-  if (cur) m.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === cur));
-  if (!m.querySelector('#browse-tabs a.active')) { const f = m.querySelector('#browse-tabs a'); if (f) f.click(); }
-  showModal('subject-browse-modal');
-}
-function closeBrowse() { hideModal('subject-browse-modal'); }
+function openBrowse() { openBrowseTree(); }
 function cleanIcon(i) { if (!i) return ''; const m = i.match(/class="([^"]+)"/); return (m ? m[1] : i).trim(); }
 
 function pageHome() {
@@ -1649,10 +1604,8 @@ async function startApp() {
 // to two or three categories simply appears under each (nothing is duplicated underneath: a
 // lesson has one scheme, a part one lesson). The structure is never thinned by the age filter;
 // lessons outside the filter are shown greyed, with a notice and counts, so it is obvious what is
-// hidden and why. Switched on and off in the menu drawer ("New Browse"); off restores the pop-up.
+// hidden and why. From v0.62 it is the only Browse (the old pop-up is removed).
 const BT = { cols: [], parts: new Map(), bound: false };
-function browseTreeOn() { try { return localStorage.getItem('imoves.browseTree') !== '0'; } catch (e) { return true; } }
-function setBrowseTree(on) { try { localStorage.setItem('imoves.browseTree', on ? '1' : '0'); } catch (e) {} document.querySelectorAll('.bt-switch input').forEach(i => { i.checked = on; }); }
 function browseSubjects() {
   return D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
 }
