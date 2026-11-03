@@ -210,6 +210,10 @@ function fitHeaderButtons() {
   document.body.classList.remove('hdr-no-home', 'hdr-no-browse');
   const left = () => Math.max(logo.getBoundingClientRect().right, slogan && slogan.getClientRects().length ? slogan.getBoundingClientRect().right : 0);
   const clash = () => tools.getBoundingClientRect().left < left() + 12;
+  // v0.59 (David, 3 Nov): an active age filter chip sits left of the search icon from 768px when
+  // there is room; it is the first thing to leave the header (back to its place under the header).
+  placeAgeChip(window.innerWidth >= 768 && ageChipOn());
+  if (clash()) placeAgeChip(false);
   if (clash()) document.body.classList.add('hdr-no-home');
   if (clash()) document.body.classList.add('hdr-no-browse');
 }
@@ -220,8 +224,17 @@ function fitHeaderCtx() {
   hdr.classList.remove('ctx-no-class', 'ctx-no-school');
   if (window.innerWidth < 768) return;
   const clash = () => { const c = ctx.getBoundingClientRect(), t = tools.getBoundingClientRect(); return c.width > 0 && c.right > t.left - 16; };
+  if (clash() && document.body.classList.contains('chip-in-hdr')) placeAgeChip(false);   // the chip gives way before the names
   if (clash()) hdr.classList.add('ctx-no-class');
   if (clash()) hdr.classList.add('ctx-no-school');
+}
+function ageChipOn() { const w = document.getElementById('m-agechip-wrap'); return !!w && !w.classList.contains('hidden'); }
+function placeAgeChip(inHeader) {
+  const chip = document.getElementById('m-agechip'), wrap = document.getElementById('m-agechip-wrap'), sb = document.getElementById('searchbtn');
+  if (!chip || !wrap || !sb) return;
+  if (inHeader) { if (chip.nextElementSibling !== sb) sb.parentNode.insertBefore(chip, sb); }
+  else if (chip.parentNode !== wrap) wrap.appendChild(chip);
+  document.body.classList.toggle('chip-in-hdr', !!inHeader);
 }
 window.addEventListener('resize', () => { clearTimeout(fitHeaderCtx.t); fitHeaderCtx.t = setTimeout(fitHeaderCtx, 60); });
 function renderUserContext() {
@@ -431,6 +444,7 @@ function updateAgeChip() {
   const hf = document.getElementById('headerfilter'), on = !!src.value && !(hf && hf.classList.contains('hidden'));
   wrap.classList.toggle('hidden', !on);
   if (on) document.getElementById('m-agechip-text').textContent = src.options[src.selectedIndex].text;
+  fitHeaderCtx();
 }
 
 // Menu dropdown: nav/partials/user-info.blade.php. Items whose pages are not built yet still

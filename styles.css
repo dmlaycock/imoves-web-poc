@@ -493,3 +493,12 @@ body:not(.hdr-no-browse) .m-drawer-browse { display: none !important; }
 @media (min-width: 768px) {
   .main-nav > .container > .row { row-gap: .5rem; }
 }
+
+/* ---------- v0.59 (David, 3 Nov 2026): age filter chip in the header ----------
+   From 768px an active age filter sits left of the search icon while there is room (placeAgeChip,
+   app.js); it leaves first as the header narrows and returns to its place under the header.
+   Phones unchanged. In the header it reads as a light outline pill on the purple bar. */
+body.chip-in-hdr #m-agechip-wrap { display: none !important; }
+#search-toolbar .m-agechip { height: 44px; margin-right: .5rem; padding: 0 1rem; gap: .6rem; font-size: 1rem; font-weight: 500; white-space: nowrap; color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.55); box-shadow: none; transition: background var(--fx, .2s), border-color var(--fx, .2s); }
+#search-toolbar .m-agechip:hover, #search-toolbar .m-agechip:focus-visible { background: rgba(255,255,255,.22); border-color: #fff; }
+#search-toolbar .m-agechip i { font-size: .75rem; opacity: .9; }
