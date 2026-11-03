@@ -450,8 +450,25 @@ body.m-drawer-open { overflow: hidden; }
   .main-nav .navbar-actions > .collapse .details { justify-content: flex-start !important; text-align: left; }
   .main-nav .navbar-actions > div:last-child { grid-area: tools; justify-self: end; align-self: center; }
 }
-@media (min-width: 768px) {
-  .main-nav .navbar-actions > .collapse, .main-nav .navbar-actions > .collapse * { min-width: 0; }
-  .main-nav .navbar-actions > .collapse .details { flex-wrap: wrap; white-space: normal; column-gap: .4rem; }
+
+/* ---------- v0.55 (David, 3 Nov 2026) ----------
+   Header: the class name (and passcode badge) drop out first as the window narrows, then the
+   school name (classes set by fitHeaderCtx in app.js); when neither shows, the logo row and the
+   buttons centre on each other. Phones: smaller buttons, centred on the logo. */
+.main-nav .navbar-actions > .collapse .details { white-space: nowrap; }
+#header.ctx-no-class .ctx-classname, #header.ctx-no-class #passcodebadge { display: none !important; }
+#header.ctx-no-school .navbar-actions > .collapse { display: none !important; }
+@media (min-width: 768px) { #header.ctx-no-school .main-nav > .container > .row { grid-template-areas: "logo slogan tools"; align-items: center; } #header.ctx-no-school .nav-slogan { align-self: center; padding-bottom: 0; } }
+@media (max-width: 767.98px) {
+  .main-nav .navbar-actions .collapse { display: none !important; }
+  .main-nav > .container > .row { align-items: center; }
+  .main-nav .navbar-brand, .main-nav .navbar-actions { align-self: center; margin: 0 !important; }
+  #search-toolbar { align-items: center; }
+  #searchopen, .m-burger { width: 38px; height: 38px; }
+  .m-burger { gap: 4px; padding: 0 9px; }
+  #searchopen { font-size: 1rem; }
 }
-@media (min-width: 768px) and (max-width: 1279.98px) { .main-nav .navbar-actions > .collapse .details, .main-nav .navbar-actions > .collapse .heading-3 { font-size: 1.1rem !important; line-height: 1.25; } }   /* v0.54.1: school name fits beside the buttons */
+/* Document rows: the Open button covers its row (stretched link), so it must not move on hover -
+   a lift there shrank the link's cover to the button and back again (the flicker on 3 Nov). */
+.doc-row .btn.doc-open:hover, .doc-row .btn.doc-open:active { transform: none !important; box-shadow: none !important; }
+.doc-row:hover .btn.doc-open { background-color: var(--bs-btn-hover-bg, #622974); }

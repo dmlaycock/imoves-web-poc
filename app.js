@@ -200,10 +200,23 @@ function bindClearAge() {
 const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
 // The strip next to the logo (school and class name, as the live header), the orange
 // Upgrade button and the per-user sticky banner.
+// v0.55 (David, 3 Nov): as the window narrows the class name goes first, then the school name,
+// rather than either colliding with the header buttons. Measured, so any length of name works.
+function fitHeaderCtx() {
+  const hdr = document.getElementById('header'), ctx = document.getElementById('userctx'), tools = document.getElementById('search-toolbar');
+  if (!hdr || !ctx || !tools) return;
+  hdr.classList.remove('ctx-no-class', 'ctx-no-school');
+  if (window.innerWidth < 768) return;
+  const clash = () => { const c = ctx.getBoundingClientRect(), t = tools.getBoundingClientRect(); return c.width > 0 && c.right > t.left - 16; };
+  if (clash()) hdr.classList.add('ctx-no-class');
+  if (clash()) hdr.classList.add('ctx-no-school');
+}
+window.addEventListener('resize', () => { clearTimeout(fitHeaderCtx.t); fitHeaderCtx.t = setTimeout(fitHeaderCtx, 60); });
 function renderUserContext() {
   const m = Auth.me() || {};
   const ctx = document.getElementById('userctx');
-  if (ctx) ctx.innerHTML = esc(m.school_name || '') + ' <span class="text-light-purple">' + (m.class_name ? esc(m.class_name) : '<a class="text-light-purple text-decoration-none" href="#/profile">Enter your class name</a>') + '</span>';
+  if (ctx) ctx.innerHTML = '<span class="ctx-school">' + esc(m.school_name || '') + '</span> <span class="text-light-purple ctx-classname">' + (m.class_name ? esc(m.class_name) : '<a class="text-light-purple text-decoration-none" href="#/profile">Enter your class name</a>') + '</span>';
+  setTimeout(fitHeaderCtx, 0);
   const up = document.getElementById('upgradebtn');
   if (up) up.classList.toggle('hidden', !E.showUpgrade);
   const bn = document.getElementById('stickybanner');
