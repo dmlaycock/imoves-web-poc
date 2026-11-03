@@ -1781,7 +1781,7 @@ function btRenderCols(scrollRight = false) {
     const open = `<a class="bt-col-link" href="${lessonHref(lesson, cat)}"><i class="bi-box-arrow-up-right me-1"></i>Open the lesson</a>`;
     if (!parts) {
       cols.push(btColumn('p', lesson.name, '', '<div class="bt-empty"><span class="spinner-border spinner-border-sm me-2"></span>Loading parts…</div>', open));
-      lessonParts(lesson.id).then(p => { BT.parts.set(lesson.id, p); if (BT.sel.l === lesson.id && location.hash.startsWith('#/browse')) btRender(true); });
+      lessonParts(lesson.id).then(p => { BT.parts.set(lesson.id, p); if (BT.sel.l === lesson.id && document.getElementById('bt-pop')?.classList.contains('open')) btRender(true); });
     } else {
       const docs = parts.filter(isDocPart), seq = parts.filter(p => !isDocPart(p));
       const rows = docs.map(p => { const d = docFile(p); return btItem({ href: d.url, title: p.heading || 'Document', icon: docIcon(d), sub: isPlanPart(p) ? 'Lesson plan · opens the file' : 'Printable · opens the file', chev: false, cls: 'leaf doc' }).replace('<a ', '<a target="_blank" rel="noopener" '); }).join('') +
@@ -1877,7 +1877,7 @@ function btTreeLessons(scheme, cat, withNote = true) {
     if (open) {
       const parts = BT.parts.get(l.id);
       if (!parts) { inner = `<div class="bt-tkids"><div class="bt-empty"><span class="spinner-border spinner-border-sm me-2"></span>Loading parts…</div></div>`; lessonParts(l.id).then(p => { BT.parts.set(l.id, p); if (BT.open.has(key)) btRender(); }); }
-      else inner = `<div class="bt-tkids">` + btPartRows(l, cat, parts) + `</div>`;
+      else inner = `<div class="bt-tkids">` + (l.description ? `<div class="bt-tdesc">${esc(limit(l.description, 220))}</div>` : '') + btPartRows(l, cat, parts) + `</div>`;
     }
     return `<div class="bt-tnode">` + btRow({ key, title: l.name, icon: access ? lessonIcon(l) : 'bi-lock-fill', cls: (ok ? '' : 'age-out ') + (access ? '' : 'restricted'), sub: `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ` · <i class="bi-stopwatch"></i> ${esc(l.duration)}m` : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`, extra: (MY.done && MY.done.has(l.id)) ? '<span class="bt-done" title="Done"><i class="bi-check-circle-fill"></i></span>' : '' }) + inner + `</div>`;
   }).join('');
@@ -1929,6 +1929,7 @@ function btRenderTree() {
   document.getElementById('bt-crumbs').innerHTML = '';
   body.innerHTML = `<div class="bt-tree" id="bt-tree">${btTreeHtml('l')}</div>`;
   btBindTree(body, 'l');
+  btScrollToDeepest(body.querySelector('.bt-tree'));
 }
 // Two-pane: tree to scheme level on the left; the chosen scheme's lessons and parts on the right.
 function btRenderTwo() {
@@ -1944,6 +1945,13 @@ function btRenderTwo() {
   }
   body.innerHTML = `<div class="bt-two"><div class="bt-two-left"><div class="bt-tree">${btTreeHtml('k')}</div></div><div class="bt-two-right ${scheme ? 'has-scheme' : ''}">${right}</div></div>`;
   btBindTree(body, 'k');   // scheme rows on the left choose; lesson rows on the right open in place
+  btScrollToDeepest(body.querySelector('.bt-two-left .bt-tree'), '.bt-trow.selected, .bt-trow.open');
   const selRow = body.querySelector('.bt-two-left .bt-trow.selected'); if (selRow) { const l = body.querySelector('.bt-two-left'); if (selRow.offsetTop > l.scrollTop + l.clientHeight - 60 || selRow.offsetTop < l.scrollTop) l.scrollTop = selRow.offsetTop - 40; }
   const back = body.querySelector('.bt-two-right'); if (window.innerWidth < 768 && scheme) { back.insertAdjacentHTML('afterbegin', `<button type="button" class="bt-back bt-two-back" id="bt-two-back"><i class="bi-arrow-left me-1"></i>Schemes</button>`); document.getElementById('bt-two-back').addEventListener('click', () => { BT.sel.k = null; BT.sel.l = null; btRemember(); btRender(); }); }
+}
+
+function btScrollToDeepest(box, sel = '.bt-trow.open') {
+  if (!box) return; const rows = box.querySelectorAll(sel); const el = rows[rows.length - 1]; if (!el) return;
+  const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 80) box.scrollTop = Math.max(0, top - 60);
 }
