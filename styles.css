@@ -363,3 +363,25 @@ p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p
   .m-agechip { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .75rem; font: inherit; font-size: var(--fs-s); font-weight: 500; color: #fff; background: var(--purple); border: 0; border-radius: 999px; box-shadow: var(--shadow-sm); }
   .m-agechip i { font-size: .7rem; opacity: .85; }
 }
+
+/* ---------- v0.49 desktop header (David, 3 Nov 2026) ----------
+   md and up: Browse leads the subject bar; the age filter sits in the header beside the nav
+   buttons, styled like them; the separate Browse + filter row is gone. */
+.hdr-filter { display: none; }
+@media (min-width: 768px) {
+  #headerfilter { display: none !important; }
+  .hdr-filter { display: flex; align-items: center; gap: .5rem; }
+  .hdr-filter.hidden { display: none; }
+  .hdr-filter label { color: #fff; font-size: var(--fs-s); font-weight: 300; line-height: 1.2; white-space: nowrap; margin: 0; padding: 0; flex: 0 0 auto; width: auto; max-width: none; }
+  .hdr-filter #classage { flex: 0 0 auto; width: auto !important; max-width: 13rem; min-height: 0; height: calc(1.5em + .75rem + 2px); padding: .375rem 2rem .375rem .75rem; font-size: var(--fs-b); font-weight: 500; color: #fff !important; background-color: transparent; border: 1px solid #fff; border-radius: var(--bs-border-radius, 5px); box-shadow: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important; background-repeat: no-repeat; background-position: right .6rem center; background-size: 12px 9px; cursor: pointer; transition: background-color .15s ease-in-out; }
+  .hdr-filter #classage:hover { background-color: rgba(255,255,255,.12); }
+  .hdr-filter #classage:focus { border-color: #fff; box-shadow: 0 0 0 .2rem rgba(255,255,255,.3); }
+  .hdr-filter #classage option { color: var(--purple); background: #fff; }
+  .subj-browse { flex: 0 0 auto !important; display: flex; }
+  .subj-browse #browsebtn { display: flex; align-items: center; white-space: nowrap; height: 100%; background: #fff; color: var(--purple); border: 0; font-size: 14px; font-weight: 500; padding: .5rem .85rem; border-radius: 5px; }
+  .subj-browse #browsebtn:hover { background: var(--ultra-purple); color: var(--purple); }
+  .subj-browse #browsebtn.hidden { display: none; }
+  #headerfilter + * , main { }
+}
+@media (min-width: 768px) and (max-width: 1199.98px) { .hdr-filter label { display: none; } }

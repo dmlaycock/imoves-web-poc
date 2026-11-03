@@ -305,6 +305,7 @@ async function route() {
   const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = FORCE_AGE_SELECTION && !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  const hdrf = document.getElementById('hdr-filter'); if (hdrf && hf) hdrf.classList.toggle('hidden', hf.classList.contains('hidden'));
   updateAgeChip(); closeMobileDrawer();
   const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
@@ -336,7 +337,34 @@ function renderSubjectBar() {
   document.getElementById('scrollable-navbar').innerHTML = subjects.map(s =>
     `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
   document.getElementById('subjectnav').classList.toggle('hidden', listed.length < 2);   // $subjectList->count() > 1, counted before the policy
+  placeDesktopControls();
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
+}
+
+// ---------- desktop header controls (v0.49, David 3 Nov 2026) ----------
+// md and up: the Browse button moves to the start of the subject bar and the age filter into
+// the header beside Home / Search / Favourites, so the separate Browse + filter row goes and
+// every page's content starts higher. The same elements are moved (not copied), so their
+// handlers, ids and saved-filter wiring are untouched. If the user has no subject bar, Browse
+// stays where it was.
+function placeDesktopControls() {
+  const btn = document.getElementById('browsebtn'), bar = document.getElementById('scrollable-navbar'), nav = document.getElementById('subjectnav');
+  if (btn && bar) {
+    if (!nav.classList.contains('hidden')) {
+      let slot = document.getElementById('subj-browse');
+      if (!slot) { slot = document.createElement('div'); slot.id = 'subj-browse'; slot.className = 'p-1 subj-browse'; }
+      if (bar.firstElementChild !== slot) bar.prepend(slot);
+      if (btn.parentElement !== slot) slot.appendChild(btn);
+    } else {
+      const home = document.getElementById('browsebtnwrap'); if (home && btn.parentElement !== home) home.appendChild(btn);
+    }
+  }
+  const tools = document.getElementById('search-toolbar'), af = document.getElementById('agefilter');
+  if (tools && af && !document.getElementById('hdr-filter')) {
+    const w = document.createElement('div'); w.id = 'hdr-filter'; w.className = 'hdr-filter me-2';
+    w.appendChild(af.querySelector('label')); w.appendChild(document.getElementById('classage'));
+    tools.prepend(w);
+  }
 }
 
 // ---------- phone menu drawer (v0.48, David 3 Nov 2026) ----------
@@ -451,6 +479,7 @@ function renderBrowse() {
     document.getElementById('browsebtn').addEventListener('click', openBrowse);
   }
   document.getElementById('browsebtnwrap').classList.toggle('hidden', !E.showBrowseMenu);
+  document.getElementById('browsebtn').classList.toggle('hidden', !E.showBrowseMenu);
 }
 // Modals (live: Bootstrap). One small helper here instead of the Bootstrap JS bundle.
 function showModal(id) {
