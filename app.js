@@ -1952,6 +1952,7 @@ function btRenderTwo() {
 
 function btScrollToDeepest(box, sel = '.bt-trow.open') {
   if (!box) return; const rows = box.querySelectorAll(sel); const el = rows[rows.length - 1]; if (!el) return;
+  if (box.scrollHeight <= box.clientHeight + 2) box = document.getElementById('bt-body');   // phones: the panel body scrolls, not the tree
   const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
   if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 80) box.scrollTop = Math.max(0, top - 60);
 }
