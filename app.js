@@ -1034,7 +1034,7 @@ function pageSubcategory(subjectId, id) {
     labels.forEach((l, i) => { if (labels.indexOf(l) !== i) labels[i] = `${l} (${i + 1})`; });
     const sw = merged ? `<div class="btn-group btn-group-sm ms-2 age-switch" role="group" aria-label="Age version">${labels.map((l, i) => `<button type="button" class="btn ${i === sel ? 'btn-light text-primary' : 'btn-outline-light'}" data-variant="${i}">${esc(l)}</button>`).join('')}</div>` : '';
     html += `<a id="scheme-${first.id}"></a><div class="row"><div class="col"><div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow ${restricted ? 'content-restricted' : ''}" data-scheme="${first.id}">
-      <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0">
+      <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0 ${merged ? 'has-age-switch' : ''}">
         <h5 class="text-truncate text-white mr-1 mb-0">${esc(first.name)}${!merged && first.subheading ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(first.subheading)}</small>` : ''}${variants.some(v => v.s.is_freemium) ? ' <span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span>' : ''}</h5>${sw}</div></div></div></div>`;
     variants.forEach((v, i) => {
       const s2 = v.s;

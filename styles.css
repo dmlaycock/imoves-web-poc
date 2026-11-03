@@ -262,3 +262,11 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
 /* v0.45.6 phone: the open lesson's header bar runs the full width of the frame (the icon
    column has nothing to show below md, so it is hidden there) */
 @media (max-width: 767.98px) { .lesson-x.open > .list-group-item + .list-group-item { display: none; } }
+
+/* v0.45.8 phone: in a scheme header with age variants the switch takes its own row under the
+   scheme name instead of squeezing the name to a few letters; buttons share the width */
+@media (max-width: 767.98px) {
+  .scheme-card .card-header > .col.has-age-switch { flex-wrap: wrap; }
+  .scheme-card .card-header .age-switch { flex: 1 1 100%; margin-left: 0 !important; margin-top: .45rem; display: flex; }
+  .scheme-card .card-header .age-switch .btn { flex: 1 1 0; padding-left: .25rem; padding-right: .25rem; white-space: nowrap; }
+}
