@@ -531,7 +531,7 @@ function subcatCard(sc, { heading, sub, cols } = {}) {
     ${isWordTile(sc) && !subheading && !meta ? '' : `<div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center">
       ${isWordTile(sc) ? '' : `<h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>`}
       ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 ${isWordTile(sc) ? 'mt-3' : ''} mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
-    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div>`}${mobile}</a></div>`;
+    <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div>`}</div>${mobile}</a></div>`;
 }
 
 // ---------- teacher actions (v0.27) ----------
