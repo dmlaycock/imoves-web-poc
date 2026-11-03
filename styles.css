@@ -325,3 +325,41 @@ p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p
 .btn { font-size: var(--fs-b); font-weight: 500; }
 .btn-sm, .btn-group-sm > .btn { font-size: var(--fs-s); }
 .subject-button .button-text { font-weight: 500; }
+
+/* ---------- v0.48 phone menu drawer (David, 3 Nov 2026) ----------
+   Below md: Search, Menu, Browse and the age filter fold into one drawer from a hamburger at
+   the top right. The header keeps the logo and the hamburger; an age chip under the header
+   shows (and clears) an active filter. md and up are unchanged. */
+.m-burger, .m-drawer, .m-drawer-backdrop, .m-agechip-wrap { display: none; }
+@media (max-width: 767.98px) {
+  #searchbtn, #search-toolbar .user-dropdown, #search-toolbar .btn-group:has(.user-dropdown), #headerfilter { display: none !important; }
+  .m-burger { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 44px; height: 44px; padding: 0 10px; background: transparent; border: 1.5px solid rgba(255,255,255,.85); border-radius: var(--bs-border-radius, 5px); cursor: pointer; }
+  .m-burger span { display: block; height: 2px; background: #fff; border-radius: 2px; transition: transform var(--fx), opacity var(--fx); }
+  .m-burger:active { transform: scale(.96); }
+  .m-drawer-backdrop { display: block; position: fixed; inset: 0; background: rgba(43,33,48,.45); z-index: 1060; opacity: 0; transition: opacity .25s ease; }
+  .m-drawer-backdrop.show { opacity: 1; }
+  .m-drawer-backdrop[hidden] { display: none; }
+  .m-drawer { display: flex; flex-direction: column; gap: .75rem; position: fixed; top: 0; right: 0; bottom: 0; width: min(86vw, 340px); z-index: 1061; background: var(--ultra-purple); box-shadow: -.5rem 0 1.5rem rgba(0,0,0,.2); padding: 0 1rem calc(1rem + env(safe-area-inset-bottom)); overflow-y: auto; transform: translateX(100%); transition: transform .28s var(--ease); visibility: hidden; }
+  .m-drawer.open { transform: none; visibility: visible; }
+  body.m-drawer-open { overflow: hidden; }
+  .m-drawer-head { display: flex; align-items: center; gap: .5rem; margin: 0 -1rem; padding: calc(.75rem + env(safe-area-inset-top)) 1rem .75rem; background: var(--purple); color: #fff; }
+  .m-drawer-ctx { flex: 1 1 auto; min-width: 0; font-size: var(--fs-s); font-weight: 500; line-height: 1.3; }
+  .m-drawer-ctx .text-light-purple, .m-drawer-ctx a { color: var(--light-purple) !important; font-weight: 300; display: block; }
+  .m-drawer-close { flex: 0 0 auto; width: 40px; height: 40px; border: 0; background: transparent; color: #fff; font-size: 1.1rem; border-radius: var(--bs-border-radius, 5px); }
+  .m-drawer-search { position: relative; margin-top: .25rem; }
+  .m-drawer-search i { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); }
+  .m-drawer-search input { width: 100%; font: inherit; font-size: var(--fs-b); font-weight: 300; padding: .6rem .9rem .6rem 2.4rem; min-height: 46px; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); background: #fff; color: var(--text); }
+  .m-drawer-search input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 .2rem rgba(115, 48, 136, .15); }
+  .m-drawer-label { font-size: var(--fs-s); font-weight: 500; color: var(--purple); margin: .25rem 0 -.4rem; }
+  .m-drawer-select { min-height: 46px; color: var(--purple); border-color: var(--mid-purple); }
+  .m-drawer-browse { min-height: 46px; }
+  .m-drawer-nav { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); overflow: hidden; margin-top: .25rem; }
+  .m-drawer-nav hr { margin: 0; border: 0; border-top: 1px solid var(--xlight-purple); opacity: 1; }
+  .m-drawer-item { display: block; width: 100%; text-align: left; padding: .7rem 1rem; font-size: var(--fs-b); font-weight: 500; color: var(--purple); background: #fff; border: 0; text-decoration: none; transition: background-color .15s ease-in-out; }
+  .m-drawer-item:active, .m-drawer-item:hover { background: var(--ultra-purple); color: var(--purple); text-decoration: none; }
+  .m-drawer-item + .m-drawer-item { border-top: 1px solid var(--xlight-purple); }
+  .m-agechip-wrap { display: block; padding-top: .75rem; }
+  .m-agechip-wrap.hidden { display: none; }
+  .m-agechip { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .75rem; font: inherit; font-size: var(--fs-s); font-weight: 500; color: #fff; background: var(--purple); border: 0; border-radius: 999px; box-shadow: var(--shadow-sm); }
+  .m-agechip i { font-size: .7rem; opacity: .85; }
+}

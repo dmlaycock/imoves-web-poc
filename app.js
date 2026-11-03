@@ -305,6 +305,7 @@ async function route() {
   const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = FORCE_AGE_SELECTION && !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
+  updateAgeChip(); closeMobileDrawer();
   const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
   try {
@@ -338,6 +339,54 @@ function renderSubjectBar() {
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
 
+// ---------- phone menu drawer (v0.48, David 3 Nov 2026) ----------
+// Below md the Search and Menu buttons, the Browse button and the age filter fold into one
+// drawer opened from a hamburger at the top right. The drawer reuses the Menu's own items, a
+// search field that submits like the search modal, and an age select kept in step with the
+// header one. While an age is set, a chip under the header says so and clears it in one tap.
+function renderMobileDrawer(menuHtml) {
+  const d = document.getElementById('m-drawer'); if (!d) return;
+  const nav = document.getElementById('m-drawer-nav');
+  nav.innerHTML = menuHtml.replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
+  nav.querySelector('#m-logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
+  nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
+  const src = document.getElementById('classage'), sel = document.getElementById('m-classage');
+  sel.innerHTML = src.innerHTML;
+  const ctx = document.getElementById('userctx'); document.getElementById('m-drawer-ctx').innerHTML = ctx ? ctx.innerHTML : '';
+  document.getElementById('m-drawer-ctx').querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
+  document.getElementById('m-browse').classList.toggle('hidden', !E.showBrowseMenu);
+  if (d.dataset.bound) return; d.dataset.bound = '1';
+  document.getElementById('m-burger').addEventListener('click', openMobileDrawer);
+  document.getElementById('m-drawer-close').addEventListener('click', closeMobileDrawer);
+  document.getElementById('m-drawer-backdrop').addEventListener('click', closeMobileDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileDrawer(); });
+  document.getElementById('m-search-form').addEventListener('submit', e => {
+    e.preventDefault(); const q = document.getElementById('m-search').value.trim(); if (!q) return;
+    closeMobileDrawer(); location.hash = '#/search?q=' + encodeURIComponent(q);
+  });
+  sel.addEventListener('change', () => { src.value = sel.value; src.dispatchEvent(new Event('change')); closeMobileDrawer(); });
+  document.getElementById('m-browse').addEventListener('click', () => { closeMobileDrawer(); openBrowse(); });
+  document.getElementById('m-agechip').addEventListener('click', () => { src.value = ''; src.dispatchEvent(new Event('change')); });
+}
+function openMobileDrawer() {
+  const d = document.getElementById('m-drawer'), bd = document.getElementById('m-drawer-backdrop'), src = document.getElementById('classage');
+  document.getElementById('m-classage').value = src ? src.value : '';
+  const an = document.getElementById('agenoun'); document.getElementById('m-agenoun').textContent = an ? an.textContent : 'lessons';
+  bd.hidden = false; requestAnimationFrame(() => { bd.classList.add('show'); d.classList.add('open'); });
+  d.setAttribute('aria-hidden', 'false'); document.getElementById('m-burger').setAttribute('aria-expanded', 'true'); document.body.classList.add('m-drawer-open');
+}
+function closeMobileDrawer() {
+  const d = document.getElementById('m-drawer'), bd = document.getElementById('m-drawer-backdrop'); if (!d || !d.classList.contains('open')) return;
+  d.classList.remove('open'); bd.classList.remove('show'); setTimeout(() => { bd.hidden = true; }, 250);
+  d.setAttribute('aria-hidden', 'true'); document.getElementById('m-burger').setAttribute('aria-expanded', 'false'); document.body.classList.remove('m-drawer-open');
+}
+function updateAgeChip() {
+  const wrap = document.getElementById('m-agechip-wrap'), src = document.getElementById('classage'); if (!wrap || !src) return;
+  const hf = document.getElementById('headerfilter'), on = !!src.value && !(hf && hf.classList.contains('hidden'));
+  wrap.classList.toggle('hidden', !on);
+  if (on) document.getElementById('m-agechip-text').textContent = src.options[src.selectedIndex].text;
+}
+
 // Menu dropdown: nav/partials/user-info.blade.php. Items whose pages are not built yet still
 // appear, as on the live site, and land on a short notice.
 function renderUserMenu() {
@@ -350,6 +399,7 @@ function renderUserMenu() {
     `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
   const menu = document.getElementById('usermenu'); menu.innerHTML = html;
   menu.querySelector('#logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
+  renderMobileDrawer(html);
   const btn = document.getElementById('dropdownMenuButton');
   if (!btn.dataset.bound) {
     btn.dataset.bound = '1';
