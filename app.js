@@ -375,7 +375,7 @@ function placeDesktopControls() {
 function renderMobileDrawer(menuHtml) {
   const d = document.getElementById('m-drawer'); if (!d) return;
   const nav = document.getElementById('m-drawer-nav');
-  nav.innerHTML = menuHtml.replace(/<a href="#\/search"[^>]*>Search<\/a>/, '').replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
+  nav.innerHTML = menuHtml.replace(/<a href="#\/search"[^>]*>Search<\/a>/, '').replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider[^"]*"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
   nav.querySelector('#m-logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
   nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
   const src = document.getElementById('classage'), sel = document.getElementById('m-classage');
@@ -419,11 +419,14 @@ function updateAgeChip() {
 // appear, as on the live site, and land on a short notice.
 function renderUserMenu() {
   const m = Auth.me() || {};
-  const item = (href, label, extra = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none" ${extra}>${label}</a>`;
-  const div = '<div class="dropdown-divider"></div>';
-  let html = item('#/', 'Home') + div + item('#/search', 'Search') + item('#/favourites', 'Favourites') + item('#/curriculum', 'Curriculum') + div +
+  // v0.50 (David, 3 Nov): an item never shows in the Menu while the same thing is a button in the
+  // header. The header shows Search from md (768px) and Home / Favourites / Curriculum / Upgrade
+  // from lg (1280px on this theme), so the matching items carry the same breakpoint classes.
+  const item = (href, label, extra = '', vis = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none ${vis}" ${extra}>${label}</a>`;
+  const div = (vis = '') => `<div class="dropdown-divider ${vis}"></div>`;
+  let html = item('#/', 'Home', '', 'd-lg-none') + div('d-lg-none') + item('#/search', 'Search', '', 'd-md-none') + item('#/favourites', 'Favourites', '', 'd-lg-none') + item('#/curriculum', 'Curriculum', '', 'd-lg-none') + div('d-lg-none') +
     item('#/profile', 'My Profile') + item(m.is_admin ? '#/school-management' : '#/my-school', m.is_admin ? 'School Management' : 'My School') +
-    (E.showUpgrade ? item('#/upgrade', 'Upgrade') : '') + div + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div +
+    (E.showUpgrade ? item('#/upgrade', 'Upgrade', '', 'd-lg-none') : '') + div() + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div() +
     `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
   const menu = document.getElementById('usermenu'); menu.innerHTML = html;
   menu.querySelector('#logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
