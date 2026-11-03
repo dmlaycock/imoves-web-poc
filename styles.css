@@ -480,3 +480,5 @@ body.m-drawer-open { overflow: hidden; }
 .main-nav .navbar-actions > .collapse .details, #hdr-browse #browsebtn,
 #scrollable-navbar .subject-button .button-text { font-size: 1rem !important; font-weight: 500 !important; line-height: 1.25 !important; }
 .main-nav .navbar-actions > .collapse .heading-3 { font-size: 1rem !important; }
+/* v0.56.1: a dash between the school and the class name; it goes with the class name when that drops out */
+#userctx .ctx-classname::before, #m-drawer-ctx .ctx-classname::before { content: "- "; color: #fff; }
