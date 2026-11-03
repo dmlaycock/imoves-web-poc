@@ -602,3 +602,13 @@ body.bt-open { overflow: hidden; }
   .bt-pop .bt-results { max-height: none; }
   .bt-body { overflow-y: auto; }
 }
+
+/* ---------- v0.63 (David, 3 Nov 2026): Browse in the subject bar ----------
+   Same style as the subject buttons, chevron after the word; it flips while the panel is open.
+   While Browse is in the bar the header and drawer Browse are hidden. */
+#scrollable-navbar .subject-browse { background-color: var(--purple); }
+#scrollable-navbar .subject-browse .button-text i { font-size: .8em; margin-left: .35rem; display: inline-block; transition: transform .2s var(--ease); vertical-align: -1px; }
+body.bt-open #scrollable-navbar .subject-browse .button-text i { transform: rotate(180deg); }
+body.bt-open #scrollable-navbar .subject-browse { outline: 2px solid #fff; outline-offset: -2px; }
+body.browse-in-bar #hdr-browse, body.browse-in-bar .m-drawer-browse { display: none !important; }
+body.bt-open #subjectnav { position: relative; z-index: 1041; }   /* above the dimmed page, so the bar's Browse button can close the panel */

@@ -373,9 +373,13 @@ function renderSubjectBar() {
   // The live bar is the user's own list (Users fid 918) filtered by SubjectPolicy.
   const listed = D.subjects.filter(s => E.buttons.includes(s.id)).sort(byOrder);
   const subjects = listed.filter(canViewSubject);
-  document.getElementById('scrollable-navbar').innerHTML = subjects.map(s =>
+  // v0.63 (David, 3 Nov, 18:43): Browse leads the subject bar as a button in the same style, with a
+  // chevron that flips while the panel is open; the header and drawer Browse hide while this shows.
+  document.getElementById('scrollable-navbar').innerHTML = (E.showBrowseMenu && subjects.length ? `<div class="p-1 flex-even"><a href="#" class="subject-button subject-browse d-flex link align-items-center text-nowrap p-2" id="bar-browse" aria-haspopup="dialog"><span class="button-text text-center w-100 text-1">Browse <i class="bi-chevron-down" aria-hidden="true"></i></span></a></div>` : '') + subjects.map(s =>
     `<div class="p-1 flex-even"><a href="#/subject/${s.id}" data-id="${s.id}" class="subject-button d-flex link align-items-center text-nowrap p-2" style="background-color: #${esc(s.button_colour || '733088')}"><span class="button-text text-center w-100 text-1">${esc(s.name)}</span></a></div>`).join('');
   document.getElementById('subjectnav').classList.toggle('hidden', listed.length < 2);   // $subjectList->count() > 1, counted before the policy
+  const bb = document.getElementById('bar-browse'); if (bb) bb.addEventListener('click', e => { e.preventDefault(); if (document.getElementById('bt-pop')?.classList.contains('open')) closeBrowseTree(); else openBrowseTree(); });
+  placeBrowse();
   placeDesktopControls();
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
@@ -386,6 +390,13 @@ function renderSubjectBar() {
 // every page's content starts higher. The same elements are moved (not copied), so their
 // handlers, ids and saved-filter wiring are untouched. If the user has no subject bar, Browse
 // stays where it was.
+// Browse is in the subject bar while that bar shows (md and up, two or more subjects); otherwise
+// it stays in the header button row (or the drawer on phones).
+function placeBrowse() {
+  const inBar = !!document.getElementById('bar-browse') && !document.getElementById('subjectnav').classList.contains('hidden') && window.innerWidth >= 768;
+  document.body.classList.toggle('browse-in-bar', inBar);
+}
+window.addEventListener('resize', placeBrowse);
 function placeDesktopControls() {
   // v0.51: Browse sits in the header's button row, between the search icon and the menu.
   const btn = document.getElementById('browsebtn'), tools = document.getElementById('search-toolbar'), burger = document.getElementById('m-burger');
@@ -1607,9 +1618,19 @@ async function startApp() {
 // hidden and why. From v0.62 it is the only Browse (the old pop-up is removed).
 const BT = { cols: [], parts: new Map(), bound: false };
 function browseSubjects() {
-  return D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
+  return D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && canAccessSubject(s) && btGroups(s.id).length).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
 }
-function btCatLessons(sc) { return subcatLessons(sc, false).length; }
+// v0.63 (David, 3 Nov, 18:43): the panel shows only what the user can see and open. Categories
+// pass their own visibility switches; schemes are those the user can view (Scheme::isViewable);
+// lessons are those LessonPolicy lets them open (without the age step - the age filter greys,
+// it never hides); anything left empty by those rules disappears. The live menu listed more
+// than the user could open; that was a constraint of the old code, not a design choice.
+function btLessons(scheme) { return schemeLessons(scheme, false).filter(l => canAccessLesson(l, false)); }
+function btSchemes(sc) { return subcatSchemes(sc, false).filter(s => schemeViewable(s) && btLessons(s).length); }
+function btCatOk(sc) { if (!canView(sc)) return false; return !sc.is_schemes || btSchemes(sc).length > 0; }
+function btCats(sg) { return subgroupSubcats(sg, false).filter(btCatOk); }
+function btGroups(subjectId) { return subjectSubgroups(subjectId).filter(canView).filter(sg => btCats(sg).length); }
+function btCatLessons(sc) { return btSchemes(sc).flatMap(btLessons).length; }
 function btPath(sel) {   // the current selection as hash query parameters
   const q = new URLSearchParams(); ['s', 'g', 'c', 'k', 'l'].forEach(k => { if (sel[k]) q.set(k, sel[k]); }); const s = q.toString(); return '#/browse' + (s ? '?' + s : '');
 }
@@ -1641,7 +1662,8 @@ function btMount() {
   return pop;
 }
 function btPlace() {
-  const h = document.getElementById('header'); const top = h ? Math.round(h.getBoundingClientRect().bottom) : 0;
+  const h = document.getElementById('header'); let top = h ? Math.round(h.getBoundingClientRect().bottom) : 0;
+  const bar = document.querySelector('#subjectnav .container-fluid'); if (document.body.classList.contains('browse-in-bar') && bar) top = Math.max(top, Math.round(bar.getBoundingClientRect().bottom));   // v0.63: under the subject bar, so the Browse button stays in view
   document.documentElement.style.setProperty('--bt-top', top + 'px');
 }
 function openBrowseTree(sel) {
@@ -1688,34 +1710,34 @@ function btRenderCols(scrollRight = false) {
   cols.push(btColumn('s', 'Subjects', subjects.length, subjects.map(s => btItem({ level: 's', id: s.id, icon: cleanIcon(s.icon) || 'bi-flag', title: s.name, selected: sel.s === s.id })).join('')));
   const subject = sel.s && D.subjectById[sel.s];
   if (subject) {
-    const groups = subjectSubgroups(subject.id).filter(canView).filter(sg => subgroupSubcats(sg, false).length);
+    const groups = btGroups(subject.id);
     if (sel.g && !groups.some(g => g.id === sel.g)) sel.g = null;
-    cols.push(btColumn('g', subject.name, groups.length, groups.map(sg => btItem({ level: 'g', id: sg.id, title: sg.name, sub: `${subgroupSubcats(sg, false).length} categories`, selected: sel.g === sg.id })).join('')));
+    cols.push(btColumn('g', subject.name, groups.length, groups.map(sg => btItem({ level: 'g', id: sg.id, title: sg.name, sub: `${btCats(sg).length} ${btCats(sg).length === 1 ? 'category' : 'categories'}`, selected: sel.g === sg.id })).join('')));
   }
   const group = sel.g && D.subgroupById[sel.g];
   if (group) {
-    const cats = subgroupSubcats(group, false);
+    const cats = btCats(group);
     if (sel.c && !cats.some(c => c.id === sel.c)) sel.c = null;
     cols.push(btColumn('c', group.name, cats.length, cats.map(sc => {
       const n = btCatLessons(sc), leaf = !sc.is_schemes || n === 0;   // direct resources and redirects: open the page itself
       const toLesson = sc.is_redirect_to_lesson && D.lessonById[sc.lesson_redirect_id], toCat = sc.is_redirect_to_category && D.subcatById[sc.subcategory_redirect_id];
-      const sub = !leaf ? `${subcatSchemes(sc, false).length} ${subcatSchemes(sc, false).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}` : toLesson ? 'Lesson · opens the lesson' : toCat ? 'Goes to ' + esc(toCat.name) : sc.is_redirect_to_url ? 'Link · opens in a new tab' : sc.is_direct_resource ? 'Resource page · opens the page' : 'Page · opens the page';
+      const sub = !leaf ? `${btSchemes(sc).length} ${btSchemes(sc).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}` : toLesson ? 'Lesson · opens the lesson' : toCat ? 'Goes to ' + esc(toCat.name) : sc.is_redirect_to_url ? 'Link · opens in a new tab' : sc.is_direct_resource ? 'Resource page · opens the page' : 'Page · opens the page';
       return btItem({ level: leaf ? null : 'c', id: sc.id, href: leaf ? (toLesson ? lessonHref(toLesson, sc) : subcatHref(sc)) : null, icon: toLesson ? lessonIcon(toLesson) : '', title: sc.name, sub, chev: !leaf, selected: sel.c === sc.id, cls: leaf ? 'leaf' : '', extra: subcatIsFree(sc) && !E.allContent ? '<span class="bt-free">Free</span>' : '' });
     }).join('')));
   }
   const cat = sel.c && D.subcatById[sel.c];
   if (cat) {
-    const schemes = subcatSchemes(cat, false);
+    const schemes = btSchemes(cat);
     if (sel.k && !schemes.some(s => s.id === sel.k)) sel.k = null;
-    cols.push(btColumn('k', cat.name, schemes.length, schemes.map(s => { const n = schemeLessons(s, false).length; return btItem({ level: 'k', id: s.id, title: s.name, sub: `${n} ${noun(cat, n)}${ageRange(schemeLessons(s, false)) ? ' · ages ' + ageRange(schemeLessons(s, false)) : ''}`, selected: sel.k === s.id, cls: schemeViewable(s) ? '' : 'restricted', extra: s.is_freemium && !E.allContent ? '<span class="bt-free">Free</span>' : '' }); }).join(''), `<a class="bt-col-link" href="${subcatHref(cat)}"><i class="bi-box-arrow-up-right me-1"></i>Open the ${esc(cat.name)} page</a>`));
+    cols.push(btColumn('k', cat.name, schemes.length, schemes.map(s => { const ls = btLessons(s), n = ls.length; return btItem({ level: 'k', id: s.id, title: s.name, sub: `${n} ${noun(cat, n)}${ageRange(ls) ? ' · ages ' + ageRange(ls) : ''}`, selected: sel.k === s.id, extra: s.is_freemium && !E.allContent ? '<span class="bt-free">Free</span>' : '' }); }).join(''), `<a class="bt-col-link" href="${subcatHref(cat)}"><i class="bi-box-arrow-up-right me-1"></i>Open the ${esc(cat.name)} page</a>`));
   }
   const scheme = sel.k && D.schemeById[sel.k];
   let hiddenAges = 0, shownAges = 0;
   if (scheme) {
-    const lessons = schemeLessons(scheme, false);
+    const lessons = btLessons(scheme);
     if (sel.l && !lessons.some(l => l.id === sel.l)) sel.l = null;
     const rows = lessons.map(l => {
-      const ok = passesAgeFilter(l, null), access = canAccessLesson(l, false);
+      const ok = passesAgeFilter(l, null), access = true;
       if (ok) shownAges++; else hiddenAges++;
       const cls = (ok ? '' : 'age-out ') + (access ? '' : 'restricted');
       const sub = `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ` · <i class="bi-stopwatch"></i> ${esc(l.duration)}m` : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`;
@@ -1760,11 +1782,11 @@ function btFind(term) {
   const hits = [];
   const subjects = browseSubjects(), subjOk = new Set(subjects.map(s => s.id));
   for (const s of subjects) if (s.name.toLowerCase().includes(q)) hits.push({ level: 'Subject', name: s.name, path: [], sel: { s: s.id } });
-  for (const sg of D.subgroups) { if (!subjOk.has(sg.subject_id) || !canView(sg)) continue; if ((sg.name || '').toLowerCase().includes(q)) hits.push({ level: 'Group', name: sg.name, path: [D.subjectById[sg.subject_id].name], sel: { s: sg.subject_id, g: sg.id } }); }
-  for (const sc of D.subcategories) { const sg = D.subgroupById[sc.subgroup_id]; if (!sg || !subjOk.has(sc.subject_id) || !canView(sg)) continue; if ((sc.name || '').toLowerCase().includes(q)) hits.push({ level: 'Category', name: sc.name, path: [D.subjectById[sc.subject_id].name, sg.name], sel: { s: sc.subject_id, g: sg.id, c: sc.id } }); }
-  const schemeHome = s => { for (const scId of new Set(D.subcatsByScheme[s.id] || [])) { const sc = D.subcatById[scId], sg = sc && D.subgroupById[sc.subgroup_id]; if (sc && sg && subjOk.has(sc.subject_id) && canView(sg)) return { sc, sg }; } return null; };
-  for (const s of D.schemes) { if (!(s.name || '').toLowerCase().includes(q)) continue; const h = schemeHome(s); if (!h) continue; hits.push({ level: 'Scheme', name: s.name + (ageRange(schemeLessons(s, false)) ? ` (ages ${ageRange(schemeLessons(s, false))})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id } }); }
-  for (const l of D.lessons) { if (!(l.name || '').toLowerCase().includes(q)) continue; const s = D.schemeById[l.scheme_id]; const h = s && schemeHome(s); if (!h) continue; hits.push({ level: 'Lesson', name: l.name + (lessonAges(l) ? ` (ages ${lessonAges(l)})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name, s.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id, l: l.id } }); }
+  for (const sg of D.subgroups) { if (!subjOk.has(sg.subject_id) || !canView(sg) || !btCats(sg).length) continue; if ((sg.name || '').toLowerCase().includes(q)) hits.push({ level: 'Group', name: sg.name, path: [D.subjectById[sg.subject_id].name], sel: { s: sg.subject_id, g: sg.id } }); }
+  for (const sc of D.subcategories) { const sg = D.subgroupById[sc.subgroup_id]; if (!sg || !subjOk.has(sc.subject_id) || !canView(sg) || !btCatOk(sc)) continue; if ((sc.name || '').toLowerCase().includes(q)) hits.push({ level: 'Category', name: sc.name, path: [D.subjectById[sc.subject_id].name, sg.name], sel: { s: sc.subject_id, g: sg.id, c: sc.id } }); }
+  const schemeHome = s => { for (const scId of new Set(D.subcatsByScheme[s.id] || [])) { const sc = D.subcatById[scId], sg = sc && D.subgroupById[sc.subgroup_id]; if (sc && sg && subjOk.has(sc.subject_id) && canView(sg) && btCatOk(sc) && btSchemes(sc).includes(s)) return { sc, sg }; } return null; };
+  for (const s of D.schemes) { if (!(s.name || '').toLowerCase().includes(q)) continue; const h = schemeHome(s); if (!h) continue; hits.push({ level: 'Scheme', name: s.name + (ageRange(btLessons(s)) ? ` (ages ${ageRange(btLessons(s))})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id } }); }
+  for (const l of D.lessons) { if (!(l.name || '').toLowerCase().includes(q) || !canAccessLesson(l, false)) continue; const s = D.schemeById[l.scheme_id]; const h = s && schemeHome(s); if (!h) continue; hits.push({ level: 'Lesson', name: l.name + (lessonAges(l) ? ` (ages ${lessonAges(l)})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name, s.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id, l: l.id } }); }
   const shown = hits.slice(0, 150);
   box.innerHTML = `<div class="bt-results-head">${hits.length ? `${hits.length} match${hits.length === 1 ? '' : 'es'} for "${esc(term)}"${hits.length > shown.length ? ` (first ${shown.length} shown)` : ''}` : `Nothing matches "${esc(term)}"`}</div>` +
     shown.map((h, i) => `<button type="button" class="bt-hit" data-i="${i}"><span class="bt-hit-level">${h.level}</span><span class="bt-hit-text"><span class="bt-name">${esc(h.name)}</span>${h.path.length ? `<small class="bt-sub">${h.path.map(esc).join(' <i class="bi-chevron-right"></i> ')}</small>` : ''}</span><i class="bi-chevron-right bt-chev"></i></button>`).join('');
