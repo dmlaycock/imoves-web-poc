@@ -388,6 +388,7 @@ function renderMobileDrawer(menuHtml) {
   document.getElementById('m-drawer-close').addEventListener('click', closeMobileDrawer);
   document.getElementById('m-drawer-backdrop').addEventListener('click', closeMobileDrawer);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileDrawer(); });
+  window.matchMedia('(min-width: 768px)').addEventListener('change', e => { if (e.matches) closeMobileDrawer(); });   // v0.50.4: no stranded backdrop if the window widens
   document.getElementById('m-search-form').addEventListener('submit', e => {
     e.preventDefault(); const q = document.getElementById('m-search').value.trim(); if (!q) return;
     closeMobileDrawer(); location.hash = '#/search?q=' + encodeURIComponent(q);
