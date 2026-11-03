@@ -486,3 +486,10 @@ body.hdr-no-home #hdr-home, body.hdr-no-browse #hdr-browse { display: none !impo
 body:not(.hdr-no-home) .m-drawer-home, body:not(.hdr-no-home) .m-drawer-home + hr { display: none !important; }
 body:not(.hdr-no-browse) .m-drawer-browse { display: none !important; }
 @media (max-width: 767.98px) { .hdr-home { width: 38px; height: 38px; font-size: 1rem; } #hdr-browse #browsebtn { height: 38px; padding: 0 .7rem; display: inline-flex; align-items: center; } }
+
+/* ---------- v0.58 (David, 3 Nov 2026): school / class line balanced against the logo ----------
+   The logo's top sits ~5px above the buttons' top, so the school / class line now sits ~5px below
+   the buttons' bottom to mirror it: slightly larger gap between logo and names. */
+@media (min-width: 768px) {
+  .main-nav > .container > .row { row-gap: .5rem; }
+}
