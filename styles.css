@@ -408,9 +408,9 @@ body.m-drawer-open { overflow: hidden; }
    sidebar's stacked buttons. */
 @media (max-width: 1279.98px) {
   .lesson-actions { display: flex; align-items: stretch; gap: .5rem; margin: 1.25rem 0; padding: 0 .5rem; }
-  .lesson-actions > div, .lesson-actions > div > .col, .lesson-actions > .row { display: contents; }
-  .lesson-actions .btn { flex: 1 1 0; min-width: 0; margin: 0 !important; width: auto !important; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: .3rem; }
-  .lesson-actions #past-readings { flex: 0 0 auto; align-self: center; font-size: var(--fs-s); white-space: nowrap; padding: 0 .25rem; }
+  .lesson-actions > div:not(.d-none), .lesson-actions > div > .col, .lesson-actions > .row { display: contents !important; }   /* the live wrappers carry Bootstrap d-flex !important */
+  .lesson-actions .btn { flex: 1 1 auto; min-width: 0; margin: 0 !important; width: auto !important; font-size: var(--fs-s); line-height: 1.2; padding: .55rem .6rem; white-space: normal; text-align: center; display: flex; align-items: center; justify-content: center; gap: .3rem; }
+  .lesson-actions #past-readings { flex: 0 1 auto; align-self: center; font-size: var(--fs-s); line-height: 1.2; text-align: center; padding: 0 .25rem; }
 }
 @media (max-width: 575.98px) {
   .lesson-actions { gap: .35rem; padding: 0; }
