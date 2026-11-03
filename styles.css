@@ -395,7 +395,7 @@ p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p
   .main-nav .navbar-brand, .main-nav .navbar-actions { display: contents !important; }   /* the brand carries Bootstrap d-flex, which is !important */
   .main-nav .navbar-logo { grid-area: logo; width: auto !important; margin: 0; padding: 0; line-height: 0; }
   .main-nav .navbar-logo img { height: 30px; width: auto !important; max-width: none !important; display: block; }
-  .main-nav .nav-slogan { grid-area: slogan; display: flex !important; align-items: center; height: calc(1.5em + .75rem + 2px); margin: 0 !important; }
+  .main-nav .nav-slogan { grid-area: slogan; display: flex !important; align-items: center; height: 38px; margin: 0 !important; }
   .main-nav .nav-slogan a { font-size: 1.25rem; line-height: 1; white-space: nowrap; }
   .main-nav .navbar-actions > .collapse { grid-area: ctx; justify-self: end; align-self: center; }
   .main-nav .navbar-actions > .collapse .school-class-details { margin: 0 !important; }
