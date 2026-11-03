@@ -1661,10 +1661,8 @@ function btPath(sel) {   // the current selection as hash query parameters
   const q = new URLSearchParams(); ['s', 'g', 'c', 'k', 'l'].forEach(k => { if (sel[k]) q.set(k, sel[k]); }); const s = q.toString(); return '#/browse' + (s ? '?' + s : '');
 }
 // v0.61 (David, 3 Nov 2026): not a page. The tree lives in a pop-over under the header on desktop
-// and a slide-in panel on phones, with three views of the same selection: Columns, Tree, Two-pane.
+// and a slide-in panel on phones.
 // #/browse (and the drawer / header Browse button) opens it over the current page.
-function btView() { try { return localStorage.getItem('imoves.browseView') || 'cols'; } catch (e) { return 'cols'; } }
-function setBtView(v) { BT.view = v; try { localStorage.setItem('imoves.browseView', v); } catch (e) {} }
 function btMount() {
   let pop = document.getElementById('bt-pop'); if (pop) return pop;
   document.body.insertAdjacentHTML('beforeend', `<div class="bt-backdrop" id="bt-backdrop" hidden></div>
@@ -1672,7 +1670,6 @@ function btMount() {
     <div class="bt-top">
       <div class="bt-title"><h4 class="mb-0 text-primary">Browse</h4><small class="text-mid-purple" id="bt-hint"></small></div>
       <div class="bt-find"><i class="bi-search" aria-hidden="true"></i><input type="search" id="bt-find" class="form-control" placeholder="Find a subject, category, scheme or lesson" autocomplete="off" aria-label="Find in Browse"><button type="button" class="bt-find-clear hidden" id="bt-find-clear" aria-label="Clear"><i class="bi-x-lg"></i></button></div>
-      <div class="bt-views" role="tablist" aria-label="View"><button type="button" data-view="cols">Columns</button><button type="button" data-view="tree">Tree</button><button type="button" data-view="two">Two-pane</button></div>
       <button type="button" class="bt-close" id="bt-close" aria-label="Close"><i class="bi-x-lg"></i></button>
     </div>
     <div class="bt-crumbs" id="bt-crumbs"></div>
@@ -1683,7 +1680,6 @@ function btMount() {
   const find = document.getElementById('bt-find'), clear = document.getElementById('bt-find-clear');
   find.addEventListener('input', () => { clear.classList.toggle('hidden', !find.value); btFind(find.value.trim()); });
   clear.addEventListener('click', () => { find.value = ''; clear.classList.add('hidden'); btFind(''); find.focus(); });
-  pop.querySelectorAll('.bt-views button').forEach(b => b.addEventListener('click', () => { setBtView(b.dataset.view); btRender(true); }));
   document.getElementById('bt-close').addEventListener('click', closeBrowseTree);
   document.getElementById('bt-backdrop').addEventListener('click', closeBrowseTree);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBrowseTree(); });
@@ -1699,7 +1695,6 @@ function openBrowseTree(sel) {
   const pop = btMount();
   try { if (!sel) sel = JSON.parse(sessionStorage.getItem('imoves.browseSel') || 'null'); } catch (e) {}
   BT.sel = Object.assign({ s: null, g: null, c: null, k: null, l: null }, sel || BT.sel || {});
-  BT.view = btView();
   btPlace();
   document.getElementById('bt-backdrop').hidden = false;
   requestAnimationFrame(() => { pop.classList.add('open'); document.getElementById('bt-backdrop').classList.add('show'); });
@@ -1829,130 +1824,11 @@ function btFind(term) {
   }));
 }
 
-// ---------- v0.61 views ----------
-const BT_HINTS = { cols: 'Pick a subject, then keep going right to a lesson and its parts.', tree: 'Open a subject and keep opening until you reach a lesson and its parts.', two: 'Pick a scheme on the left; its lessons and parts are on the right.' };
+// v0.61.4 (David, 3 Nov, 17:43): the Columns view is the one that stays; the Tree and Two-pane
+// views built for comparison in v0.61 are removed.
 function btRender(scrollRight = false) {
   const pop = document.getElementById('bt-pop'); if (!pop) return;
-  const view = BT.view || btView();
-  pop.querySelectorAll('.bt-views button').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  pop.dataset.view = view;
-  document.getElementById('bt-hint').textContent = BT_HINTS[view];
-  BT.open = BT.open || new Set();
-  // The selection path is open in the tree views, so switching views keeps the place.
-  const sel = BT.sel; ['s', 'g', 'c', 'k', 'l'].forEach(k => { if (sel[k]) BT.open.add(k + sel[k]); });
-  if (view === 'tree') btRenderTree(); else if (view === 'two') btRenderTwo(); else btRenderCols(scrollRight);
+  document.getElementById('bt-hint').textContent = 'Pick a subject, then keep going right to a lesson and its parts.';
+  btRenderCols(scrollRight);
 }
 function btAgeClearBind(root) { const ac = root.querySelector('#bt-age-clear'); if (ac) ac.addEventListener('click', () => { const src = document.getElementById('classage'); src.value = ''; src.dispatchEvent(new Event('change')); }); }
-// Tree view: one outline, nodes open in place. Opening a node also makes it the selection, so the
-// other views land in the same place; closing only folds it.
-function btToggle(key) {
-  const level = key[0], id = +key.slice(1);
-  if (BT.open.has(key)) { BT.open.delete(key); for (const k of [...BT.open]) if (btUnder(k, key)) BT.open.delete(k); }
-  else { BT.open.add(key); const order = ['s', 'g', 'c', 'k', 'l'], i = order.indexOf(level); BT.sel[level] = id; order.slice(i + 1).forEach(k => { BT.sel[k] = null; }); btRemember(); }
-  btRender();
-}
-function btUnder(k, parent) {   // is node k below parent in the tree?
-  const path = btPathOf(k); return path.includes(parent) && k !== parent;
-}
-function btPathOf(key) {
-  const level = key[0], id = +key.slice(1), out = [];
-  if (level === 'l') { const l = D.lessonById[id]; if (!l) return out; out.push('k' + l.scheme_id); const sc = btSchemeCat(D.schemeById[l.scheme_id]); if (sc) out.push('c' + sc.id, 'g' + sc.subgroup_id, 's' + sc.subject_id); return out; }
-  if (level === 'k') { const sc = btSchemeCat(D.schemeById[id]); if (sc) out.push('c' + sc.id, 'g' + sc.subgroup_id, 's' + sc.subject_id); return out; }
-  if (level === 'c') { const sc = D.subcatById[id]; if (sc) out.push('g' + sc.subgroup_id, 's' + sc.subject_id); return out; }
-  if (level === 'g') { const sg = D.subgroupById[id]; if (sg) out.push('s' + sg.subject_id); return out; }
-  return out;
-}
-function btSchemeCat(s) { if (!s) return null; const c = BT.sel.c && D.subcatById[BT.sel.c]; if (c && (D.subcatsByScheme[s.id] || []).includes(c.id)) return c; return D.subcatById[(D.subcatsByScheme[s.id] || [])[0]] || null; }
-function btRow({ key, title, sub = '', icon = '', cls = '', extra = '', leaf = false, href = null }) {
-  const open = key && BT.open.has(key);
-  const tag = href ? 'a' : 'button';
-  return `<${tag} ${href ? `href="${href}"` : 'type="button"'} class="bt-trow ${cls} ${open ? 'open' : ''} ${leaf ? 'leaf' : ''}" ${key ? `data-key="${key}"` : ''}>${leaf ? '<span class="bt-tchev"></span>' : '<i class="bi-chevron-right bt-tchev" aria-hidden="true"></i>'}${icon ? `<i class="${icon} bt-ico" aria-hidden="true"></i>` : ''}<span class="bt-text"><span class="bt-name">${esc(title)}</span>${sub ? `<small class="bt-sub">${sub}</small>` : ''}</span>${extra}</${tag}>`;
-}
-function btTreeLessons(scheme, cat, withNote = true) {
-  const lessons = schemeLessons(scheme, false); let shown = 0, hidden = 0;
-  const rows = lessons.map(l => {
-    const ok = passesAgeFilter(l, null), access = canAccessLesson(l, false); if (ok) shown++; else hidden++;
-    const key = 'l' + l.id, open = BT.open.has(key);
-    let inner = '';
-    if (open) {
-      const parts = BT.parts.get(l.id);
-      if (!parts) { inner = `<div class="bt-tkids"><div class="bt-empty"><span class="spinner-border spinner-border-sm me-2"></span>Loading parts…</div></div>`; lessonParts(l.id).then(p => { BT.parts.set(l.id, p); if (BT.open.has(key)) btRender(); }); }
-      else inner = `<div class="bt-tkids">` + (l.description ? `<div class="bt-tdesc">${esc(limit(l.description, 220))}</div>` : '') + btPartRows(l, cat, parts) + `</div>`;
-    }
-    return `<div class="bt-tnode">` + btRow({ key, title: l.name, icon: access ? lessonIcon(l) : 'bi-lock-fill', cls: (ok ? '' : 'age-out ') + (access ? '' : 'restricted'), sub: `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ` · <i class="bi-stopwatch"></i> ${esc(l.duration)}m` : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`, extra: (MY.done && MY.done.has(l.id)) ? '<span class="bt-done" title="Done"><i class="bi-check-circle-fill"></i></span>' : '' }) + inner + `</div>`;
-  }).join('');
-  return (withNote ? btAgeNotice(shown, hidden) : '') + rows;
-}
-function btPartRows(l, cat, parts) {
-  const docs = parts.filter(isDocPart), seq = parts.filter(p => !isDocPart(p));
-  const open = `<a class="bt-trow leaf go" href="${lessonHref(l, cat)}"><span class="bt-tchev"></span><i class="bi-box-arrow-up-right bt-ico"></i><span class="bt-text"><span class="bt-name">Open the lesson</span></span></a>`;
-  if (!parts.length) return open + '<div class="bt-empty">No live parts</div>';
-  return open + docs.map(p => { const d = docFile(p); return `<a class="bt-trow leaf doc" href="${esc(d.url)}" target="_blank" rel="noopener"><span class="bt-tchev"></span><i class="${docIcon(d)} bt-ico"></i><span class="bt-text"><span class="bt-name">${esc(p.heading || 'Document')}</span><small class="bt-sub">${isPlanPart(p) ? 'Lesson plan' : 'Printable'} · opens the file</small></span></a>`; }).join('') +
-    seq.map((p, i) => `<a class="bt-trow leaf" href="${lessonHref(l, cat)}&part=${p.id}"><span class="bt-tchev"></span><i class="${partIcon(p)} bt-ico"></i><span class="bt-text"><span class="bt-name">${esc(p.heading || p.media_type)}</span><small class="bt-sub">Part ${i + 1} of ${seq.length}${p.duration && p.duration.trim() !== ':' ? ' · ' + esc(p.duration) : ''}</small></span></a>`).join('');
-}
-function btCatRow(sc, { leafOnly = false } = {}) {
-  const n = btCatLessons(sc), leaf = !sc.is_schemes || n === 0;
-  const toLesson = sc.is_redirect_to_lesson && D.lessonById[sc.lesson_redirect_id], toCat = sc.is_redirect_to_category && D.subcatById[sc.subcategory_redirect_id];
-  const sub = !leaf ? `${subcatSchemes(sc, false).length} ${subcatSchemes(sc, false).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}` : toLesson ? 'Lesson · opens the lesson' : toCat ? 'Goes to ' + esc(toCat.name) : sc.is_redirect_to_url ? 'Link · opens in a new tab' : sc.is_direct_resource ? 'Resource page · opens the page' : 'Page · opens the page';
-  return { leaf, row: btRow({ key: leaf ? null : 'c' + sc.id, href: leaf ? (toLesson ? lessonHref(toLesson, sc) : subcatHref(sc)) : null, leaf, icon: toLesson ? lessonIcon(toLesson) : '', title: sc.name, sub, extra: subcatIsFree(sc) && !E.allContent ? '<span class="bt-free">Free</span>' : '' }) };
-}
-function btTreeHtml(maxLevel = 'l') {
-  const stop = l => ['s', 'g', 'c', 'k', 'l'].indexOf(maxLevel) < ['s', 'g', 'c', 'k', 'l'].indexOf(l);
-  return browseSubjects().map(s => {
-    const ks = 's' + s.id; let kids = '';
-    if (BT.open.has(ks) && !stop('g')) kids = `<div class="bt-tkids">` + subjectSubgroups(s.id).filter(canView).filter(sg => subgroupSubcats(sg, false).length).map(sg => {
-      const kg = 'g' + sg.id; let gk = '';
-      if (BT.open.has(kg) && !stop('c')) gk = `<div class="bt-tkids">` + subgroupSubcats(sg, false).map(sc => {
-        const { leaf, row } = btCatRow(sc); const kc = 'c' + sc.id; let ck = '';
-        if (!leaf && BT.open.has(kc) && !stop('k')) ck = `<div class="bt-tkids">` + subcatSchemes(sc, false).map(k => {
-          const kk = 'k' + k.id; const n = schemeLessons(k, false).length; let kk2 = '';
-          if (BT.open.has(kk) && !stop('l')) kk2 = `<div class="bt-tkids">` + btTreeLessons(k, sc) + `</div>`;
-          return `<div class="bt-tnode">` + btRow({ key: kk, title: k.name, cls: (schemeViewable(k) ? '' : 'restricted ') + (maxLevel === 'k' && BT.sel.k === k.id ? 'selected' : ''), leaf: maxLevel === 'k', sub: `${n} ${noun(sc, n)}${ageRange(schemeLessons(k, false)) ? ' · ages ' + ageRange(schemeLessons(k, false)) : ''}`, extra: k.is_freemium && !E.allContent ? '<span class="bt-free">Free</span>' : '' }) + kk2 + `</div>`;
-        }).join('') + `</div>`;
-        return `<div class="bt-tnode">` + row + ck + `</div>`;
-      }).join('') + `</div>`;
-      return `<div class="bt-tnode">` + btRow({ key: kg, title: sg.name, sub: `${subgroupSubcats(sg, false).length} categories` }) + gk + `</div>`;
-    }).join('') + `</div>`;
-    return `<div class="bt-tnode">` + btRow({ key: ks, title: s.name, icon: cleanIcon(s.icon) || 'bi-flag' }) + kids + `</div>`;
-  }).join('');
-}
-function btBindTree(root, maxLevel) {
-  root.querySelectorAll('.bt-trow[data-key]').forEach(b => b.addEventListener('click', e => {
-    e.preventDefault(); const key = b.dataset.key;
-    if (maxLevel === 'k' && key[0] === 'k') { BT.sel.k = +key.slice(1); BT.sel.l = null; btRemember(); btRender(); return; }   // two-pane: a scheme is chosen, not opened
-    btToggle(key);
-  }));
-  btAgeClearBind(root);
-}
-function btRenderTree() {
-  const body = document.getElementById('bt-body'); if (!body) return;
-  document.getElementById('bt-crumbs').innerHTML = '';
-  body.innerHTML = `<div class="bt-tree" id="bt-tree">${btTreeHtml('l')}</div>`;
-  btBindTree(body, 'l');
-  btScrollToDeepest(body.querySelector('.bt-tree'));
-}
-// Two-pane: tree to scheme level on the left; the chosen scheme's lessons and parts on the right.
-function btRenderTwo() {
-  const body = document.getElementById('bt-body'); if (!body) return;
-  document.getElementById('bt-crumbs').innerHTML = '';
-  const scheme = BT.sel.k && D.schemeById[BT.sel.k], cat = scheme && btSchemeCat(scheme);
-  let right = '';
-  if (!scheme) right = `<div class="bt-two-empty"><i class="bi-arrow-left-circle"></i><p>Choose a scheme on the left to see its lessons here.</p></div>`;
-  else {
-    const path = [D.subjectById[cat.subject_id]?.name, D.subgroupById[cat.subgroup_id]?.name, cat.name].filter(Boolean).map(esc).join(' <i class="bi-chevron-right"></i> ');
-    right = `<header class="bt-two-head"><small class="bt-two-path">${path}</small><h5>${esc(scheme.name)}</h5>${scheme.subheading ? `<small class="bt-sub">${esc(scheme.subheading)}</small>` : ''}<a class="btn btn-sm btn-outline-primary bt-two-open" href="${subcatHref(cat)}">Open the ${esc(cat.name)} page</a></header>` +
-      `<div class="bt-two-list">${btTreeLessons(scheme, cat)}</div>`;
-  }
-  body.innerHTML = `<div class="bt-two"><div class="bt-two-left"><div class="bt-tree">${btTreeHtml('k')}</div></div><div class="bt-two-right ${scheme ? 'has-scheme' : ''}">${right}</div></div>`;
-  btBindTree(body, 'k');   // scheme rows on the left choose; lesson rows on the right open in place
-  btScrollToDeepest(body.querySelector('.bt-two-left .bt-tree'), '.bt-trow.selected, .bt-trow.open');
-  const selRow = body.querySelector('.bt-two-left .bt-trow.selected'); if (selRow) { const l = body.querySelector('.bt-two-left'); if (selRow.offsetTop > l.scrollTop + l.clientHeight - 60 || selRow.offsetTop < l.scrollTop) l.scrollTop = selRow.offsetTop - 40; }
-  const back = body.querySelector('.bt-two-right'); if (window.innerWidth < 768 && scheme) { back.insertAdjacentHTML('afterbegin', `<button type="button" class="bt-back bt-two-back" id="bt-two-back"><i class="bi-arrow-left me-1"></i>Schemes</button>`); document.getElementById('bt-two-back').addEventListener('click', () => { BT.sel.k = null; BT.sel.l = null; btRemember(); btRender(); }); }
-}
-
-function btScrollToDeepest(box, sel = '.bt-trow.open') {
-  if (!box) return; const rows = box.querySelectorAll(sel); const el = rows[rows.length - 1]; if (!el) return;
-  if (box.scrollHeight <= box.clientHeight + 2) box = document.getElementById('bt-body');   // phones: the panel body scrolls, not the tree
-  const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-  if (top < box.scrollTop || top > box.scrollTop + box.clientHeight - 80) box.scrollTop = Math.max(0, top - 60);
-}
