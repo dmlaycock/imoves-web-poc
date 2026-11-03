@@ -330,62 +330,39 @@ p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p
 .subject-button .button-text { font-weight: 500; }
 
 /* ---------- v0.48 phone menu drawer (David, 3 Nov 2026) ----------
-   Below md: Search, Menu, Browse and the age filter fold into one drawer from a hamburger at
-   the top right. The header keeps the logo and the hamburger; an age chip under the header
-   shows (and clears) an active filter. md and up are unchanged. */
-.m-burger, .m-drawer, .m-drawer-backdrop, .m-agechip-wrap { display: none; }
-@media (max-width: 767.98px) {
-  #searchbtn, #search-toolbar .user-dropdown, #search-toolbar .btn-group:has(.user-dropdown), #headerfilter { display: none !important; }
-  .m-burger { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 44px; height: 44px; padding: 0 10px; background: transparent; border: 1.5px solid rgba(255,255,255,.85); border-radius: var(--bs-border-radius, 5px); cursor: pointer; }
-  .m-burger span { display: block; height: 2px; background: #fff; border-radius: 2px; transition: transform var(--fx), opacity var(--fx); }
-  .m-burger:active { transform: scale(.96); }
-  .m-drawer-backdrop { display: block; position: fixed; inset: 0; background: rgba(43,33,48,.45); z-index: 1060; opacity: 0; transition: opacity .25s ease; }
-  .m-drawer-backdrop.show { opacity: 1; }
-  .m-drawer-backdrop[hidden] { display: none; }
-  .m-drawer { display: flex; flex-direction: column; gap: .75rem; position: fixed; top: 0; right: 0; bottom: 0; width: min(86vw, 340px); z-index: 1061; background: var(--ultra-purple); box-shadow: -.5rem 0 1.5rem rgba(0,0,0,.2); padding: 0 1rem calc(1rem + env(safe-area-inset-bottom)); overflow-y: auto; transform: translateX(100%); transition: transform .28s var(--ease); visibility: hidden; }
-  .m-drawer.open { transform: none; visibility: visible; }
-  body.m-drawer-open { overflow: hidden; }
-  .m-drawer-head { display: flex; align-items: center; gap: .5rem; margin: 0 -1rem; padding: calc(.75rem + env(safe-area-inset-top)) 1rem .75rem; background: var(--purple); color: #fff; }
-  .m-drawer-ctx { flex: 1 1 auto; min-width: 0; font-size: var(--fs-s); font-weight: 500; line-height: 1.3; }
-  .m-drawer-ctx .text-light-purple, .m-drawer-ctx a { color: var(--light-purple) !important; font-weight: 300; display: block; }
-  .m-drawer-close { flex: 0 0 auto; width: 40px; height: 40px; border: 0; background: transparent; color: #fff; font-size: 1.1rem; border-radius: var(--bs-border-radius, 5px); }
-  .m-drawer-search { position: relative; margin-top: .25rem; }
-  .m-drawer-search i { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); }
-  .m-drawer-search input { width: 100%; font: inherit; font-size: var(--fs-b); font-weight: 300; padding: .6rem .9rem .6rem 2.4rem; min-height: 46px; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); background: #fff; color: var(--text); }
-  .m-drawer-search input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 .2rem rgba(115, 48, 136, .15); }
-  .m-drawer-label { font-size: var(--fs-s); font-weight: 500; color: var(--purple); margin: .25rem 0 -.4rem; }
-  .m-drawer-select { min-height: 46px; color: var(--purple); border-color: var(--mid-purple); }
-  .m-drawer-browse { min-height: 46px; }
-  .m-drawer-nav { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); overflow: hidden; margin-top: .25rem; }
-  .m-drawer-nav hr { margin: 0; border: 0; border-top: 1px solid var(--xlight-purple); opacity: 1; }
-  .m-drawer-item { display: block; width: 100%; text-align: left; padding: .7rem 1rem; font-size: var(--fs-b); font-weight: 500; color: var(--purple); background: #fff; border: 0; text-decoration: none; transition: background-color .15s ease-in-out; }
-  .m-drawer-item:active, .m-drawer-item:hover { background: var(--ultra-purple); color: var(--purple); text-decoration: none; }
-  .m-drawer-item + .m-drawer-item { border-top: 1px solid var(--xlight-purple); }
-  .m-agechip-wrap { display: block; padding-top: .75rem; }
-  .m-agechip-wrap.hidden { display: none; }
-  .m-agechip { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .75rem; font: inherit; font-size: var(--fs-s); font-weight: 500; color: #fff; background: var(--purple); border: 0; border-radius: 999px; box-shadow: var(--shadow-sm); }
-  .m-agechip i { font-size: .7rem; opacity: .85; }
-}
+ Below md: Search, Menu, Browse and the age filter fold into one drawer from a hamburger at
+ the top right. The header keeps the logo and the hamburger; an age chip under the header
+ shows (and clears) an active filter. md and up are unchanged. */
+.m-burger { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 44px; height: 44px; padding: 0 10px; background: transparent; border: 1.5px solid rgba(255,255,255,.85); border-radius: var(--bs-border-radius, 5px); cursor: pointer; }
+.m-burger span { display: block; height: 2px; background: #fff; border-radius: 2px; transition: transform var(--fx), opacity var(--fx); }
+.m-burger:active { transform: scale(.96); }
+.m-drawer-backdrop { display: block; position: fixed; inset: 0; background: rgba(43,33,48,.45); z-index: 1060; opacity: 0; transition: opacity .25s ease; }
+.m-drawer-backdrop.show { opacity: 1; }
+.m-drawer-backdrop[hidden] { display: none; }
+.m-drawer { display: flex; flex-direction: column; gap: .75rem; position: fixed; top: 0; right: 0; bottom: 0; width: min(86vw, 340px); z-index: 1061; background: var(--ultra-purple); box-shadow: -.5rem 0 1.5rem rgba(0,0,0,.2); padding: 0 1rem calc(1rem + env(safe-area-inset-bottom)); overflow-y: auto; transform: translateX(100%); transition: transform .28s var(--ease); visibility: hidden; }
+.m-drawer.open { transform: none; visibility: visible; }
+body.m-drawer-open { overflow: hidden; }
+.m-drawer-head { display: flex; align-items: center; gap: .5rem; margin: 0 -1rem; padding: calc(.75rem + env(safe-area-inset-top)) 1rem .75rem; background: var(--purple); color: #fff; }
+.m-drawer-ctx { flex: 1 1 auto; min-width: 0; font-size: var(--fs-s); font-weight: 500; line-height: 1.3; }
+.m-drawer-ctx .text-light-purple, .m-drawer-ctx a { color: var(--light-purple) !important; font-weight: 300; display: block; }
+.m-drawer-close { flex: 0 0 auto; width: 40px; height: 40px; border: 0; background: transparent; color: #fff; font-size: 1.1rem; border-radius: var(--bs-border-radius, 5px); }
+.m-drawer-search { position: relative; margin-top: .25rem; }
+.m-drawer-search i { position: absolute; left: .85rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); }
+.m-drawer-search input { width: 100%; font: inherit; font-size: var(--fs-b); font-weight: 300; padding: .6rem .9rem .6rem 2.4rem; min-height: 46px; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); background: #fff; color: var(--text); }
+.m-drawer-search input:focus { outline: none; border-color: var(--purple); box-shadow: 0 0 0 .2rem rgba(115, 48, 136, .15); }
+.m-drawer-label { font-size: var(--fs-s); font-weight: 500; color: var(--purple); margin: .25rem 0 -.4rem; }
+.m-drawer-select { min-height: 46px; color: var(--purple); border-color: var(--mid-purple); }
+.m-drawer-browse { min-height: 46px; }
+.m-drawer-nav { display: flex; flex-direction: column; background: #fff; border: 1px solid var(--mid-purple); border-radius: var(--bs-border-radius, 5px); overflow: hidden; margin-top: .25rem; }
+.m-drawer-nav hr { margin: 0; border: 0; border-top: 1px solid var(--xlight-purple); opacity: 1; }
+.m-drawer-item { display: block; width: 100%; text-align: left; padding: .7rem 1rem; font-size: var(--fs-b); font-weight: 500; color: var(--purple); background: #fff; border: 0; text-decoration: none; transition: background-color .15s ease-in-out; }
+.m-drawer-item:active, .m-drawer-item:hover { background: var(--ultra-purple); color: var(--purple); text-decoration: none; }
+.m-drawer-item + .m-drawer-item { border-top: 1px solid var(--xlight-purple); }
+.m-agechip-wrap { display: block; padding-top: .75rem; }
+.m-agechip-wrap.hidden { display: none; }
+.m-agechip { display: inline-flex; align-items: center; gap: .5rem; padding: .35rem .75rem; font: inherit; font-size: var(--fs-s); font-weight: 500; color: #fff; background: var(--purple); border: 0; border-radius: 999px; box-shadow: var(--shadow-sm); }
+.m-agechip i { font-size: .7rem; opacity: .85; }
 
-/* ---------- v0.49 desktop header (David, 3 Nov 2026) ----------
-   md and up: Browse leads the subject bar; the age filter sits in the header beside the nav
-   buttons, styled like them; the separate Browse + filter row is gone. */
-.hdr-filter { display: none; }
-@media (min-width: 768px) {
-  #headerfilter { display: none !important; }
-  .hdr-filter { display: flex; align-items: center; gap: .5rem; }
-  .hdr-filter.hidden { display: none; }
-  .hdr-filter label { color: #fff !important; line-height: 1.2 !important; font-size: var(--fs-s); font-weight: 300; line-height: 1.2; white-space: nowrap; margin: 0; padding: 0; flex: 0 0 auto; width: auto; max-width: none; }
-  .hdr-filter #classage { flex: 0 0 auto; width: auto !important; max-width: 13rem; min-height: 0; height: calc(1.5em + .75rem + 2px); padding: .375rem 2rem .375rem .75rem; font-size: var(--fs-b); font-weight: 500; color: #fff !important; background-color: transparent; border: 1px solid #fff; border-radius: var(--bs-border-radius, 5px); box-shadow: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important; background-repeat: no-repeat; background-position: right .6rem center; background-size: 12px 9px; cursor: pointer; transition: background-color .15s ease-in-out; }
-  .hdr-filter #classage:hover { background-color: rgba(255,255,255,.12); }
-  .hdr-filter #classage:focus { border-color: #fff; box-shadow: 0 0 0 .2rem rgba(255,255,255,.3); }
-  .hdr-filter #classage option { color: var(--purple); background: #fff; }
-  .subj-browse { flex: 0 0 auto !important; display: flex; }
-  .subj-browse #browsebtn { display: block; white-space: nowrap; height: 100%; line-height: 1.6; background: #fff; color: var(--purple); border: 0; font-size: 14px; font-weight: 500; padding: .5rem .85rem; border-radius: 5px; }
-  .subj-browse #browsebtn:hover { background: var(--ultra-purple); color: var(--purple); }
-  .subj-browse #browsebtn.hidden { display: none; }
-}
 
 /* ---------- v0.50 desktop header layout (David, 3 Nov 2026) ----------
    md and up, two rows on one grid:
@@ -405,6 +382,20 @@ p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p
   .main-nav .navbar-actions > .collapse .school-class-details > div { margin: 0 !important; }
   .main-nav .navbar-actions > div:last-child { grid-area: tools; justify-self: end; }
   .main-nav #search-toolbar { margin: 0 !important; flex-wrap: nowrap; }
-  .hdr-filter label { display: none !important; }
-  .hdr-filter #classage { max-width: 12rem; }
 }
+
+/* ---------- v0.51 header controls (David, 3 Nov 2026) ----------
+   Every width: the old Menu dropdown and the Home / Favourites / Curriculum / Upgrade header
+   buttons are gone (their items live in the drawer), as is the Browse + age filter row (the
+   filter lives in the drawer). From md the header's button row is: search icon, Browse, menu.
+   Phones: the hamburger only; search and Browse are in the drawer. */
+#headerfilter, #search-toolbar .btn-group:has(.user-dropdown), #search-toolbar > .btn-group.d-lg-block, #upgradebtn { display: none !important; }
+#search-toolbar { display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap; }
+#search-toolbar > * { margin: 0 !important; }
+#searchopen { width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 1.1rem; }
+#hdr-browse #browsebtn { height: 44px; white-space: nowrap; background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.85); }
+#hdr-browse #browsebtn:hover { background: rgba(255,255,255,.12); }
+#hdr-browse #browsebtn.hidden { display: none; }
+.m-burger { width: 44px; height: 44px; }
+@media (max-width: 767.98px) { #searchbtn, #hdr-browse { display: none !important; } }
+@media (min-width: 768px) { .m-drawer-search, .m-drawer-browse { display: none !important; } }

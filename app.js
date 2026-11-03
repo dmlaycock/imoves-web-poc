@@ -341,30 +341,21 @@ function renderSubjectBar() {
   setTimeout(() => { const n = document.getElementById('scrollable-navbar'); if (n) n.dispatchEvent(new Event('scroll')); }, 0);
 }
 
-// ---------- desktop header controls (v0.49, David 3 Nov 2026) ----------
+// ---------- header controls (v0.49, v0.51, David 3 Nov 2026) ----------
 // md and up: the Browse button moves to the start of the subject bar and the age filter into
 // the header beside Home / Search / Favourites, so the separate Browse + filter row goes and
 // every page's content starts higher. The same elements are moved (not copied), so their
 // handlers, ids and saved-filter wiring are untouched. If the user has no subject bar, Browse
 // stays where it was.
 function placeDesktopControls() {
-  const btn = document.getElementById('browsebtn'), bar = document.getElementById('scrollable-navbar'), nav = document.getElementById('subjectnav');
-  if (btn && bar) {
-    if (!nav.classList.contains('hidden')) {
-      let slot = document.getElementById('subj-browse');
-      if (!slot) { slot = document.createElement('div'); slot.id = 'subj-browse'; slot.className = 'p-1 subj-browse'; }
-      if (bar.firstElementChild !== slot) bar.prepend(slot);
-      if (btn.parentElement !== slot) slot.appendChild(btn);
-    } else {
-      const home = document.getElementById('browsebtnwrap'); if (home && btn.parentElement !== home) home.appendChild(btn);
-    }
-  }
-  const tools = document.getElementById('search-toolbar'), af = document.getElementById('agefilter');
-  if (tools && af && !document.getElementById('hdr-filter')) {
-    const w = document.createElement('div'); w.id = 'hdr-filter'; w.className = 'hdr-filter me-2';
-    w.appendChild(af.querySelector('label')); w.appendChild(document.getElementById('classage'));
-    tools.prepend(w);
-  }
+  // v0.51: Browse sits in the header's button row, between the search icon and the menu.
+  const btn = document.getElementById('browsebtn'), tools = document.getElementById('search-toolbar'), burger = document.getElementById('m-burger');
+  if (!btn || !tools || !burger) return;
+  let slot = document.getElementById('hdr-browse');
+  if (!slot) { slot = document.createElement('div'); slot.id = 'hdr-browse'; tools.insertBefore(slot, burger); }
+  if (btn.parentElement !== slot) slot.appendChild(btn);
+  btn.className = 'btn' + (btn.classList.contains('hidden') ? ' hidden' : '');
+  btn.innerHTML = 'Browse all resources';
 }
 
 // ---------- phone menu drawer (v0.48, David 3 Nov 2026) ----------
@@ -425,9 +416,9 @@ function renderUserMenu() {
   // from lg (1280px on this theme), so the matching items carry the same breakpoint classes.
   const item = (href, label, extra = '', vis = '') => `<a href="${href}" class="dropdown-item btn btn-secondary pl-3 pe-4 shadow-none ${vis}" ${extra}>${label}</a>`;
   const div = (vis = '') => `<div class="dropdown-divider ${vis}"></div>`;
-  let html = item('#/', 'Home', '', 'd-lg-none') + div('d-lg-none') + item('#/search', 'Search', '', 'd-md-none') + item('#/favourites', 'Favourites', '', 'd-lg-none') + item('#/curriculum', 'Curriculum', '', 'd-lg-none') + div('d-lg-none') +
+  let html = item('#/', 'Home') + div() + item('#/search', 'Search') + item('#/favourites', 'Favourites') + item('#/curriculum', 'Curriculum') + div() +
     item('#/profile', 'My Profile') + item(m.is_admin ? '#/school-management' : '#/my-school', m.is_admin ? 'School Management' : 'My School') +
-    (E.showUpgrade ? item('#/upgrade', 'Upgrade', '', 'd-lg-none') : '') + div() + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div() +
+    (E.showUpgrade ? item('#/upgrade', 'Upgrade') : '') + div() + item('https://imoves.com/help', 'Help', 'target="_blank" rel="noopener"') + div() +
     `<button type="button" class="dropdown-item btn btn-secondary shadow-none pl-3 pe-4" id="logoutbtn">Log Out</button>`;
   const menu = document.getElementById('usermenu'); menu.innerHTML = html;
   menu.querySelector('#logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
