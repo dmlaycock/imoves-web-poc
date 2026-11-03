@@ -472,3 +472,11 @@ body.m-drawer-open { overflow: hidden; }
    a lift there shrank the link's cover to the button and back again (the flicker on 3 Nov). */
 .doc-row .btn.doc-open:hover, .doc-row .btn.doc-open:active { transform: none !important; box-shadow: none !important; }
 .doc-row:hover .btn.doc-open { background-color: var(--bs-btn-hover-bg, #622974); }
+
+/* ---------- v0.56 (David, 3 Nov 2026) ----------
+   One size and weight for the header and subject-bar text: slogan, school name, class name,
+   the Browse button and the subject buttons all at 1rem / 500. */
+.main-nav .nav-slogan a, #userctx, #userctx .ctx-school, #userctx .ctx-classname, #userctx .ctx-classname a,
+.main-nav .navbar-actions > .collapse .details, #hdr-browse #browsebtn,
+#scrollable-navbar .subject-button .button-text { font-size: 1rem !important; font-weight: 500 !important; line-height: 1.25 !important; }
+.main-nav .navbar-actions > .collapse .heading-3 { font-size: 1rem !important; }
