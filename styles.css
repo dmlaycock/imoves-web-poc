@@ -279,23 +279,53 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
   .scheme-card .card-header .age-switch { flex: 1 1 auto; margin-left: .5rem !important; }
   .scheme-card .card-header .age-switch .btn { font-size: .8rem; padding-left: .3rem; padding-right: .3rem; }
 }
-/* Phone category cards (v0.46.4): one plain white card per category - title, subtext, meta -
-   no thumbnail (it only repeated the title), no internal divider, a chevron to show it opens.
-   TEMPORARY WORKAROUND alongside WORD_TILE_IMAGES in app.js - remove with the CMS rebuild. */
+/* Phone category cards (v0.46.4, v0.47): one plain white card per category - title, subtext,
+   meta - no thumbnail (it only repeated the title), no internal divider, a chevron centred on
+   the card to show it opens. TEMPORARY WORKAROUND alongside WORD_TILE_IMAGES in app.js. */
 @media (max-width: 767.98px) {
-  .subcategory-card.d-md-none { padding-bottom: .6rem; border: 1px solid var(--mid-purple); }
-  .subcategory-card.d-md-none > .border-bottom { border-bottom: 0 !important; position: relative; }
-  .subcategory-card.d-md-none > .border-bottom::after { content: "\F285"; font-family: "bootstrap-icons"; position: absolute; right: .9rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); font-size: .9rem; }
+  .subcategory-card.d-md-none { position: relative; padding: .15rem 2.2rem .7rem 0; border: 1px solid var(--mid-purple); }
+  .subcategory-card.d-md-none::after { content: "\F285"; font-family: "bootstrap-icons"; position: absolute; right: .9rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); font-size: .9rem; line-height: 1; }
+  .subcategory-card.d-md-none > .border-bottom { border-bottom: 0 !important; }
   .subcategory-card.d-md-none > .border-bottom > .row > .col-5 { display: none; }
-  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding: 0 2.2rem 0 calc(1rem + 11px); }   /* title text lines up with the subtext (the live row carries a -12px gutter) */
-  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .7rem 0 .15rem !important; font-size: 1.1rem; }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding: 0 0 0 calc(1rem + 11px); }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .55rem 0 0 !important; }
   .subcategory-card.d-md-none > .card-body > div > .pt-3 { padding-top: 0 !important; }
-  .subcategory-card.d-md-none .subcategory-card--subheading { margin: 0 1rem .25rem !important; font-size: .95rem; }
+  .subcategory-card.d-md-none .subcategory-card--subheading { margin: .15rem 1rem 0 !important; }
   .subcategory-card.d-md-none .subcategory-card--subheading:empty { display: none; }
-  .subcategory-card.d-md-none .card-body ul { margin: 0 .5rem; justify-content: flex-start !important; }
+  .subcategory-card.d-md-none .card-body ul { margin: .25rem .5rem 0; justify-content: flex-start !important; }
   .subcategory-card.d-md-none .card-body ul:empty { display: none; }
-  .subcategory-card.d-md-none .card-body li { padding: .15rem .5rem; flex: 0 0 auto !important; }
-  .col-12 > a > .subcategory-card.d-md-none { margin-bottom: 0; }
+  .subcategory-card.d-md-none .card-body li { padding: 0 .5rem; flex: 0 0 auto !important; }
   .subcategory-card.d-md-none:active { background: var(--ultra-purple); }
+  .card-body > .row > [class*="col-"]:has(> a > .subcategory-card.d-md-none) { margin-bottom: .6rem !important; }
+  .card-body.pb-1:has(.subcategory-card.d-md-none) { padding-bottom: .4rem !important; }
 }
 .subcategory-card.tile-only { padding-bottom: 0; }   /* word tile with nothing under it: no empty body, no ledge */
+
+/* ---------- v0.47 type scale (David, 3 Nov 2026) ----------
+   One typeface (BalooPrimary: 300 light, 500 semi-bold, 700 bold) at five sizes, applied
+   everywhere so panel headers, titles, body, secondary and meta text look the same on every
+   page. Form controls inherit the typeface (the age select was in the system font). */
+:root { --fs-h: 1.25rem; --fs-t: 1.125rem; --fs-b: 1rem; --fs-s: .875rem; --fs-m: .75rem; }
+@media (max-width: 575.98px) { :root { --fs-h: 1.125rem; --fs-t: 1.0625rem; } }
+select, input, textarea, button, .form-select, .form-control { font-family: inherit; }
+.form-select { font-size: var(--fs-b); font-weight: 300; }
+/* panel and scheme headers */
+.card-header, h5.card-header, .card-header > div, .card-header h5, .card-header .h5 { font-size: var(--fs-h); font-weight: 500; line-height: 1.25; }
+.card-header small, .card-header .i-small, .card-header .text-white-50 { font-size: var(--fs-s); font-weight: 300; }
+/* row and card titles */
+.lesson-row h5, .part-head h5, .doc-row h5, .subcategory-card .card-title, .subcategory-card .h5, .lesson-inline h5, #lessonPage h5:not(.card-header) { font-size: var(--fs-t); font-weight: 500; line-height: 1.25; }
+.lesson-row h5 .badge, .part-head h5 .badge { font-size: var(--fs-m); }
+/* body text */
+p.card-text, .card-text, .card-body p, .lesson-inline .media-body, .media-body p, .card-text.lead, .lead { font-size: var(--fs-b); font-weight: 300; line-height: 1.5; }
+.card-body p.h6 { font-size: var(--fs-b); }
+/* secondary: subtext under titles, descriptions on rows, labels, breadcrumbs, printables head */
+.subcategory-card--subheading, .lesson-row .fw-light, label.fw-light, #agefilter label, .breadcrumb, .breadcrumb-item, .doc-printables-head, .notice { font-size: var(--fs-s); }
+.subcategory-card--subheading, .lesson-row .fw-light, label.fw-light, #agefilter label, .breadcrumb-item { font-weight: 300; }
+.doc-printables-head { font-weight: 500; }
+/* meta: counts, durations, Part x of y, badges, footer */
+.subcategory-card li, .subcategory-card .small, .lesson-icon, .part-head small, .part-head .lesson-icon, small.text-mid-purple, .badge, .scheme-badge .badge, footer, footer .text-1, footer .text-md, .poc-foot { font-size: var(--fs-m); }
+.subcategory-card li, .lesson-icon, .part-head small, footer, footer .text-1 { font-weight: 300; }
+/* buttons */
+.btn { font-size: var(--fs-b); font-weight: 500; }
+.btn-sm, .btn-group-sm > .btn { font-size: var(--fs-s); }
+.subject-button .button-text { font-weight: 500; }
