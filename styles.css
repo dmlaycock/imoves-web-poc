@@ -279,13 +279,23 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
   .scheme-card .card-header .age-switch { flex: 1 1 auto; margin-left: .5rem !important; }
   .scheme-card .card-header .age-switch .btn { font-size: .8rem; padding-left: .3rem; padding-right: .3rem; }
 }
-/* Phone category cards: no thumbnail (it only repeats the title); the title takes the full width.
+/* Phone category cards (v0.46.4): one plain white card per category - title, subtext, meta -
+   no thumbnail (it only repeated the title), no internal divider, a chevron to show it opens.
    TEMPORARY WORKAROUND alongside WORD_TILE_IMAGES in app.js - remove with the CMS rebuild. */
 @media (max-width: 767.98px) {
+  .subcategory-card.d-md-none { padding-bottom: .6rem; border: 1px solid var(--mid-purple); }
+  .subcategory-card.d-md-none > .border-bottom { border-bottom: 0 !important; position: relative; }
+  .subcategory-card.d-md-none > .border-bottom::after { content: "\F285"; font-family: "bootstrap-icons"; position: absolute; right: .9rem; top: 50%; transform: translateY(-50%); color: var(--mid-purple); font-size: .9rem; }
   .subcategory-card.d-md-none > .border-bottom > .row > .col-5 { display: none; }
-  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding-left: 1rem; }
-  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .75rem 0 !important; }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding: 0 2.2rem 0 1rem; }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .7rem 0 .15rem !important; font-size: 1.1rem; }
+  .subcategory-card.d-md-none > .card-body > div > .pt-3 { padding-top: 0 !important; }
+  .subcategory-card.d-md-none .subcategory-card--subheading { margin: 0 1rem .25rem !important; font-size: .95rem; }
+  .subcategory-card.d-md-none .subcategory-card--subheading:empty { display: none; }
+  .subcategory-card.d-md-none .card-body ul { margin: 0 .5rem; justify-content: flex-start !important; }
+  .subcategory-card.d-md-none .card-body ul:empty { display: none; }
+  .subcategory-card.d-md-none .card-body li { padding: .15rem .5rem; flex: 0 0 auto !important; }
+  .col-12 > a > .subcategory-card.d-md-none { margin-bottom: 0; }
+  .subcategory-card.d-md-none:active { background: var(--ultra-purple); }
 }
-.subcategory-card.d-md-none { padding-bottom: 0; }
-.subcategory-card.d-md-none > .border-bottom:last-child { border-bottom: 0 !important; }   /* no ledge under a title-only card */
 .subcategory-card.tile-only { padding-bottom: 0; }   /* word tile with nothing under it: no empty body, no ledge */
