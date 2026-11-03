@@ -420,3 +420,8 @@ body.m-drawer-open { overflow: hidden; }
 }
 @media (max-width: 1279.98px) { .lesson-actions .btn i { display: none !important; } .lesson-actions .btn { padding: .5rem .55rem; } }
 @media (min-width: 820px) and (max-width: 1279.98px) { .lesson-actions .btn, .lesson-actions #past-readings { white-space: nowrap; } }   /* v0.52.2: one line per label wherever the row has room */
+/* v0.52.3 phones: six equal columns, small labels that may wrap (hyphenated if a word is too long) */
+@media (max-width: 575.98px) {
+  .lesson-actions { gap: .3rem; padding: 0; }
+  .lesson-actions .btn, .lesson-actions #past-readings { flex: 1 1 0 !important; min-width: 0; padding: .45rem .15rem !important; font-size: .68rem !important; line-height: 1.15; white-space: normal !important; overflow-wrap: anywhere; hyphens: auto; text-align: center; }
+}
