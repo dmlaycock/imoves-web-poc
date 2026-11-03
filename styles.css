@@ -397,9 +397,7 @@ body.m-drawer-open { overflow: hidden; }
 #hdr-browse #browsebtn:hover { background: rgba(255,255,255,.12); }
 #hdr-browse #browsebtn.hidden { display: none; }
 .m-burger { width: 44px; height: 44px; }
-@media (max-width: 767.98px) { #hdr-browse { display: none !important; } }
 .m-drawer-search { display: none !important; }   /* v0.52: the header search icon shows at every width */
-@media (min-width: 768px) { .m-drawer-browse { display: none !important; } }
 
 /* ---------- v0.52 lesson page actions on one row (David, 3 Nov 2026) ----------
    Below lg (1280px), where the sidebar stacks above the lesson, History, Favourite, Mark Done,
@@ -429,11 +427,6 @@ body.m-drawer-open { overflow: hidden; }
 
 /* v0.53 Home icon between Browse and the menu from 768px (where the header has room); the
    drawer's Home item and its divider step aside there so Home is never in two places */
-.hdr-home { display: none; }
-@media (min-width: 768px) {
-  .hdr-home { display: inline-flex; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; font-size: 1.15rem; }
-  .m-drawer-home, .m-drawer-home + hr { display: none !important; }
-}
 
 /* ---------- v0.54 header to David's mock-up (3 Nov 2026) ----------
    From 768px:   [logo] Active・Educational・Fun                      (search) (home) (Browse) (menu)
@@ -482,3 +475,14 @@ body.m-drawer-open { overflow: hidden; }
 .main-nav .navbar-actions > .collapse .heading-3 { font-size: 1rem !important; }
 /* v0.56.1: a dash between the school and the class name; it goes with the class name when that drops out */
 #userctx .ctx-classname::before, #m-drawer-ctx .ctx-classname::before { content: "- "; color: #fff; }
+
+/* ---------- v0.57 header buttons by available room (David, 3 Nov 2026) ----------
+   Home and Browse stay in the header for as long as they fit beside the logo (and slogan);
+   as the window narrows Home goes first, then Browse (fitHeaderButtons in app.js sets the
+   body classes). Whichever has left the header appears in the drawer instead, so each is
+   only ever in one place. */
+.hdr-home { display: inline-flex; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; font-size: 1.15rem; }
+body.hdr-no-home #hdr-home, body.hdr-no-browse #hdr-browse { display: none !important; }
+body:not(.hdr-no-home) .m-drawer-home, body:not(.hdr-no-home) .m-drawer-home + hr { display: none !important; }
+body:not(.hdr-no-browse) .m-drawer-browse { display: none !important; }
+@media (max-width: 767.98px) { .hdr-home { width: 38px; height: 38px; font-size: 1rem; } #hdr-browse #browsebtn { height: 38px; padding: 0 .7rem; display: inline-flex; align-items: center; } }

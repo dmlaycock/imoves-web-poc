@@ -202,7 +202,19 @@ const col = v => (v ? (/^(#|rgb|hsl)/.test(v) ? v : '#' + v) : '');
 // Upgrade button and the per-user sticky banner.
 // v0.55 (David, 3 Nov): as the window narrows the class name goes first, then the school name,
 // rather than either colliding with the header buttons. Measured, so any length of name works.
+// v0.57: Home and Browse stay in the header while they fit beside the logo and slogan; Home
+// goes first, then Browse. The drawer shows whichever has left (CSS keys off the body classes).
+function fitHeaderButtons() {
+  const tools = document.getElementById('search-toolbar'), logo = document.querySelector('.main-nav .navbar-logo'), slogan = document.querySelector('.main-nav .nav-slogan');
+  if (!tools || !logo) return;
+  document.body.classList.remove('hdr-no-home', 'hdr-no-browse');
+  const left = () => Math.max(logo.getBoundingClientRect().right, slogan && slogan.getClientRects().length ? slogan.getBoundingClientRect().right : 0);
+  const clash = () => tools.getBoundingClientRect().left < left() + 12;
+  if (clash()) document.body.classList.add('hdr-no-home');
+  if (clash()) document.body.classList.add('hdr-no-browse');
+}
 function fitHeaderCtx() {
+  fitHeaderButtons();
   const hdr = document.getElementById('header'), ctx = document.getElementById('userctx'), tools = document.getElementById('search-toolbar');
   if (!hdr || !ctx || !tools) return;
   hdr.classList.remove('ctx-no-class', 'ctx-no-school');
