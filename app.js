@@ -1673,7 +1673,7 @@ function pageBrowse(qs) {
     <div class="bt-cols" id="bt-cols"></div>
   </div>`;
   BT.sel = sel;
-  btRender();
+  btRender(!!sel.s);
   const find = document.getElementById('bt-find'), clear = document.getElementById('bt-find-clear');
   find.addEventListener('input', () => { clear.classList.toggle('hidden', !find.value); btFind(find.value.trim()); });
   clear.addEventListener('click', () => { find.value = ''; clear.classList.add('hidden'); btFind(''); find.focus(); });
@@ -1716,7 +1716,9 @@ function btRender(scrollRight = false) {
     if (sel.c && !cats.some(c => c.id === sel.c)) sel.c = null;
     cols.push(btColumn('c', group.name, cats.length, cats.map(sc => {
       const n = btCatLessons(sc), leaf = !sc.is_schemes || n === 0;   // direct resources and redirects: open the page itself
-      return btItem({ level: leaf ? null : 'c', id: sc.id, href: leaf ? subcatHref(sc) : null, title: sc.name, sub: leaf ? (sc.is_direct_resource ? 'Resource page' : sc.is_redirect_to_url ? 'Link' : 'Page') : `${subcatSchemes(sc, false).length} ${subcatSchemes(sc, false).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}`, chev: !leaf, selected: sel.c === sc.id, cls: leaf ? 'leaf' : '', extra: subcatIsFree(sc) && !E.allContent ? '<span class="bt-free">Free</span>' : '' });
+      const toLesson = sc.is_redirect_to_lesson && D.lessonById[sc.lesson_redirect_id], toCat = sc.is_redirect_to_category && D.subcatById[sc.subcategory_redirect_id];
+      const sub = !leaf ? `${subcatSchemes(sc, false).length} ${subcatSchemes(sc, false).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}` : toLesson ? 'Lesson · opens the lesson' : toCat ? 'Goes to ' + esc(toCat.name) : sc.is_redirect_to_url ? 'Link · opens in a new tab' : sc.is_direct_resource ? 'Resource page · opens the page' : 'Page · opens the page';
+      return btItem({ level: leaf ? null : 'c', id: sc.id, href: leaf ? (toLesson ? lessonHref(toLesson, sc) : subcatHref(sc)) : null, icon: toLesson ? lessonIcon(toLesson) : '', title: sc.name, sub, chev: !leaf, selected: sel.c === sc.id, cls: leaf ? 'leaf' : '', extra: subcatIsFree(sc) && !E.allContent ? '<span class="bt-free">Free</span>' : '' });
     }).join('')));
   }
   const cat = sel.c && D.subcatById[sel.c];
@@ -1734,7 +1736,7 @@ function btRender(scrollRight = false) {
       const ok = passesAgeFilter(l, null), access = canAccessLesson(l, false);
       if (ok) shownAges++; else hiddenAges++;
       const cls = (ok ? '' : 'age-out ') + (access ? '' : 'restricted');
-      const sub = `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ' · ' + esc(l.duration) : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`;
+      const sub = `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ` · <i class="bi-stopwatch"></i> ${esc(l.duration)}m` : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`;
       return btItem({ level: 'l', id: l.id, icon: access ? lessonIcon(l) : 'bi-lock-fill', title: l.name, sub, selected: sel.l === l.id, cls, extra: (MY.done && MY.done.has(l.id)) ? '<span class="bt-done" title="Done"><i class="bi-check-circle-fill"></i></span>' : '' });
     }).join('');
     cols.push(btColumn('l', scheme.name, lessons.length, rows, btAgeNotice(shownAges, hiddenAges)));
@@ -1779,8 +1781,8 @@ function btFind(term) {
   for (const sg of D.subgroups) { if (!subjOk.has(sg.subject_id) || !canView(sg)) continue; if ((sg.name || '').toLowerCase().includes(q)) hits.push({ level: 'Group', name: sg.name, path: [D.subjectById[sg.subject_id].name], sel: { s: sg.subject_id, g: sg.id } }); }
   for (const sc of D.subcategories) { const sg = D.subgroupById[sc.subgroup_id]; if (!sg || !subjOk.has(sc.subject_id) || !canView(sg)) continue; if ((sc.name || '').toLowerCase().includes(q)) hits.push({ level: 'Category', name: sc.name, path: [D.subjectById[sc.subject_id].name, sg.name], sel: { s: sc.subject_id, g: sg.id, c: sc.id } }); }
   const schemeHome = s => { for (const scId of new Set(D.subcatsByScheme[s.id] || [])) { const sc = D.subcatById[scId], sg = sc && D.subgroupById[sc.subgroup_id]; if (sc && sg && subjOk.has(sc.subject_id) && canView(sg)) return { sc, sg }; } return null; };
-  for (const s of D.schemes) { if (!(s.name || '').toLowerCase().includes(q)) continue; const h = schemeHome(s); if (!h) continue; hits.push({ level: 'Scheme', name: s.name, path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id } }); }
-  for (const l of D.lessons) { if (!(l.name || '').toLowerCase().includes(q)) continue; const s = D.schemeById[l.scheme_id]; const h = s && schemeHome(s); if (!h) continue; hits.push({ level: 'Lesson', name: l.name, path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name, s.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id, l: l.id } }); }
+  for (const s of D.schemes) { if (!(s.name || '').toLowerCase().includes(q)) continue; const h = schemeHome(s); if (!h) continue; hits.push({ level: 'Scheme', name: s.name + (ageRange(schemeLessons(s, false)) ? ` (ages ${ageRange(schemeLessons(s, false))})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id } }); }
+  for (const l of D.lessons) { if (!(l.name || '').toLowerCase().includes(q)) continue; const s = D.schemeById[l.scheme_id]; const h = s && schemeHome(s); if (!h) continue; hits.push({ level: 'Lesson', name: l.name + (lessonAges(l) ? ` (ages ${lessonAges(l)})` : ''), path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name, s.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id, l: l.id } }); }
   const shown = hits.slice(0, 150);
   box.innerHTML = `<div class="bt-results-head">${hits.length ? `${hits.length} match${hits.length === 1 ? '' : 'es'} for "${esc(term)}"${hits.length > shown.length ? ` (first ${shown.length} shown)` : ''}` : `Nothing matches "${esc(term)}"`}</div>` +
     shown.map((h, i) => `<button type="button" class="bt-hit" data-i="${i}"><span class="bt-hit-level">${h.level}</span><span class="bt-hit-text"><span class="bt-name">${esc(h.name)}</span>${h.path.length ? `<small class="bt-sub">${h.path.map(esc).join(' <i class="bi-chevron-right"></i> ')}</small>` : ''}</span><i class="bi-chevron-right bt-chev"></i></button>`).join('');
