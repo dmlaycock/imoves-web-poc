@@ -1121,7 +1121,7 @@ async function fillLessonBody(el, lessonId, sc) {
   el.innerHTML = `<div class="card scheme-card bg-ultra-light-purple border-0 shadow mb-3 lesson-inline">
     ${lessonText(l) ? `<div class="row g-0"><div class="col px-3 pt-3 pb-2"><div class="media-body px-1">${lessonText(l)}</div></div></div>` : ''}
     <div class="row"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true)}</div></div></div>
-    <div class="row"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><a class="btn btn-outline-primary btn-sm" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen me-1"></i> Open full page</a></div></div></div></div>`;
+    <div class="row d-none d-md-flex"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><a class="btn btn-outline-primary btn-sm" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen me-1"></i> Open full page</a></div></div></div></div>`;   // v0.45.6: no "Open full page" on phones
   el.dataset.loaded = '1';
   bindParts(el);
   logView(lessonId);

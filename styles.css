@@ -258,3 +258,7 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
 .lesson-x.open + .lesson-drawer > div > .lesson-inline { margin-top: 0; border: 2px solid var(--purple) !important; border-top: 0 !important; border-radius: 0 0 var(--bs-card-border-radius, 5px) var(--bs-card-border-radius, 5px); background: var(--ultra-purple); }
 .lesson-inline .lesson-block { border-width: 1px; border-color: var(--mid-purple); box-shadow: 0 .25rem .75rem rgba(0,0,0,.08); }
 .lesson-inline .lesson-block .list-group-item.active-part, .lesson-inline .lesson-collapse.active { border-color: var(--xlight-purple) !important; }
+
+/* v0.45.6 phone: the open lesson's header bar runs the full width of the frame (the icon
+   column has nothing to show below md, so it is hidden there) */
+@media (max-width: 767.98px) { .lesson-x.open > .list-group-item + .list-group-item { display: none; } }
