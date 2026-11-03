@@ -172,7 +172,10 @@ body.signed-out #subjectnav, body.signed-out #headerfilter, body.signed-out #sea
 .lesson-block > .list-group-item { border-left: 0; border-right: 0; border-top: 1px solid var(--xlight-purple); border-bottom: 0; }
 .lesson-block > .list-group-item:first-child, .doc-printables-head + .list-group-item { border-top: 0; }
 .doc-printables-head { background: var(--ultra-purple); color: var(--purple); font-weight: 600; font-size: .95rem; padding: .5rem 1rem; display: flex; align-items: center; }
-.doc-row .part-head { cursor: default; }
+.doc-row { position: relative; }
+.doc-row .part-head { cursor: pointer; }
+.doc-row:hover { background-color: var(--ultra-purple); }
+.doc-row:hover .part-head > .col > div:first-child i { transform: translateX(2px); }
 @media (min-width: 768px) { .doc-row .part-head { min-height: 4.3rem; } }   /* = a parts row with its duration and Part x of y lines (md up; below md those lines are hidden) */
 .doc-row .btn { white-space: nowrap; }
 

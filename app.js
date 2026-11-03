@@ -1482,7 +1482,8 @@ function docFile(p) {
 function docIcon(d) { return { PDF: 'bi-file-earmark-pdf-fill', DOC: 'bi-file-earmark-word-fill', DOCX: 'bi-file-earmark-word-fill', PPT: 'bi-file-earmark-slides-fill', PPTX: 'bi-file-earmark-slides-fill', XLS: 'bi-file-earmark-spreadsheet-fill', XLSX: 'bi-file-earmark-spreadsheet-fill', JPG: 'bi-file-earmark-image-fill', JPEG: 'bi-file-earmark-image-fill', PNG: 'bi-file-earmark-image-fill', MP3: 'bi-file-earmark-music-fill', ZIP: 'bi-file-earmark-zip-fill' }[d.type] || 'bi-file-earmark-arrow-down-fill'; }
 function docButton(d) {
   if (!d.url) return '<span class="text-mid-purple fw-light">File not available</span>';
-  return `<a class="btn btn-primary btn-sm doc-open" href="${esc(d.url)}" target="_blank" rel="noopener"><i class="bi-eye me-1"></i>Open</a>`;
+  // v0.50.3: stretched-link makes the whole row (icon and title too) open the file, like the button.
+  return `<a class="btn btn-primary btn-sm doc-open stretched-link" href="${esc(d.url)}" target="_blank" rel="noopener"><i class="bi-eye me-1"></i>Open</a>`;
 }
 // v0.44.2 (David): one Open button, no file details, icons the size of the part icons.
 function renderDocs(l, docs) {
