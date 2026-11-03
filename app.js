@@ -344,7 +344,7 @@ async function route() {
   maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
   const hdrf = document.getElementById('hdr-filter'); if (hdrf && hf) hdrf.classList.toggle('hidden', hf.classList.contains('hidden'));
-  updateAgeChip(); closeMobileDrawer(); if (!BT.pendingOpen) closeBrowseTree();
+  updateAgeChip(); closeMobileDrawer(); if (!BT.pendingOpen) closeBrowseTree(); closeLessonFocus();
   const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
   try {
@@ -1213,6 +1213,8 @@ function bindLessonRows(sc) {
 // sticky header. Scrolled once the content is in, and again when the drawer has finished
 // growing, so the row ends up at the top rather than wherever the layout was mid-animation.
 function scrollToTop(el) {
+  const focus = el.closest('.lesson-focus');
+  if (focus) { const box = focus.querySelector('.lesson-focus-body'); const bar = focus.querySelector('.lesson-focus-bar'); const go = b => box.scrollTo({ top: Math.max(0, el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8), behavior: b }); requestAnimationFrame(() => go('smooth')); setTimeout(() => go('smooth'), 380); return; }   // v0.64: inside the full-screen lesson
   const target = () => { const header = document.getElementById('header'); return Math.max(0, el.getBoundingClientRect().top + window.scrollY - ((header ? header.offsetHeight : 0) + 8)); };
   const go = behavior => window.scrollTo({ top: target(), behavior });
   requestAnimationFrame(() => go('smooth'));
@@ -1230,9 +1232,10 @@ async function fillLessonBody(el, lessonId, sc) {
   el.innerHTML = `<div class="card scheme-card bg-ultra-light-purple border-0 shadow mb-3 lesson-inline">
     ${lessonText(l) ? `<div class="row g-0"><div class="col px-3 pt-3 pb-2"><div class="media-body px-1">${lessonText(l)}</div></div></div>` : ''}
     <div class="row"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true)}</div></div></div>
-    <div class="row d-none d-md-flex"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><a class="btn btn-outline-primary btn-sm" href="${lessonHref(l, sc)}"><i class="bi-arrows-fullscreen me-1"></i> Open full page</a></div></div></div></div>`;   // v0.45.6: no "Open full page" on phones
+    <div class="row d-none d-md-flex"><div class="col-12"><div class="card-body pt-0 pb-3 d-flex justify-content-end"><button type="button" class="btn btn-outline-primary btn-sm lesson-fullscreen" data-focus="${l.id}"><i class="bi-arrows-fullscreen me-1"></i> Full screen</button></div></div></div></div>`;   // v0.45.6: not on phones; v0.64: full screen of the lesson pane, not the lesson page
   el.dataset.loaded = '1';
   bindParts(el);
+  el.querySelector('.lesson-fullscreen').addEventListener('click', () => openLessonFocus(el, l, sc));
   logView(lessonId);
 }
 function lessonText(l) {
@@ -1807,3 +1810,38 @@ function btRender(scrollRight = false) {
   btRenderCols(scrollRight);
 }
 function btAgeClearBind(root) { const ac = root.querySelector('#bt-age-clear'); if (ac) ac.addEventListener('click', () => { const src = document.getElementById('classage'); src.value = ''; src.dispatchEvent(new Event('change')); }); }
+
+// ---------- v0.64 full-screen lesson (David, 3 Nov 2026, 18:51) ----------
+// "Open full page" on an expanded lesson used to go to the lesson page. Now it shows just the
+// lesson pane, full screen, with nothing around it: a bar with the lesson name and an obvious
+// "Close full screen (Esc)" button. The pane is the same element moved into the overlay and moved
+// back on close, so the category page is exactly as it was. True browser full screen is requested
+// too where the browser allows it (projectors); leaving it (Esc) closes the overlay.
+let FOCUS = null;
+function openLessonFocus(drawerEl, l, sc) {
+  if (FOCUS) closeLessonFocus();
+  const pane = drawerEl.querySelector('.lesson-inline'); if (!pane) return;
+  const scheme = D.schemeById[l.scheme_id];
+  const ov = document.createElement('div'); ov.className = 'lesson-focus'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', l.name);
+  ov.innerHTML = `<div class="lesson-focus-bar"><div class="lesson-focus-title"><h5>${esc(l.name)}</h5><small>${esc([scheme && scheme.name, ageText(l)].filter(Boolean).join(' · '))}</small></div><button type="button" class="lesson-focus-close" id="lesson-focus-close"><i class="bi-x-lg"></i><span>Close full screen</span><kbd>Esc</kbd></button></div><div class="lesson-focus-body"><div class="lesson-focus-inner"></div></div>`;
+  const placeholder = document.createComment('lesson pane in full screen');
+  pane.parentNode.insertBefore(placeholder, pane);
+  ov.querySelector('.lesson-focus-inner').appendChild(pane);
+  document.body.appendChild(ov); document.body.classList.add('lesson-focus-open');
+  FOCUS = { ov, pane, placeholder };
+  const onKey = e => { if (e.key === 'Escape') closeLessonFocus(); };
+  const onFs = () => { if (!document.fullscreenElement && FOCUS && FOCUS.fs) closeLessonFocus(); };
+  FOCUS.onKey = onKey; FOCUS.onFs = onFs;
+  document.addEventListener('keydown', onKey); document.addEventListener('fullscreenchange', onFs);
+  ov.querySelector('#lesson-focus-close').addEventListener('click', closeLessonFocus);
+  if (ov.requestFullscreen) ov.requestFullscreen().then(() => { if (FOCUS) FOCUS.fs = true; }).catch(() => {});
+  requestAnimationFrame(() => ov.classList.add('show'));
+}
+function closeLessonFocus() {
+  if (!FOCUS) return;
+  const f = FOCUS; FOCUS = null;
+  document.removeEventListener('keydown', f.onKey); document.removeEventListener('fullscreenchange', f.onFs);
+  if (document.fullscreenElement === f.ov && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+  f.placeholder.parentNode.insertBefore(f.pane, f.placeholder); f.placeholder.remove();
+  f.ov.remove(); document.body.classList.remove('lesson-focus-open');
+}
