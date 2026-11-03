@@ -501,6 +501,19 @@ function bindCollapses() {
   }));
 }
 
+// TEMPORARY WORKAROUND (David, 3 Nov 2026) - remove when the CMS rebuild makes the category image
+// optional and generates a typographic tile itself. These tile images are words on a colour and
+// already carry the category name, so the desktop card shows no heading under them (the subtext
+// and meta line stay). Keyed by image file so every subject that reuses the tile is covered.
+const WORD_TILE_IMAGES = new Set([
+  'Thumbnails mixed (3).jpg', 'Thumbnails mixed (1).jpg', 'Thumbnails mixed.jpg', 'Thumbnails mixed (2).jpg', '2191s.jpg',   // Active Assemblies
+  '1 (18).jpg', '2 (13).jpg', '7 (11).jpg', '5 (13).jpg',                     // Active 30 minutes: New to imoves?, Active Blasts, Active Learning, Wellbeing
+  '4 (12).jpg', '8 (9).jpg', '6 (9).jpg', '10 (2).jpg',                       // PE / Recommended Programme: Fundamentals, Dance, Gymnastics, Pilates and Yoga
+  '9 (3).jpg', '3 (10).jpg', '11 (2).jpg', 'TS.jpg',                          // KS2 Deeper Dive: Sports Specific, Athletics, OAA, Teacher Support
+  'Thumbnails mixed (6).jpg', 'Thumbnails mixed (7).jpg', 'BG.jpg', 'OSF.jpg', // PE Extra
+  'Thumbnails mixed (8).jpg', 'Thumbnails mixed (9).jpg', 'Thumbnails mixed (10).jpg', 'Thumbnails mixed (11).jpg',   // Working Wall Posters
+]);
+const isWordTile = sc => WORD_TILE_IMAGES.has(decodeURIComponent((sc.image || '').split('/').pop()));
 // A subcategory card: subjects/partials/subcategory-card.blade.php (desktop variant).
 function subcatCard(sc, { heading, sub, cols } = {}) {
   const lessons = subcatLessons(sc), dr = directResource(sc), vid = dr && dr.duration;
@@ -516,8 +529,8 @@ function subcatCard(sc, { heading, sub, cols } = {}) {
   return `<div class="${cols || 'col-12 col-md-6 col-lg-6 col-xl-3 mb-4'}"><a href="${subcatHref(sc)}" title="${esc(sc.name)}" class="text-decoration-none">
     <div class="card subcategory-card lift shadow-sm d-none d-md-flex flex-column h-100"><img src="${esc(img(sc.image))}" class="card-img-top" alt="${esc(sc.name)}" loading="lazy">
     <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center">
-      <h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>
-      ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
+      ${isWordTile(sc) ? '' : `<h5 class="text-primary ${subheading ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-nowrap">${esc(limit(heading || sc.name, 25))}</h5>`}
+      ${subheading ? `<h6 class="subcategory-card--subheading h6 text-mid-purple fw-light mb-2 ${isWordTile(sc) ? 'mt-3' : ''} mx-3 card-title">${esc(limit(subheading, 130))}</h6>` : ''}</div></div>
     <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around">${meta}</ul></div></div>${mobile}</a></div>`;
 }
 
@@ -1032,7 +1045,8 @@ function pageSubcategory(subjectId, id) {
     const restricted = !schemeViewable(variants[sel].s);
     const labels = variants.map((v, i) => v.ages ? ageTextRange(v.ages) : (v.s.subheading || `Version ${i + 1}`));
     labels.forEach((l, i) => { if (labels.indexOf(l) !== i) labels[i] = `${l} (${i + 1})`; });
-    const sw = merged ? `<div class="btn-group btn-group-sm ms-2 age-switch" role="group" aria-label="Age version">${labels.map((l, i) => `<button type="button" class="btn ${i === sel ? 'btn-light text-primary' : 'btn-outline-light'}" data-variant="${i}">${esc(l)}</button>`).join('')}</div>` : '';
+    // v0.46: on phones the word "Ages" is shown once, before the group, and the buttons carry only the range.
+    const sw = merged ? `<span class="age-switch-lbl d-md-none">Ages:</span><div class="btn-group btn-group-sm ms-2 age-switch" role="group" aria-label="Age version">${labels.map((l, i) => `<button type="button" class="btn ${i === sel ? 'btn-light text-primary' : 'btn-outline-light'}" data-variant="${i}">${esc(l).replace(/^(Ages?)\s+/i, '<span class="age-pre">$1 </span>')}</button>`).join('')}</div>` : '';
     html += `<a id="scheme-${first.id}"></a><div class="row"><div class="col"><div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow ${restricted ? 'content-restricted' : ''}" data-scheme="${first.id}">
       <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0 ${merged ? 'has-age-switch' : ''}">
         <h5 class="text-truncate text-white mr-1 mb-0">${esc(first.name)}${!merged && first.subheading ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(first.subheading)}</small>` : ''}${variants.some(v => v.s.is_freemium) ? ' <span class="scheme-badge badge-freemium ms-2"><span class="badge bg-success">Free</span></span>' : ''}</h5>${sw}</div></div></div></div>`;

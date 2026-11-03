@@ -270,3 +270,19 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
   .scheme-card .card-header .age-switch { flex: 1 1 100%; margin-left: 0 !important; margin-top: .45rem; display: flex; }
   .scheme-card .card-header .age-switch .btn { flex: 1 1 0; padding-left: .15rem; padding-right: .15rem; font-size: .72rem; white-space: nowrap; min-width: 0; }
 }
+
+/* ---------- v0.46 (David, 3 Nov 2026) ----------
+   Phone age switch: "Ages:" once, then the ranges. */
+.age-switch-lbl { color: #fff; font-weight: 600; font-size: .85rem; margin-top: .55rem; flex: 0 0 auto; }
+@media (max-width: 767.98px) {
+  .age-pre { display: none; }
+  .scheme-card .card-header .age-switch { flex: 1 1 auto; margin-left: .5rem !important; }
+  .scheme-card .card-header .age-switch .btn { font-size: .8rem; padding-left: .3rem; padding-right: .3rem; }
+}
+/* Phone category cards: no thumbnail (it only repeats the title); the title takes the full width.
+   TEMPORARY WORKAROUND alongside WORD_TILE_IMAGES in app.js - remove with the CMS rebuild. */
+@media (max-width: 767.98px) {
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-5 { display: none; }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding-left: 1rem; }
+  .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .75rem 0 !important; }
+}
