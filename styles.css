@@ -426,3 +426,11 @@ body.m-drawer-open { overflow: hidden; }
   .lesson-actions .btn, .lesson-actions #past-readings { flex: 1 1 0 !important; min-width: 0; padding: .45rem .15rem !important; font-size: .68rem !important; line-height: 1.15; white-space: normal !important; overflow-wrap: anywhere; hyphens: auto; text-align: center; }
 }
 @media (max-width: 575.98px) { .lesson-actions { gap: .25rem; } .lesson-actions .btn, .lesson-actions #past-readings { overflow-wrap: normal; font-size: .64rem !important; padding: .45rem .1rem !important; } }   /* v0.52.4: whole words fit */
+
+/* v0.53 Home icon between Browse and the menu from 768px (where the header has room); the
+   drawer's Home item and its divider step aside there so Home is never in two places */
+.hdr-home { display: none; }
+@media (min-width: 768px) {
+  .hdr-home { display: inline-flex; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; font-size: 1.15rem; }
+  .m-drawer-home, .m-drawer-home + hr { display: none !important; }
+}

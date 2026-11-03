@@ -368,6 +368,7 @@ function renderMobileDrawer(menuHtml) {
   const nav = document.getElementById('m-drawer-nav');
   nav.innerHTML = menuHtml.replace(/<a href="#\/search"[^>]*>Search<\/a>/, '').replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider[^"]*"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
   nav.querySelector('#m-logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
+  const homeItem = nav.querySelector('a[href="#/"]'); if (homeItem) homeItem.classList.add('m-drawer-home');   // v0.53: hidden where the header shows the Home icon
   nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
   const src = document.getElementById('classage'), sel = document.getElementById('m-classage');
   sel.innerHTML = src.innerHTML;
@@ -619,6 +620,9 @@ const MY = { fav: new Set(), done: new Set(), seen: new Set() };
 async function loadMyLessons() {
   try { const [r] = await rpc('web_my_lessons'); MY.fav = new Set(r.favourites); MY.done = new Set(r.completed); MY.seen = new Set(r.seen); }
   catch (e) { console.warn('my lessons unavailable:', e.message); }
+  // v0.53: the month each lesson was last marked done, for the "Done MM/YY" button.
+  MY.doneAt = new Map();
+  try { (await rpc('web_my_completions')).forEach(r => MY.doneAt.set(r.lesson_id, r.last_at)); } catch (e) { /* function not deployed yet: plain "Done" */ }
 }
 async function restWrite(path, body, method = 'POST') {
   const prefer = 'return=minimal' + (path.includes('on_conflict=') ? ',resolution=merge-duplicates' : '');
@@ -636,7 +640,7 @@ async function toggleFavourite(lessonId) {
 // them (mark-as-incomplete).
 async function toggleDone(lessonId) {
   if (MY.done.has(lessonId)) { await restWrite(`user_lesson_completions?user_id=eq.${uid()}&lesson_id=eq.${lessonId}`, null, 'DELETE'); MY.done.delete(lessonId); }
-  else { await restWrite('user_lesson_completions', { user_id: uid(), lesson_id: lessonId }); MY.done.add(lessonId); }
+  else { await restWrite('user_lesson_completions', { user_id: uid(), lesson_id: lessonId }); MY.done.add(lessonId); if (MY.doneAt) MY.doneAt.set(lessonId, new Date().toISOString()); }
   paintStates();
 }
 async function logView(lessonId) {
@@ -656,8 +660,13 @@ function paintStates() {
   document.querySelectorAll('[data-done-for]').forEach(el => {
     const on = MY.done.has(+el.dataset.doneFor); const row = el.dataset.doneKind === 'icon';
     if (row) { el.innerHTML = on ? '<i class="bi-check-circle-fill text-success"></i>' : '<i class="bi-circle text-mid-purple"></i>'; el.title = on ? 'Mark as Incomplete' : 'Mark as Complete'; }
-    else { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? `<i class="d-none d-lg-inline bi-check-circle-fill mr-1"></i> ${esc(el.dataset.label)} Complete` : `<i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done`; }
+    else { el.classList.toggle('btn-primary', on || el.dataset.bg === '1'); el.classList.toggle('btn-outline-primary', !on && el.dataset.bg !== '1'); el.innerHTML = on ? `<i class="d-none d-lg-inline bi-check-circle-fill mr-1"></i> ${doneLabel(+el.dataset.doneFor)}` : `<i class="d-none d-lg-inline bi-check-circle mr-1"></i> Mark <span class="d-none d-xl-inline">as</span> Done`; }
   });
+}
+// v0.53 (David, 3 Nov): "Done MM/YY" - the month the lesson was last marked done.
+function doneLabel(id) {
+  const at = MY.doneAt && MY.doneAt.get(id); if (!at) return 'Done';
+  const d = new Date(at); return `Done ${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getFullYear()).slice(-2)}`;
 }
 function bindActions(root) {
   root.querySelectorAll('[data-fav-for]').forEach(el => { if (el.dataset.bound) return; el.dataset.bound = '1'; el.addEventListener('click', async e => { e.stopPropagation(); e.preventDefault(); el.classList.add('cursor-wait'); try { await toggleFavourite(+el.dataset.favFor); } catch (x) { alert('Could not save: ' + x.message); } el.classList.remove('cursor-wait'); }); });
