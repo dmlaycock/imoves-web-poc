@@ -288,3 +288,4 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
 }
 .subcategory-card.d-md-none { padding-bottom: 0; }
 .subcategory-card.d-md-none > .border-bottom:last-child { border-bottom: 0 !important; }   /* no ledge under a title-only card */
+.subcategory-card.tile-only { padding-bottom: 0; }   /* word tile with nothing under it: no empty body, no ledge */
