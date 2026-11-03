@@ -263,21 +263,17 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
    column has nothing to show below md, so it is hidden there) */
 @media (max-width: 767.98px) { .lesson-x.open > .list-group-item + .list-group-item { display: none; } }
 
-/* v0.45.8 phone: in a scheme header with age variants the switch takes its own row under the
-   scheme name instead of squeezing the name to a few letters; buttons share the width */
+/* ---------- v0.46 / v0.47.3 age switch (David, 3 Nov 2026) ----------
+   Desktop: the switch sits at the right of the scheme header with a clear gap from the name.
+   Phone: "Ages:" once, then the ranges as equal buttons on their own row under the name. */
+.age-switch-wrap { display: flex; align-items: center; gap: .5rem; flex: 0 0 auto; margin-left: 1rem; }
+.age-switch-lbl { color: #fff; font-weight: 500; font-size: var(--fs-s); white-space: nowrap; }
 @media (max-width: 767.98px) {
   .scheme-card .card-header > .col.has-age-switch { flex-wrap: wrap; }
-  .scheme-card .card-header .age-switch { flex: 1 1 100%; margin-left: 0 !important; margin-top: .45rem; display: flex; }
-  .scheme-card .card-header .age-switch .btn { flex: 1 1 0; padding-left: .15rem; padding-right: .15rem; font-size: .72rem; white-space: nowrap; min-width: 0; }
-}
-
-/* ---------- v0.46 (David, 3 Nov 2026) ----------
-   Phone age switch: "Ages:" once, then the ranges. */
-.age-switch-lbl { color: #fff; font-weight: 600; font-size: .85rem; margin-top: .55rem; flex: 0 0 auto; }
-@media (max-width: 767.98px) {
+  .age-switch-wrap { flex: 1 1 100%; margin-left: 0; margin-top: .5rem; }
+  .age-switch-wrap .age-switch { flex: 1 1 auto; display: flex; }
+  .age-switch-wrap .age-switch .btn { flex: 1 1 0; padding-left: .3rem; padding-right: .3rem; white-space: nowrap; min-width: 0; }
   .age-pre { display: none; }
-  .scheme-card .card-header .age-switch { flex: 1 1 auto; margin-left: .5rem !important; }
-  .scheme-card .card-header .age-switch .btn { font-size: .8rem; padding-left: .3rem; padding-right: .3rem; }
 }
 /* Phone category cards (v0.46.4, v0.47): one plain white card per category - title, subtext,
    meta - no thumbnail (it only repeated the title), no internal divider, a chevron centred on
