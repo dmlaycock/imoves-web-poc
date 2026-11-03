@@ -353,9 +353,9 @@ async function route() {
     if (p[0] === 'subject' && p[2] === 'subcategory') return pageSubcategory(+p[1], +p[3]);
     if (p[0] === 'subject') return pageSubject(+p[1]);
     if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
-    if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null);
+    if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null, qs.part ? +qs.part : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
-    if (p[0] === 'browse') { openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
+    if (p[0] === 'browse') { if (browseTreeOn()) return pageBrowse(qs); openBrowse(); history.replaceState(null, '', location.pathname + location.search + '#/'); return; }
     if (p[0] === 'favourites') return pageFavourites();
     if (p[0] === 'curriculum') return pageCurriculum();
     if (p[0] === 'profile') return pageProfile();
@@ -413,7 +413,9 @@ function renderMobileDrawer(menuHtml) {
   const ctx = document.getElementById('userctx'); document.getElementById('m-drawer-ctx').innerHTML = ctx ? ctx.innerHTML : '';
   document.getElementById('m-drawer-ctx').querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
   document.getElementById('m-browse').classList.toggle('hidden', !E.showBrowseMenu);
+  const sw = document.getElementById('m-browse-switch'); if (sw) { sw.classList.toggle('hidden', !E.showBrowseMenu); sw.querySelector('input').checked = browseTreeOn(); }
   if (d.dataset.bound) return; d.dataset.bound = '1';
+  if (sw) sw.querySelector('input').addEventListener('change', e => { setBrowseTree(e.target.checked); if (location.hash.startsWith('#/browse') && !e.target.checked) location.hash = '#/'; });
   document.getElementById('m-burger').addEventListener('click', openMobileDrawer);
   document.getElementById('m-drawer-close').addEventListener('click', closeMobileDrawer);
   document.getElementById('m-drawer-backdrop').addEventListener('click', closeMobileDrawer);
@@ -552,6 +554,7 @@ function bindSubjectScroll() {
   nav.addEventListener('scroll', upd); window.addEventListener('resize', upd); upd();
 }
 function openBrowse() {
+  if (browseTreeOn()) { location.hash = '#/browse'; return; }   // v0.60: the tree page
   const m = document.getElementById('subject-browse-modal');
   const cur = (location.hash.match(/^#\/subject\/(\d+)/) || [])[1];
   if (cur) m.querySelectorAll('#browse-tabs a, #browse-panes .tab-pane').forEach(el => el.classList.toggle('active', el.dataset.pane === cur));
@@ -1272,7 +1275,7 @@ function lessonText(l) {
   return h;
 }
 
-async function pageLesson(id, scId) {
+async function pageLesson(id, scId, partId = null) {
   app.innerHTML = '<div class="loading">Opening lesson…</div>';
   const [rows, parts] = await Promise.all([
     rest(`lessons?id=eq.${id}&select=*`),
@@ -1295,7 +1298,7 @@ async function pageLesson(id, scId) {
     <div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow">
       <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0"><h5 class="text-truncate text-white mr-1 mb-0">${esc(l.name)}${l.heading_2 ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(l.heading_2)}</small>` : ''}</h5><span class="d-flex flex-wrap justify-content-end text-nowrap text-light-purple fw-light py-1">${esc(ageText(l))}</span></div></div></div></div>
       <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(scheme?.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(l.name)}"><div class="media-body px-1">${lessonText(l)}</div></div></div></div>
-      <div class="row mt-2"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true)}</div></div></div>
+      <div class="row mt-2"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true, partId)}</div></div></div>
       ${seq.length > 1 ? `<div class="row mt-2"><div class="col-12"><div class="card-body py-4"><div class="d-flex w-100 justify-content-between"><a href="${prev ? lessonHref(prev, sc) : '#'}" class="btn btn-outline-primary ${prev ? '' : 'disabled'}"><i class="bi-skip-backward-circle mr-1"></i> Previous ${esc(Label)}</a><a href="${next ? lessonHref(next, sc) : '#'}" class="btn ${next ? 'btn-primary' : 'btn-outline-primary disabled'}">Next ${esc(Label)} <i class="bi-skip-forward-circle-fill ms-1"></i></a></div></div></div></div>` : ''}
     </div></div></div></div>`;
   // Sidebar: What To Expect card (rotated, on a splodge), History / Mark as Done, Favourites
@@ -1320,6 +1323,7 @@ async function pageLesson(id, scId) {
   reveal();
   bindParts(app);
   bindActions(app);
+  if (partId) { const it = app.querySelector(`.lesson-part-item[data-part="${partId}"]`); if (it) setTimeout(() => scrollToTop(it), 150); }   // v0.60: arrived from the Browse tree
   logView(l.id);
   if (l.show_assessment) {
     renderReadings(l.id); app.querySelectorAll('[data-thumb]').forEach(b => b.addEventListener('click', () => openThumb(l)));
@@ -1541,7 +1545,7 @@ function renderDocs(l, docs) {
     ${others.length ? `<div class="list-group lesson-block doc-printables"><div class="doc-printables-head"><i class="bi-printer me-2"></i>Printables</div>${others.map(p => row(p, p.heading || 'Download')).join('')}</div>` : ''}
   </div>`;
 }
-function renderParts(l, allParts, openFirst) {
+function renderParts(l, allParts, openFirst, openPart = null) {
   if (!allParts.length) return '<div class="notice">This lesson has no live parts at the moment.</div>';
   // v0.44: downloads leave the sequence and sit above it as documents (renderDocs); the parts
   // played or shown to the class are numbered among themselves.
@@ -1549,7 +1553,7 @@ function renderParts(l, allParts, openFirst) {
   const docsHtml = renderDocs(l, docs);
   if (!parts.length) return docsHtml;
   return docsHtml + `<div class="accordion list-group lesson-block lesson-parts mt-0" id="lesson-${l.id}-parts">` + parts.map((p, i) => {
-    const show = openFirst && i === 0;
+    const show = openPart && parts.some(x => x.id === openPart) ? p.id === openPart : (openFirst && i === 0);   // v0.60: ?part= from the Browse tree
     const info = p.additional_info && p.additional_info.trim();
     const infoHtml = info ? para(p.additional_info) : '';
     let card = '';
@@ -1637,3 +1641,154 @@ async function startApp() {
   rest('content_refreshes?select=at&order=at.desc&limit=1').then(r => { if (r && r[0]) document.getElementById('stamp').textContent = new Date(r[0].at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }).catch(() => {});
   if (await Auth.init()) await startApp();
 })();
+
+// ---------- v0.60 Browse tree (David, 3 Nov 2026) ----------
+// An alternative Browse: a full page (#/browse) of Finder-style columns - Subjects | Groups |
+// Categories | Schemes | Lessons | Parts - with a find-as-you-type box. A scheme that belongs
+// to two or three categories simply appears under each (nothing is duplicated underneath: a
+// lesson has one scheme, a part one lesson). The structure is never thinned by the age filter;
+// lessons outside the filter are shown greyed, with a notice and counts, so it is obvious what is
+// hidden and why. Switched on and off in the menu drawer ("New Browse"); off restores the pop-up.
+const BT = { cols: [], parts: new Map(), bound: false };
+function browseTreeOn() { try { return localStorage.getItem('imoves.browseTree') !== '0'; } catch (e) { return true; } }
+function setBrowseTree(on) { try { localStorage.setItem('imoves.browseTree', on ? '1' : '0'); } catch (e) {} document.querySelectorAll('.bt-switch input').forEach(i => { i.checked = on; }); }
+function browseSubjects() {
+  return D.subjects.filter(s => s.is_browsable && E.browse.includes(s.id) && canViewSubject(s) && subjectSubgroups(s.id).some(sg => subgroupSubcats(sg, false).some(sc => subcatSchemes(sc, false).length > 0))).sort((a, b) => (a.browse_order ?? -1) - (b.browse_order ?? -1));
+}
+function btCatLessons(sc) { return subcatLessons(sc, false).length; }
+function btPath(sel) {   // the current selection as hash query parameters
+  const q = new URLSearchParams(); ['s', 'g', 'c', 'k', 'l'].forEach(k => { if (sel[k]) q.set(k, sel[k]); }); const s = q.toString(); return '#/browse' + (s ? '?' + s : '');
+}
+function pageBrowse(qs) {
+  setBg(null); document.body.classList.add('bg-no-margin');
+  const sel = { s: +qs.s || null, g: +qs.g || null, c: +qs.c || null, k: +qs.k || null, l: +qs.l || null };
+  app.innerHTML = `<div class="bt">
+    <div class="bt-top">
+      <div class="bt-title"><h4 class="mb-0 text-primary">Browse</h4><small class="text-mid-purple">Pick a subject, then keep going right to a lesson and its parts.</small></div>
+      <div class="bt-find"><i class="bi-search" aria-hidden="true"></i><input type="search" id="bt-find" class="form-control" placeholder="Find a subject, category, scheme or lesson" autocomplete="off" aria-label="Find in Browse"><button type="button" class="bt-find-clear hidden" id="bt-find-clear" aria-label="Clear"><i class="bi-x-lg"></i></button></div>
+    </div>
+    <div class="bt-crumbs" id="bt-crumbs"></div>
+    <div class="bt-age hidden" id="bt-age"></div>
+    <div class="bt-results hidden" id="bt-results"></div>
+    <div class="bt-cols" id="bt-cols"></div>
+  </div>`;
+  BT.sel = sel;
+  btRender();
+  const find = document.getElementById('bt-find'), clear = document.getElementById('bt-find-clear');
+  find.addEventListener('input', () => { clear.classList.toggle('hidden', !find.value); btFind(find.value.trim()); });
+  clear.addEventListener('click', () => { find.value = ''; clear.classList.add('hidden'); btFind(''); find.focus(); });
+  if (window.innerWidth >= 768) find.focus({ preventScroll: true });
+}
+function btSelect(level, id) {
+  const order = ['s', 'g', 'c', 'k', 'l'], i = order.indexOf(level);
+  const sel = BT.sel; sel[level] = id; order.slice(i + 1).forEach(k => { sel[k] = null; });
+  history.replaceState(null, '', location.pathname + location.search + btPath(sel));
+  btRender(true);
+}
+function btItem({ href, level, id, cls = '', icon = '', title, sub = '', chev = true, selected = false, extra = '' }) {
+  const tag = href ? 'a' : 'button';
+  return `<${tag} ${href ? `href="${href}"` : 'type="button"'} class="bt-item ${cls} ${selected ? 'selected' : ''}" ${level ? `data-level="${level}" data-id="${id}"` : ''}>
+    ${icon ? `<i class="${icon} bt-ico" aria-hidden="true"></i>` : ''}<span class="bt-text"><span class="bt-name">${esc(title)}</span>${sub ? `<small class="bt-sub">${sub}</small>` : ''}</span>${extra}${chev ? '<i class="bi-chevron-right bt-chev" aria-hidden="true"></i>' : ''}
+  </${tag}>`;
+}
+function btColumn(level, heading, count, body, note = '') {
+  return `<section class="bt-col" data-col="${level}"><header class="bt-col-head"><span>${esc(heading)}</span><small>${count}</small></header>${note}<div class="bt-col-body">${body || '<div class="bt-empty">Nothing here</div>'}</div></section>`;
+}
+function btAgeNotice(shown, hidden) {
+  const src = document.getElementById('classage'), label = src && src.value ? src.options[src.selectedIndex].text : '';
+  if (!label) return '';
+  return `<div class="bt-age-note"><i class="bi-funnel-fill" aria-hidden="true"></i><span><strong>Age filter on: ${esc(label)}.</strong> ${hidden ? `${hidden} of ${shown + hidden} lessons here are for other ages and are greyed out.` : `All ${shown} lessons here suit this age.`}</span><button type="button" class="btn btn-sm btn-outline-primary" id="bt-age-clear">Show all ages</button></div>`;
+}
+function btRender(scrollRight = false) {
+  const sel = BT.sel, cols = [];
+  const subjects = browseSubjects();
+  if (sel.s && !subjects.some(s => s.id === sel.s)) sel.s = null;
+  cols.push(btColumn('s', 'Subjects', subjects.length, subjects.map(s => btItem({ level: 's', id: s.id, icon: cleanIcon(s.icon) || 'bi-flag', title: s.name, selected: sel.s === s.id })).join('')));
+  const subject = sel.s && D.subjectById[sel.s];
+  if (subject) {
+    const groups = subjectSubgroups(subject.id).filter(canView).filter(sg => subgroupSubcats(sg, false).length);
+    if (sel.g && !groups.some(g => g.id === sel.g)) sel.g = null;
+    cols.push(btColumn('g', subject.name, groups.length, groups.map(sg => btItem({ level: 'g', id: sg.id, title: sg.name, sub: `${subgroupSubcats(sg, false).length} categories`, selected: sel.g === sg.id })).join('')));
+  }
+  const group = sel.g && D.subgroupById[sel.g];
+  if (group) {
+    const cats = subgroupSubcats(group, false);
+    if (sel.c && !cats.some(c => c.id === sel.c)) sel.c = null;
+    cols.push(btColumn('c', group.name, cats.length, cats.map(sc => {
+      const n = btCatLessons(sc), leaf = !sc.is_schemes || n === 0;   // direct resources and redirects: open the page itself
+      return btItem({ level: leaf ? null : 'c', id: sc.id, href: leaf ? subcatHref(sc) : null, title: sc.name, sub: leaf ? (sc.is_direct_resource ? 'Resource page' : sc.is_redirect_to_url ? 'Link' : 'Page') : `${subcatSchemes(sc, false).length} ${subcatSchemes(sc, false).length === 1 ? 'scheme' : 'schemes'} · ${n} ${noun(sc, n)}`, chev: !leaf, selected: sel.c === sc.id, cls: leaf ? 'leaf' : '', extra: subcatIsFree(sc) && !E.allContent ? '<span class="bt-free">Free</span>' : '' });
+    }).join('')));
+  }
+  const cat = sel.c && D.subcatById[sel.c];
+  if (cat) {
+    const schemes = subcatSchemes(cat, false);
+    if (sel.k && !schemes.some(s => s.id === sel.k)) sel.k = null;
+    cols.push(btColumn('k', cat.name, schemes.length, schemes.map(s => { const n = schemeLessons(s, false).length; return btItem({ level: 'k', id: s.id, title: s.name, sub: `${n} ${noun(cat, n)}${ageRange(schemeLessons(s, false)) ? ' · ages ' + ageRange(schemeLessons(s, false)) : ''}`, selected: sel.k === s.id, cls: schemeViewable(s) ? '' : 'restricted', extra: s.is_freemium && !E.allContent ? '<span class="bt-free">Free</span>' : '' }); }).join(''), `<a class="bt-col-link" href="${subcatHref(cat)}"><i class="bi-box-arrow-up-right me-1"></i>Open the ${esc(cat.name)} page</a>`));
+  }
+  const scheme = sel.k && D.schemeById[sel.k];
+  let hiddenAges = 0, shownAges = 0;
+  if (scheme) {
+    const lessons = schemeLessons(scheme, false);
+    if (sel.l && !lessons.some(l => l.id === sel.l)) sel.l = null;
+    const rows = lessons.map(l => {
+      const ok = passesAgeFilter(l, null), access = canAccessLesson(l, false);
+      if (ok) shownAges++; else hiddenAges++;
+      const cls = (ok ? '' : 'age-out ') + (access ? '' : 'restricted');
+      const sub = `${lessonAges(l) ? 'Ages ' + lessonAges(l) : 'All ages'}${l.duration ? ' · ' + esc(l.duration) : ''}${ok ? '' : ' · <em>outside your age filter</em>'}${access ? '' : ' · <em>not in your subscription</em>'}`;
+      return btItem({ level: 'l', id: l.id, icon: access ? lessonIcon(l) : 'bi-lock-fill', title: l.name, sub, selected: sel.l === l.id, cls, extra: (MY.done && MY.done.has(l.id)) ? '<span class="bt-done" title="Done"><i class="bi-check-circle-fill"></i></span>' : '' });
+    }).join('');
+    cols.push(btColumn('l', scheme.name, lessons.length, rows, btAgeNotice(shownAges, hiddenAges)));
+  }
+  const lesson = sel.l && D.lessonById[sel.l];
+  if (lesson) {
+    const parts = BT.parts.get(lesson.id);
+    const open = `<a class="bt-col-link" href="${lessonHref(lesson, cat)}"><i class="bi-box-arrow-up-right me-1"></i>Open the lesson</a>`;
+    if (!parts) {
+      cols.push(btColumn('p', lesson.name, '', '<div class="bt-empty"><span class="spinner-border spinner-border-sm me-2"></span>Loading parts…</div>', open));
+      lessonParts(lesson.id).then(p => { BT.parts.set(lesson.id, p); if (BT.sel.l === lesson.id && location.hash.startsWith('#/browse')) btRender(true); });
+    } else {
+      const docs = parts.filter(isDocPart), seq = parts.filter(p => !isDocPart(p));
+      const rows = docs.map(p => { const d = docFile(p); return btItem({ href: d.url, title: p.heading || 'Document', icon: docIcon(d), sub: isPlanPart(p) ? 'Lesson plan · opens the file' : 'Printable · opens the file', chev: false, cls: 'leaf doc' }).replace('<a ', '<a target="_blank" rel="noopener" '); }).join('') +
+        seq.map((p, i) => btItem({ href: lessonHref(lesson, cat) + `&part=${p.id}`, title: p.heading || p.media_type, icon: partIcon(p), sub: `Part ${i + 1} of ${seq.length}${p.duration && p.duration.trim() !== ':' ? ' · ' + esc(p.duration) : ''}`, chev: false, cls: 'leaf' })).join('');
+      cols.push(btColumn('p', lesson.name, parts.length, rows || '<div class="bt-empty">No live parts</div>', open));
+    }
+  }
+  const wrap = document.getElementById('bt-cols'); if (!wrap) return;
+  wrap.innerHTML = cols.join('');
+  wrap.querySelectorAll('.bt-item[data-level]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); btSelect(b.dataset.level, +b.dataset.id); }));
+  const ac = wrap.querySelector('#bt-age-clear'); if (ac) ac.addEventListener('click', () => { const src = document.getElementById('classage'); src.value = ''; src.dispatchEvent(new Event('change')); });
+  // Breadcrumb: the path so far, each step clickable (phones show one column at a time, so this is the way back).
+  const crumb = [{ name: 'Subjects', fn: () => btSelect('s', null) }, subject && { name: subject.name, fn: () => btSelect('g', null) }, group && { name: group.name, fn: () => btSelect('c', null) }, cat && { name: cat.name, fn: () => btSelect('k', null) }, scheme && { name: scheme.name, fn: () => btSelect('l', null) }, lesson && { name: lesson.name }].filter(Boolean);
+  const cr = document.getElementById('bt-crumbs');
+  cr.innerHTML = crumb.map((c, i) => `${i ? '<i class="bi-chevron-right" aria-hidden="true"></i>' : ''}<button type="button" class="bt-crumb ${i === crumb.length - 1 ? 'current' : ''}" data-i="${i}">${esc(c.name)}</button>`).join('') + (crumb.length > 1 ? `<button type="button" class="bt-back" id="bt-back"><i class="bi-arrow-left me-1"></i>Back</button>` : '');
+  cr.querySelectorAll('.bt-crumb').forEach(b => b.addEventListener('click', () => { const c = crumb[+b.dataset.i]; if (c.fn) c.fn(); }));
+  const back = cr.querySelector('#bt-back'); if (back) back.addEventListener('click', () => { const c = crumb[crumb.length - 2]; if (c && c.fn) c.fn(); });
+  wrap.classList.toggle('has-sel', cols.length > 1);
+  // Keep the newest column in view, and the selected item visible in each column.
+  wrap.querySelectorAll('.bt-item.selected').forEach(el => { const body = el.closest('.bt-col-body'); if (body && (el.offsetTop < body.scrollTop || el.offsetTop + el.offsetHeight > body.scrollTop + body.clientHeight)) body.scrollTop = el.offsetTop - 8; });
+  if (scrollRight) requestAnimationFrame(() => { wrap.scrollTo({ left: wrap.scrollWidth, behavior: 'smooth' }); });
+}
+// Find: a flat list of matches at every level with the path to each; choosing one opens the tree there.
+function btFind(term) {
+  const box = document.getElementById('bt-results'), cols = document.getElementById('bt-cols'), cr = document.getElementById('bt-crumbs');
+  const q = term.toLowerCase();
+  if (q.length < 2) { box.classList.add('hidden'); box.innerHTML = ''; cols.classList.remove('hidden'); cr.classList.remove('hidden'); return; }
+  const hits = [];
+  const subjects = browseSubjects(), subjOk = new Set(subjects.map(s => s.id));
+  for (const s of subjects) if (s.name.toLowerCase().includes(q)) hits.push({ level: 'Subject', name: s.name, path: [], sel: { s: s.id } });
+  for (const sg of D.subgroups) { if (!subjOk.has(sg.subject_id) || !canView(sg)) continue; if ((sg.name || '').toLowerCase().includes(q)) hits.push({ level: 'Group', name: sg.name, path: [D.subjectById[sg.subject_id].name], sel: { s: sg.subject_id, g: sg.id } }); }
+  for (const sc of D.subcategories) { const sg = D.subgroupById[sc.subgroup_id]; if (!sg || !subjOk.has(sc.subject_id) || !canView(sg)) continue; if ((sc.name || '').toLowerCase().includes(q)) hits.push({ level: 'Category', name: sc.name, path: [D.subjectById[sc.subject_id].name, sg.name], sel: { s: sc.subject_id, g: sg.id, c: sc.id } }); }
+  const schemeHome = s => { for (const scId of new Set(D.subcatsByScheme[s.id] || [])) { const sc = D.subcatById[scId], sg = sc && D.subgroupById[sc.subgroup_id]; if (sc && sg && subjOk.has(sc.subject_id) && canView(sg)) return { sc, sg }; } return null; };
+  for (const s of D.schemes) { if (!(s.name || '').toLowerCase().includes(q)) continue; const h = schemeHome(s); if (!h) continue; hits.push({ level: 'Scheme', name: s.name, path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id } }); }
+  for (const l of D.lessons) { if (!(l.name || '').toLowerCase().includes(q)) continue; const s = D.schemeById[l.scheme_id]; const h = s && schemeHome(s); if (!h) continue; hits.push({ level: 'Lesson', name: l.name, path: [D.subjectById[h.sc.subject_id].name, h.sg.name, h.sc.name, s.name], sel: { s: h.sc.subject_id, g: h.sg.id, c: h.sc.id, k: s.id, l: l.id } }); }
+  const shown = hits.slice(0, 150);
+  box.innerHTML = `<div class="bt-results-head">${hits.length ? `${hits.length} match${hits.length === 1 ? '' : 'es'} for "${esc(term)}"${hits.length > shown.length ? ` (first ${shown.length} shown)` : ''}` : `Nothing matches "${esc(term)}"`}</div>` +
+    shown.map((h, i) => `<button type="button" class="bt-hit" data-i="${i}"><span class="bt-hit-level">${h.level}</span><span class="bt-hit-text"><span class="bt-name">${esc(h.name)}</span>${h.path.length ? `<small class="bt-sub">${h.path.map(esc).join(' <i class="bi-chevron-right"></i> ')}</small>` : ''}</span><i class="bi-chevron-right bt-chev"></i></button>`).join('');
+  box.classList.remove('hidden'); cols.classList.add('hidden'); cr.classList.add('hidden');
+  box.querySelectorAll('.bt-hit').forEach(b => b.addEventListener('click', () => {
+    const h = shown[+b.dataset.i]; BT.sel = { s: null, g: null, c: null, k: null, l: null, ...h.sel };
+    document.getElementById('bt-find').value = ''; document.getElementById('bt-find-clear').classList.add('hidden');
+    box.classList.add('hidden'); cols.classList.remove('hidden'); cr.classList.remove('hidden');
+    history.replaceState(null, '', location.pathname + location.search + btPath(BT.sel)); btRender(true);
+  }));
+}
