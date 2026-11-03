@@ -434,3 +434,19 @@ body.m-drawer-open { overflow: hidden; }
   .hdr-home { display: inline-flex; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; font-size: 1.15rem; }
   .m-drawer-home, .m-drawer-home + hr { display: none !important; }
 }
+
+/* ---------- v0.54 header to David's mock-up (3 Nov 2026) ----------
+   From 768px:   [logo] Active・Educational・Fun                      (search) (home) (Browse) (menu)
+                 School name  class name                              (buttons centred on both rows)
+   The school and class name show from 768px (were 1280px), left-aligned under the logo. */
+@media (min-width: 768px) {
+  .main-nav > .container > .row { grid-template-columns: auto 1fr auto; grid-template-areas: "logo slogan tools" "ctx ctx tools"; column-gap: .75rem; row-gap: .2rem; align-items: end; }
+  .main-nav .navbar-logo { align-self: end; }
+  .main-nav .nav-slogan { grid-area: slogan; height: auto; align-self: end; padding-bottom: 2px; }
+  .main-nav .nav-slogan a { font-size: 1.05rem; }
+  .main-nav .navbar-actions > .collapse { grid-area: ctx; justify-self: start; align-self: start; }
+  .main-nav .navbar-actions > .collapse .school-class-details { flex-direction: row !important; justify-content: flex-start !important; }
+  .main-nav .navbar-actions > .collapse .school-class-details > .flex-column { display: block !important; }
+  .main-nav .navbar-actions > .collapse .details { justify-content: flex-start !important; text-align: left; }
+  .main-nav .navbar-actions > div:last-child { grid-area: tools; justify-self: end; align-self: center; }
+}
