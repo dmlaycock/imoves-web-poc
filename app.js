@@ -252,9 +252,13 @@ async function saveClassAge(v) {
 // force_age_selection (Users fid 567) and on subjects flagged force_age_selection, until an
 // age range is chosen.
 const AGE_LABELS = { 4: '4–5', 5: '5–6', 6: '6–7', 7: '7-8', 8: '8–9', 9: '9–10', 10: '10–11' };   // HasFilters::$AGE_FILTERS
+// v0.47.2 (David, 3 Nov 2026): forcing an age choice is a usability gripe and is dropped from the
+// rebuild. The Quickbase flags (subject force_age_selection, Users fid 567) are left as they are
+// but no longer read; "All ages" is always available and the modal never appears.
+const FORCE_AGE_SELECTION = false;
 function maybeForceAge(subj) {
   const me = Auth.me() || {};
-  const need = classAge() == null && ((subj && subj.force_age_selection) || me.force_age_selection);
+  const need = FORCE_AGE_SELECTION && classAge() == null && ((subj && subj.force_age_selection) || me.force_age_selection);
   let m = document.getElementById('age-selection-modal');
   if (!need) { if (m && m.classList.contains('show')) hideModal('age-selection-modal'); return; }
   if (!m) { m = document.createElement('div'); m.id = 'age-selection-modal'; m.className = 'modal fade'; m.tabIndex = -1; document.body.appendChild(m); }
@@ -298,7 +302,7 @@ async function route() {
   const subj = p[0] === 'subject' ? D.subjectById[+p[1]] : null;
   ROUTE_SUBJECT = p[0] === 'subject' ? +p[1] : null;   // Filterable::subjectContext
   const an = document.getElementById('agenoun'); if (an) an.textContent = subj && subj.name === 'Active Blasts' ? 'activities' : 'lessons';   // Subject::lessonLabel() - hard-coded on the live site
-  const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = !!(subj && subj.force_age_selection);
+  const allAges = document.querySelector('#classage option[value=""]'); if (allAges) allAges.hidden = FORCE_AGE_SELECTION && !!(subj && subj.force_age_selection);
   maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
   const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
