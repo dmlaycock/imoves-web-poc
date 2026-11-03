@@ -418,3 +418,5 @@ body.m-drawer-open { overflow: hidden; }
   .lesson-actions .btn i { display: none !important; }
   .lesson-actions #past-readings { flex: 1 1 0; white-space: normal; text-align: center; font-size: .72rem; line-height: 1.15; }
 }
+@media (max-width: 1279.98px) { .lesson-actions .btn i { display: none !important; } .lesson-actions .btn { padding: .5rem .55rem; } }
+@media (min-width: 820px) and (max-width: 1279.98px) { .lesson-actions .btn, .lesson-actions #past-readings { white-space: nowrap; } }   /* v0.52.2: one line per label wherever the row has room */
