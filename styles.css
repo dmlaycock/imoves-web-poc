@@ -242,7 +242,7 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
 /* v0.45.2-3 phone alignment: the age filter's label lines up with the Browse button and the
    cards (the nested live row adds a gutter); menu items ease their tint. Mobile resource cards
    with nothing under the title drop their empty body in app.js (subcatCard). */
-@media (max-width: 575.98px) { #agefilter > label.col { margin-left: -12px; text-align: left; } }
+@media (max-width: 575.98px) { #agefilter > label.col { margin-left: 0; padding-left: 0; text-align: left; } #agefilter { margin-left: 0; } }
 .dropdown-item { transition: background-color .15s ease-in-out, color .15s ease-in-out; }
 
 /* ---------- v0.45.4 expanded lesson on the category page: one block, one owner ----------
