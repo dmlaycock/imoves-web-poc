@@ -286,3 +286,5 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
   .subcategory-card.d-md-none > .border-bottom > .row > .col-7 { flex: 0 0 100%; max-width: 100%; margin-left: 0 !important; padding-left: 1rem; }
   .subcategory-card.d-md-none > .border-bottom > .row > .col-7 .card-title { margin: .75rem 0 !important; }
 }
+.subcategory-card.d-md-none { padding-bottom: 0; }
+.subcategory-card.d-md-none > .border-bottom:last-child { border-bottom: 0 !important; }   /* no ledge under a title-only card */
