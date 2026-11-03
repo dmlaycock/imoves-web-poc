@@ -242,7 +242,7 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
 /* v0.45.2-3 phone alignment: the age filter's label lines up with the Browse button and the
    cards (the nested live row adds a gutter); menu items ease their tint. Mobile resource cards
    with nothing under the title drop their empty body in app.js (subcatCard). */
-@media (max-width: 575.98px) { #agefilter > label.col { margin-left: -12px; } }
+@media (max-width: 575.98px) { #agefilter > label.col { margin-left: -12px; text-align: left; } }
 .dropdown-item { transition: background-color .15s ease-in-out, color .15s ease-in-out; }
 
 /* ---------- v0.45.4 expanded lesson on the category page: one block, one owner ----------
@@ -311,7 +311,7 @@ select, input, textarea, button, .form-select, .form-control { font-family: inhe
 .form-select { font-size: var(--fs-b); font-weight: 300; }
 /* panel and scheme headers */
 .card-header, h5.card-header, .card-header > div, .card-header h5, .card-header .h5 { font-size: var(--fs-h); font-weight: 500; line-height: 1.25; }
-.card-header small, .card-header .i-small, .card-header .text-white-50 { font-size: var(--fs-s); font-weight: 300; }
+.card-header small, .card-header .i-small, .card-header .text-white-50, .card-header span.fw-light { font-size: var(--fs-s); font-weight: 300; }
 /* row and card titles */
 .lesson-row h5, .part-head h5, .doc-row h5, .subcategory-card .card-title, .subcategory-card .h5, .lesson-inline h5, #lessonPage h5:not(.card-header) { font-size: var(--fs-t); font-weight: 500; line-height: 1.25; }
 .lesson-row h5 .badge, .part-head h5 .badge { font-size: var(--fs-m); }
