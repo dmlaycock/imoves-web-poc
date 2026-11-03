@@ -331,7 +331,7 @@ const app = document.getElementById('app-page');
 function reveal() { /* v0.32: no reveal animation, as live */ }
 window.addEventListener('hashchange', route);
 async function route() {
-  const hash = location.hash.slice(1) || '/';
+  const hash0 = location.hash, hash = location.hash.slice(1) || '/';
   const [pathPart, query = ''] = hash.split('?');
   const qs = Object.fromEntries(new URLSearchParams(query));
   const p = pathPart.split('/').filter(Boolean);
@@ -344,7 +344,7 @@ async function route() {
   maybeForceAge(subj);
   const hf = document.getElementById('headerfilter'); if (hf) hf.classList.toggle('hidden', p[0] === 'curriculum' || p[0] === 'profile' || p[0] === 'school-management' || p[0] === 'my-school');
   const hdrf = document.getElementById('hdr-filter'); if (hdrf && hf) hdrf.classList.toggle('hidden', hf.classList.contains('hidden'));
-  updateAgeChip(); closeMobileDrawer(); closeBrowseTree();
+  updateAgeChip(); closeMobileDrawer(); if (!BT.pendingOpen) closeBrowseTree();
   const af = document.getElementById('agefilter'); if (af) af.classList.toggle('hidden', p[0] === 'search' || p[0] === 'favourites');   // results pages: Browse button only (results-list.blade.php)
   window.scrollTo(0, 0);
   try {
@@ -355,7 +355,7 @@ async function route() {
     if (p[0] === 'lesson' && p[2] === 'history') return pageLessonHistory(+p[1]);
     if (p[0] === 'lesson') return pageLesson(+p[1], qs.sc ? +qs.sc : null, qs.part ? +qs.part : null);
     if (p[0] === 'search') return pageSearch(qs.q || '');
-    if (p[0] === 'browse') { history.replaceState(null, '', location.pathname + location.search + '#/'); if (browseTreeOn()) { await pageHome(); openBrowseTree(qs.s ? { s: +qs.s, g: +qs.g || null, c: +qs.c || null, k: +qs.k || null, l: +qs.l || null } : null); return; } openBrowse(); return; }
+    if (p[0] === 'browse') { if (browseTreeOn()) { BT.pendingOpen = qs.s ? { s: +qs.s, g: +qs.g || null, c: +qs.c || null, k: +qs.k || null, l: +qs.l || null } : {}; location.replace(location.pathname + location.search + '#/'); return; } history.replaceState(null, '', location.pathname + location.search + '#/'); openBrowse(); return; }
     if (p[0] === 'favourites') return pageFavourites();
     if (p[0] === 'curriculum') return pageCurriculum();
     if (p[0] === 'profile') return pageProfile();
@@ -365,6 +365,7 @@ async function route() {
     if (p[0] === 'upgrade') { app.innerHTML = '<div class="notice">The upgrade options page arrives with Phase 2 of the rebuild.</div>'; return; }
     app.innerHTML = `<div class="notice">Page not found.</div>`;
   } catch (e) { app.innerHTML = `<div class="notice">Something went wrong: ${esc(e.message)}</div>`; }
+  finally { if (BT.pendingOpen && location.hash === hash0) { const s0 = BT.pendingOpen; BT.pendingOpen = null; openBrowseTree(Object.keys(s0).length ? s0 : null); } }   // v0.61: #/browse opens the panel over the page
 }
 
 // ---------- pages ----------
