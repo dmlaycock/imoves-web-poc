@@ -303,7 +303,7 @@ img.fx-in { opacity: 1; transition: opacity .3s ease-out; }
    page. Form controls inherit the typeface (the age select was in the system font). */
 :root { --fs-h: 1.25rem; --fs-t: 1.125rem; --fs-b: 1rem; --fs-s: .875rem; --fs-m: .75rem; }
 @media (max-width: 575.98px) { :root { --fs-h: 1.125rem; --fs-t: 1.0625rem; } }
-select, input, textarea, button, .form-select, .form-control { font-family: inherit; }
+select, input, textarea, button, .form-select, .form-control { font-family: "BalooPrimary", sans-serif !important; }   /* v0.48.1: the live sheet sets Arial on form controls */
 .form-select { font-size: var(--fs-b); font-weight: 300; }
 /* panel and scheme headers */
 .card-header, h5.card-header, .card-header > div, .card-header h5, .card-header .h5 { font-size: var(--fs-h); font-weight: 500; line-height: 1.25; }

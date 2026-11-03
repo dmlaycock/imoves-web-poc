@@ -347,7 +347,7 @@ function renderSubjectBar() {
 function renderMobileDrawer(menuHtml) {
   const d = document.getElementById('m-drawer'); if (!d) return;
   const nav = document.getElementById('m-drawer-nav');
-  nav.innerHTML = menuHtml.replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
+  nav.innerHTML = menuHtml.replace(/<a href="#\/search"[^>]*>Search<\/a>/, '').replace(/class="dropdown-item[^"]*"/g, 'class="m-drawer-item"').replace(/<div class="dropdown-divider"><\/div>/g, '<hr>').replace(/id="logoutbtn"/, 'id="m-logoutbtn"');
   nav.querySelector('#m-logoutbtn').addEventListener('click', () => Auth.signOut('bye'));
   nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMobileDrawer));
   const src = document.getElementById('classage'), sel = document.getElementById('m-classage');
