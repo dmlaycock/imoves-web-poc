@@ -425,3 +425,4 @@ body.m-drawer-open { overflow: hidden; }
   .lesson-actions { gap: .3rem; padding: 0; }
   .lesson-actions .btn, .lesson-actions #past-readings { flex: 1 1 0 !important; min-width: 0; padding: .45rem .15rem !important; font-size: .68rem !important; line-height: 1.15; white-space: normal !important; overflow-wrap: anywhere; hyphens: auto; text-align: center; }
 }
+@media (max-width: 575.98px) { .lesson-actions { gap: .25rem; } .lesson-actions .btn, .lesson-actions #past-readings { overflow-wrap: normal; font-size: .64rem !important; padding: .45rem .1rem !important; } }   /* v0.52.4: whole words fit */
