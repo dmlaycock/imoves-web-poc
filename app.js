@@ -352,7 +352,7 @@ function placeDesktopControls() {
   const btn = document.getElementById('browsebtn'), tools = document.getElementById('search-toolbar'), burger = document.getElementById('m-burger');
   if (!btn || !tools || !burger) return;
   let slot = document.getElementById('hdr-browse');
-  if (!slot) { slot = document.createElement('div'); slot.id = 'hdr-browse'; tools.insertBefore(slot, burger); }
+  if (!slot) { slot = document.createElement('div'); slot.id = 'hdr-browse'; tools.insertBefore(slot, document.getElementById('hdr-home') || burger); }   // order: search, Browse, Home, menu
   if (btn.parentElement !== slot) slot.appendChild(btn);
   btn.className = 'btn' + (btn.classList.contains('hidden') ? ' hidden' : '');
   btn.innerHTML = 'Browse';
