@@ -355,7 +355,7 @@ function placeDesktopControls() {
   if (!slot) { slot = document.createElement('div'); slot.id = 'hdr-browse'; tools.insertBefore(slot, burger); }
   if (btn.parentElement !== slot) slot.appendChild(btn);
   btn.className = 'btn' + (btn.classList.contains('hidden') ? ' hidden' : '');
-  btn.innerHTML = 'Browse all resources';
+  btn.innerHTML = 'Browse';
 }
 
 // ---------- phone menu drawer (v0.48, David 3 Nov 2026) ----------
@@ -1260,11 +1260,13 @@ async function pageLesson(id, scId) {
       ${item('bi-lightning-charge', l.intensity)}${item('bi-lightbulb', l.focus)}${item('bi-clock', l.duration ? `About ${l.duration}m long` : '')}${item('bi-building', l.location && l.location.length ? `In the ${l.location.join(', ')}` : '')}${item('bi-watch', l.preparation ? `Prep in ${l.preparation}m` : '')}
     </div></div></div></div>
     <hr class="d-none d-lg-block mx-lg-2 ${bg ? 'border-mid-purple' : ''}">
+    <div class="lesson-actions">
     <div class="my-4 d-flex justify-content-between px-2"><a href="#/lesson/${l.id}/history" class="btn shadow ${btn}"><i class="d-none d-lg-inline bi-list-check mr-1"></i> History</a><button type="button" class="d-lg-none mx-2 btn shadow add-to-favourites ${btn}" data-fav-for="${l.id}" data-fav-kind="mobile" data-bg="${bg ? 1 : 0}"></button><button type="button" class="btn shadow ms-1 mark-as-complete ${btn}" data-done-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}"></button></div>
     <hr class="d-none d-lg-block mx-2 ${bg ? 'border-mid-purple' : ''}">
     <div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow add-to-favourites w-100 ${btn}" data-fav-for="${l.id}" data-bg="${bg ? 1 : 0}" data-label="${esc(Label)}" data-labels="${esc(Labels)}"></button></div>
     ${l.show_assessment ? `<div class="d-lg-none px-2 mb-3 row"><div class="col"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}">Thumb-o-meter</button></div><div class="col d-flex align-items-center"><a href="#" class="fw-bold text-decoration-underline" id="past-readings">Past measurements</a></div></div><div class="d-none d-lg-block my-4 px-2"><button type="button" class="btn shadow w-100 ${btn}" data-thumb="${l.id}"><i class="bi-hand-thumbs-up me-2"></i>Thumb-o-meter</button></div><div class="d-none d-lg-block my-4 px-2 text-primary" id="readings"></div>` : ''}
     <div class="my-4 px-2"><button type="button" class="btn shadow w-100 curriculum-btn ${btn}" data-lesson-id="${l.id}"><i class="bi bi-bookmark-plus me-1"></i> Add to Curriculum</button></div>
+    </div>
   </div></div>`;
   app.innerHTML = html;
   reveal();

@@ -397,5 +397,24 @@ body.m-drawer-open { overflow: hidden; }
 #hdr-browse #browsebtn:hover { background: rgba(255,255,255,.12); }
 #hdr-browse #browsebtn.hidden { display: none; }
 .m-burger { width: 44px; height: 44px; }
-@media (max-width: 767.98px) { #searchbtn, #hdr-browse { display: none !important; } }
-@media (min-width: 768px) { .m-drawer-search, .m-drawer-browse { display: none !important; } }
+@media (max-width: 767.98px) { #hdr-browse { display: none !important; } }
+.m-drawer-search { display: none !important; }   /* v0.52: the header search icon shows at every width */
+@media (min-width: 768px) { .m-drawer-browse { display: none !important; } }
+
+/* ---------- v0.52 lesson page actions on one row (David, 3 Nov 2026) ----------
+   Below lg (1280px), where the sidebar stacks above the lesson, History, Favourite, Mark Done,
+   Thumb-o-meter, Past measurements and Add to Curriculum sit on a single row of equal buttons.
+   On phones the labels drop to a smaller size and may wrap to two lines. lg and up keep the
+   sidebar's stacked buttons. */
+@media (max-width: 1279.98px) {
+  .lesson-actions { display: flex; align-items: stretch; gap: .5rem; margin: 1.25rem 0; padding: 0 .5rem; }
+  .lesson-actions > div, .lesson-actions > div > .col, .lesson-actions > .row { display: contents; }
+  .lesson-actions .btn { flex: 1 1 0; min-width: 0; margin: 0 !important; width: auto !important; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: .3rem; }
+  .lesson-actions #past-readings { flex: 0 0 auto; align-self: center; font-size: var(--fs-s); white-space: nowrap; padding: 0 .25rem; }
+}
+@media (max-width: 575.98px) {
+  .lesson-actions { gap: .35rem; padding: 0; }
+  .lesson-actions .btn { font-size: .72rem; line-height: 1.15; padding: .45rem .2rem; white-space: normal; text-align: center; }
+  .lesson-actions .btn i { display: none !important; }
+  .lesson-actions #past-readings { flex: 1 1 0; white-space: normal; text-align: center; font-size: .72rem; line-height: 1.15; }
+}
