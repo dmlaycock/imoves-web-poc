@@ -1103,13 +1103,12 @@ function bindLessonRows(sc) {
 // sticky header. Scrolled once the content is in, and again when the drawer has finished
 // growing, so the row ends up at the top rather than wherever the layout was mid-animation.
 function scrollToTop(el) {
-  const go = () => {
-    const header = document.getElementById('header');
-    const top = el.getBoundingClientRect().top + window.scrollY - ((header ? header.offsetHeight : 0) + 8);
-    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-  };
-  requestAnimationFrame(go);
-  setTimeout(go, 380);   // after the .32s open transition
+  const target = () => { const header = document.getElementById('header'); return Math.max(0, el.getBoundingClientRect().top + window.scrollY - ((header ? header.offsetHeight : 0) + 8)); };
+  const go = behavior => window.scrollTo({ top: target(), behavior });
+  requestAnimationFrame(() => go('smooth'));
+  setTimeout(() => go('smooth'), 380);   // after the .32s open transition
+  // v0.45.6: settle exactly - a smooth scroll can be cut short or throttled (iOS, background tabs)
+  setTimeout(() => { if (Math.abs(window.scrollY - target()) > 4) go('auto'); }, 900);
 }
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
