@@ -630,3 +630,11 @@ body.bt-open #subjectnav { position: relative; z-index: 1041; }   /* above the d
 .lesson-focus .lesson-inline { border: 0 !important; border-radius: var(--radius) !important; margin-top: 0; }
 .lesson-focus .lesson-fullscreen { display: none; }
 body.lesson-focus-open { overflow: hidden; }
+
+/* v0.65 CMS preview */
+.preview-banner { background: #ffc20e; color: #2a1a3a; font-size: 14px; padding: 6px 16px; text-align: center; }
+.preview-banner b { margin-right: 6px; }
+.preview-banner a { margin-left: 12px; color: #2a1a3a; font-weight: 600; }
+.cms-body p { margin: 0 0 .25rem; padding-right: .25rem; }
+.cms-body h5 { color: var(--bs-purple, #733088); margin: .75rem 0 .25rem; }
+.cms-body ul { padding-left: 1.25rem; margin-bottom: .25rem; }

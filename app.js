@@ -10,6 +10,14 @@ function apiHeaders() {
   if (SUPABASE_SCHEMA && !SUPABASE_SCHEMA.startsWith('__')) headers['Accept-Profile'] = SUPABASE_SCHEMA;
   return headers;
 }
+// ---------- v0.65 preview (CMS increment 4) ----------
+// ?content=draft|published reads the CMS views (public.d_* drafts, public.v_* published) in
+// place of the Quickbase-fed tables, so staff see a page as it will be before publishing.
+// ?as=free|trial|paying overrides the signed-in user's entitlements; ?ages=5-7 the age rights.
+// Without these the site reads the public tables as before (Quickbase stays the master until
+// the Phase 2 flip).
+const PREVIEW = (() => { const q = new URLSearchParams(location.search); const c = q.get('content'); return { content: c === 'draft' || c === 'published' ? c : '', as: ['free', 'trial', 'paying'].includes(q.get('as')) ? q.get('as') : '', ages: /^\d+-\d+$/.test(q.get('ages') || '') ? q.get('ages').split('-').map(Number) : null, on: !!(c || q.get('as') || q.get('ages')) }; })();
+const T = name => PREVIEW.content ? (PREVIEW.content === 'draft' ? 'd_' : 'v_') + name : name;
 async function restFetch(path, init) {
   let r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: { ...apiHeaders(), ...(init && init.headers) } });
   if (r.status === 401 && Auth.accessToken() && await Auth.refresh()) {
@@ -43,13 +51,13 @@ async function rpc(name, args) {
 const D = {}; // in-memory copy of the tree
 async function loadTree() {
   const [subjects, subgroups, subcategories, schemes, links, lessons, subjectLinks] = await Promise.all([
-    rest('subjects?select=*&order=order', { all: true }),
-    rest('subgroups?select=*&order=order', { all: true }),
-    rest('subcategories?select=id,name,order,homepage_order,image,background_image_url,description,subheading,is_live,is_schemes,is_direct_resource,is_redirect_to_category,is_redirect_to_lesson,is_redirect_to_url,is_direct_resource_different_for_free,direct_resource_heading_all,direct_resource_heading_free,direct_resource_heading_paid,direct_resource_text_all,direct_resource_text_free,direct_resource_text_paid,direct_resource_wistia_id_all,direct_resource_wistia_id_free,direct_resource_wistia_id_paid,direct_resource_wistia_duration_all,direct_resource_wistia_duration_free,direct_resource_wistia_duration_paid,is_direct_resource_linked,direct_resource_link_text,direct_resource_link_url,subject_id,subgroup_id,subcategory_redirect_id,lesson_redirect_id,url_redirect,content_noun_derived_plural,content_noun_derived_singular,is_visible_on_homepage,show_all,show_free,show_trial,show_paying&order=order', { all: true }),
-    rest('schemes?select=id,name,subheading,description,body_opening_text,body_closing_text,body_subheading_1,body_subheading_1_text,body_subheading_2,body_subheading_2_text,body_subheading_3,body_subheading_3_text,is_live,is_freemium,image,order', { all: true }),
-    rest('scheme_subcategories?select=*', { all: true }),
-    rest('lessons?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template,subject_ids&order=order', { all: true }),
-    rest('scheme_subjects?select=scheme_id,subject_id', { all: true }),
+    rest(`${T('subjects')}?select=*&order=order`, { all: true }),
+    rest(`${T('subgroups')}?select=*&order=order`, { all: true }),
+    rest(`${T('subcategories')}?select=id,name,order,homepage_order,image,background_image_url,description,subheading,is_live,is_schemes,is_direct_resource,is_redirect_to_category,is_redirect_to_lesson,is_redirect_to_url,is_direct_resource_different_for_free,direct_resource_heading_all,direct_resource_heading_free,direct_resource_heading_paid,direct_resource_text_all,direct_resource_text_free,direct_resource_text_paid,direct_resource_wistia_id_all,direct_resource_wistia_id_free,direct_resource_wistia_id_paid,direct_resource_wistia_duration_all,direct_resource_wistia_duration_free,direct_resource_wistia_duration_paid,is_direct_resource_linked,direct_resource_link_text,direct_resource_link_url,subject_id,subgroup_id,subcategory_redirect_id,lesson_redirect_id,url_redirect,content_noun_derived_plural,content_noun_derived_singular,is_visible_on_homepage,show_all,show_free,show_trial,show_paying&order=order`, { all: true }),
+    rest(`${T('schemes')}?select=id,name,subheading,description,body_opening_text,body_closing_text,body_subheading_1,body_subheading_1_text,body_subheading_2,body_subheading_2_text,body_subheading_3,body_subheading_3_text,is_live,is_freemium,image,order${PREVIEW.content ? ',body' : ''}`, { all: true }),
+    rest(`${T('scheme_subcategories')}?select=*`, { all: true }),
+    rest(`${T('lessons')}?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template,subject_ids${PREVIEW.content ? ',image' : ''}&order=order`, { all: true }),
+    rest(`${T('scheme_subjects')}?select=scheme_id,subject_id`, { all: true }),
   ]);
   D.subjects = subjects.filter(s => s.is_live && (!E.niched || E.nicheIds.has(s.id)));   // LiveScope + NicheScope
   D.subgroups = subgroups.filter(s => s.is_live);
@@ -64,12 +72,13 @@ async function loadTree() {
   for (const l of links) {
     // Scheme::qbRelationMap reads three category fields (527, 537, 544). The shared table also holds
     // the CMS PoC's links from fields 702-704 (positions 4-6), which the live platform never reads.
-    if (l.position > 3) continue;
+    if (!PREVIEW.content && l.position > 3) continue;
     const s = D.schemeById[l.scheme_id]; if (!s) continue;
+    if (PREVIEW.content) (D.placementOrder ||= {})[`${l.subcategory_id}:${s.id}`] = l.placement_order;   // the CMS orders schemes per category
     (D.schemesBySubcat[l.subcategory_id] ||= []).push(s);
     (D.subcatsByScheme[l.scheme_id] ||= []).push(l.subcategory_id);
   }
-  for (const k in D.schemesBySubcat) D.schemesBySubcat[k].sort(byOrder);
+  for (const k in D.schemesBySubcat) D.schemesBySubcat[k].sort(PREVIEW.content ? (a, b) => (D.placementOrder[`${k}:${a.id}`] ?? 1e9) - (D.placementOrder[`${k}:${b.id}`] ?? 1e9) || byOrder(a, b) : byOrder);
   D.subjectsByScheme = {};
   for (const l of subjectLinks) (D.subjectsByScheme[l.scheme_id] ||= []).push(l.subject_id);
   D.ageKeys = null;
@@ -105,6 +114,14 @@ function initEntitlements() {
   E.lessonMessage = m.lesson_message_1 || 'This lesson isn’t included in your subscription.';
   E.upgradeText = m.lesson_upgrade_button_text || 'Upgrade';
   E.showUpgrade = !!m.show_upgrade_button;
+  // Preview as an audience (CMS "Preview as ..."): the legacy audience flags until packages arrive (increment 5).
+  if (PREVIEW.as) {
+    E.freeAll = PREVIEW.as === 'free'; E.trialAll = PREVIEW.as === 'trial'; E.payingAll = PREVIEW.as === 'paying';
+    E.allContent = PREVIEW.as === 'paying'; E.allSubjects = PREVIEW.as !== 'free'; E.complementary = false;
+    E.niched = false; E.nicheIds = new Set(); if (PREVIEW.as === 'free') { E.userSubjects = new Set(); E.subjectIds = new Set(); }
+    E.showUpgrade = PREVIEW.as !== 'paying';
+  }
+  if (PREVIEW.ages) { const [a, z] = PREVIEW.ages; E.allAges = false; E.ageRights = [4, 5, 6, 7, 8, 9, 10].map(y => y >= a && y < z); }
 }
 // SubjectPolicy::view, SubgroupPolicy::view and SubcategoryPolicy::view are the same test.
 // Show lists and buttons only: nothing on the live site blocks opening a subject or category page.
@@ -912,13 +929,13 @@ async function loadCurriculum() {
 }
 async function curriculumLessons(ids) {
   if (!ids.length) return {};
-  const rows = await rest(`lessons?id=in.(${[...new Set(ids)].join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration`);
+  const rows = await rest(`${T('lessons')}?id=in.(${[...new Set(ids)].join(',')})&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration${PREVIEW.content ? ',image' : ''}`);
   return index(rows);
 }
 function curriculumLessonCard(l, gl, edit) {
   const scheme = D.schemeById[l.scheme_id]; const sc = scheme && D.subcatById[(D.subcatsByScheme[scheme.id] || [])[0]];
   const blurb = (l.description || l.body_opening_text || '').trim();
-  return `<div class="col mb-4" data-gl="${gl.id}" data-lesson-id="${l.id}"><a href="${edit ? '#' : lessonHref(l, sc)}" class="text-decoration-none ${edit ? 'pe-none' : ''}"><div class="card subcategory-card ${edit ? '' : 'lift'} h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy">
+  return `<div class="col mb-4" data-gl="${gl.id}" data-lesson-id="${l.id}"><a href="${edit ? '#' : lessonHref(l, sc)}" class="text-decoration-none ${edit ? 'pe-none' : ''}"><div class="card subcategory-card ${edit ? '' : 'lift'} h-100 shadow-sm d-flex flex-column"><img src="${esc(img(l.image || scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy">
     <div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between">
       ${edit ? `<div class="align-self-end mx-3 pt-2 pe-auto"><i class="drag-handle bi bi-arrows-move" style="cursor: pointer;" title="Drag to move"></i> <div class="dropdown d-inline"><i class="bi bi-three-dots-vertical" role="button" data-menu></i><ul class="dropdown-menu"><li><button type="button" class="dropdown-item" data-copy="${l.id}">Copy</button></li><li><button type="button" class="dropdown-item" data-del-gl="${gl.id}">Delete</button></li></ul></div></div>` : ''}
       <div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
@@ -1049,7 +1066,7 @@ async function openGroupSelect(lessonId, after) {
   if (!admin) body = `<h5>Please ask your School Administrator to add the Lesson to the Curriculum.</h5>`;
   else {
     await loadCurriculum();
-    const [l] = await rest(`lessons?id=eq.${lessonId}&select=id,name`);
+    const [l] = await rest(`${T('lessons')}?id=eq.${lessonId}&select=id,name`);
     const t = CUR.tabs.find(x => x.id === CUR.current) || CUR.tabs[0];
     body = `<h3 class="px-4">${esc(l ? l.name : '')}</h3>` + (CUR.tabs.length ? `<ul class="nav nav-pills px-4" role="presentation">` + CUR.tabs.map(x => `<li class="nav-item"><a href="#" class="nav-link ${x.id === (t && t.id) ? 'active' : ''}" data-seltab="${x.id}">${esc(x.name)}</a></li>`).join('') + `</ul><div class="mt-3 px-4" id="selgroups">${t ? t.groups.map(g => `<div class="card shadow bg-light-purple border-primary mb-3"><h5 class="card-header bg-primary bg-gradient-primary text-white d-flex"><div>${esc(g.name)}</div><div class="ms-auto"><input type="checkbox" class="group-select" value="${g.id}" ${g.lessons.some(x => x.lesson_id === lessonId) ? 'checked' : ''}></div></h5></div>`).join('') || '<p class="text-mid-purple">This tab has no groups yet.</p>' : ''}</div>` : `<p class="text-mid-purple px-4">No curriculum tabs yet. Open Curriculum, switch to Unlocked and add a tab first.</p>`);
   }
@@ -1095,7 +1112,10 @@ function lessonIcon(l) { return l.has_video ? 'bi-play-btn-fill' : l.has_audio ?
 function partIcon(p) { return { Video: 'bi-camera-reels-fill', Audio: 'bi-file-music-fill', Slides: 'bi-easel-fill', Download: 'bi-file-arrow-down-fill', Image: 'bi-file-image-fill' }[p.media_type] || 'bi-file-earmark-ruled-fill'; }
 const para = (t, cls = 'text-purple') => t && String(t).trim() ? `<p class="card-text ${cls} fw-light text-6 mb-1 pe-1">${nl(t)}</p>` : '';
 // The scheme-card body text (scheme-card.blade.php media-body)
+// v0.65: the CMS stores one rich-text body (p, h5, strong, em, ul, li) instead of the eight fields.
+const bodyHtml = b => `<div class="cms-body text-purple fw-light text-6">${b}</div>`;
 function schemeBody(s) {
+  if (s.body) return para(s.description) + bodyHtml(s.body);
   let h = para(s.description) + para(s.body_opening_text);
   for (const i of [1, 2, 3]) if (s[`body_subheading_${i}`]) h += `<h5 class="text-purple">${esc(s[`body_subheading_${i}`])}</h5>${para(s[`body_subheading_${i}_text`], 'text-mid-purple')}`;
   h += para(s.body_closing_text);
@@ -1224,7 +1244,7 @@ function scrollToTop(el) {
 }
 async function fillLessonBody(el, lessonId, sc) {
   const [rows, parts] = await Promise.all([
-    rest(`lessons?id=eq.${lessonId}&select=*`),
+    rest(`${T('lessons')}?id=eq.${lessonId}&select=*`),
     lessonParts(lessonId),
   ]);
   const l = rows[0];
@@ -1239,6 +1259,7 @@ async function fillLessonBody(el, lessonId, sc) {
   logView(lessonId);
 }
 function lessonText(l) {
+  if (l.body) return bodyHtml(l.body);
   let h = para(l.body_opening_text);
   for (const i of [1, 2, 3]) if (l[`body_subheading_${i}`]) h += `<h5 class="text-purple">${esc(l[`body_subheading_${i}`])}</h5>${para(l[`body_subheading_${i}_text`], 'text-mid-purple')}`;
   h += para(l.body_closing_text);
@@ -1248,7 +1269,7 @@ function lessonText(l) {
 async function pageLesson(id, scId, partId = null) {
   app.innerHTML = '<div class="loading">Opening lesson…</div>';
   const [rows, parts] = await Promise.all([
-    rest(`lessons?id=eq.${id}&select=*`),
+    rest(`${T('lessons')}?id=eq.${id}&select=*`),
     lessonParts(id),
   ]);
   const l = rows[0];
@@ -1267,7 +1288,7 @@ async function pageLesson(id, scId, partId = null) {
   html += `<div class="row"><div class="col-12 order-2 col-lg-9 order-lg-1"><div class="row"><div class="col-sm">
     <div class="card mb-5 scheme-card bg-ultra-light-purple border-0 shadow">
       <div class="row"><div class="col"><div class="card-header bg-primary bg-gradient-primary"><div class="col d-flex justify-content-between align-items-center px-0"><h5 class="text-truncate text-white mr-1 mb-0">${esc(l.name)}${l.heading_2 ? ` <small class="text-white-50 ml-0 ml-sm-2 d-block d-sm-inline">${esc(l.heading_2)}</small>` : ''}</h5><span class="d-flex flex-wrap justify-content-end text-nowrap text-light-purple fw-light py-1">${esc(ageText(l))}</span></div></div></div></div>
-      <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(scheme?.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(l.name)}"><div class="media-body px-1">${lessonText(l)}</div></div></div></div>
+      <div class="row g-0"><div class="col px-3 pt-4 pb-3"><div class="media d-block d-md-flex align-items-center"><img src="${esc(img(l.image || scheme?.image))}" class="img-thumbnail shadow-sm img-fluid align-self-start ms-1 me-3 mb-3 mb-md-0 scheme-thumbnail" alt="${esc(l.name)}"><div class="media-body px-1">${lessonText(l)}</div></div></div></div>
       <div class="row mt-2"><div class="col-12"><div class="card-body py-3">${renderParts(l, parts, true, partId)}</div></div></div>
       ${seq.length > 1 ? `<div class="row mt-2"><div class="col-12"><div class="card-body py-4"><div class="d-flex w-100 justify-content-between"><a href="${prev ? lessonHref(prev, sc) : '#'}" class="btn btn-outline-primary ${prev ? '' : 'disabled'}"><i class="bi-skip-backward-circle mr-1"></i> Previous ${esc(Label)}</a><a href="${next ? lessonHref(next, sc) : '#'}" class="btn ${next ? 'btn-primary' : 'btn-outline-primary disabled'}">Next ${esc(Label)} <i class="bi-skip-forward-circle-fill ms-1"></i></a></div></div></div></div>` : ''}
     </div></div></div></div>`;
@@ -1351,7 +1372,7 @@ function openThumb(l) {
 // Lesson history (lesson/history.blade.php)
 async function pageLessonHistory(id) {
   app.innerHTML = '<div class="loading">Loading history…</div>';
-  const [[l], rows] = await Promise.all([rest(`lessons?id=eq.${id}&select=id,name,heading_2`), rpc('web_lesson_history', { p_lesson_id: id })]);
+  const [[l], rows] = await Promise.all([rest(`${T('lessons')}?id=eq.${id}&select=id,name,heading_2`), rpc('web_lesson_history', { p_lesson_id: id })]);
   if (!l) { app.innerHTML = '<div class="notice">Lesson not found.</div>'; return; }
   setBg(null);
   const table = (title, list) => `<div class="heading-2">${title}</div><table class="viewed-table table table-borderless text-1 text-primary"><thead><tr><th class="pl-0">Date</th><th class="pl-0">Time</th></tr></thead><tbody>${list.map(r => `<tr><td class="pl-0">${fmtDate(r.at)}</td><td class="pl-0">${fmtTime(r.at)}</td></tr>`).join('')}</tbody></table>`;
@@ -1367,7 +1388,7 @@ function subjectIcon(s) { return s && s.icon ? `<i class="${esc(s.icon)} text-wh
 // results/show-favourites.blade.php lesson card (favourites and search results share it).
 function resultLessonCard(l, scheme, sc) {
   const blurb = (l.description || l.body_opening_text || '').trim();
-  return `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
+  return `<div class="col-12 col-md-6 col-lg-3 mb-4"><a href="${lessonHref(l, sc)}" class="text-decoration-none"><div class="card subcategory-card lift h-100 shadow-sm d-flex flex-column"><img src="${esc(img(l.image || scheme?.image))}" class="card-img-top" alt="${esc(l.name)}" loading="lazy"><div class="card-body border-top border-primary p-0 d-flex flex-column justify-content-between"><div class="align-self-start w-100 flex-grow-1"><div class="pt-2 d-flex flex-column w-100 h-100 justify-content-center"><h5 class="text-primary ${blurb ? 'mt-3 mb-1' : 'my-3'} mx-3 card-title text-truncate"><small class="text-mid-purple mb-2">${esc(scheme ? scheme.name : '')}<br></small>${esc(l.name)}</h5>${blurb ? `<h6 class="h6 text-mid-purple fw-light mb-3 mx-3 card-title">${esc(limit(blurb, 100))}</h6>` : ''}</div></div>
         <ul class="list-group border-0 list-group-flush list-group-horizontal text-mid-purple small text-nowrap justify-content-around"><li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate"><i class="bi-person text-purple mr-1"></i> <span>${esc(ageText(l))}</span></span></li>${l.duration ? `<li class="list-group-item border-0 bg-transparent d-flex flex-fill justify-content-start align-items-center"><span class="lesson-icon text-truncate ms-2 ml-lg-3 my-1"><i class="bi-clock text-purple mr-1"></i> ${l.duration}m</span></li>` : ''}</ul></div></div></a></div>`;
 }
 // Lessons grouped under one panel per subject (ResultsController), subjects in name order,
@@ -1401,7 +1422,7 @@ async function pageFavourites() {
   let html = `<div class="row"><div class="col-xs-12 col-6 my-3 mb-0"><h4 class="text-primary"><span class="badge bg-warning me-2"><i class="bi-star-fill" style="position: relative; bottom: 1px;"></i></span><span class="d-none d-md-inline">My Favourite Lessons</span><span class="d-inline d-md-none">Favourites</span></h4></div>
     <div class="col-xs-12 col-6 my-3 mb-0"><div class="text-end">${(Auth.me() || {}).is_admin ? '<small class="text-primary fw-light">Your Favourites are shared automatically across all authorised users at your school</small>' : ''}</div></div><div class="col-12" style="margin-top: -0.5em"><hr></div></div>`;
   if (!ids.length) { app.innerHTML = html + NO_FAVOURITES; reveal(); return; }
-  const lessons = await rest(`lessons?id=in.(${ids.join(',')})&is_live=eq.true&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration,subject_ids&order=name`);
+  const lessons = await rest(`${T('lessons')}?id=in.(${ids.join(',')})&is_live=eq.true&select=id,name,description,body_opening_text,scheme_id,age_min,age_max,duration,subject_ids${PREVIEW.content ? ',image' : ''}&order=name`);
   app.innerHTML = html + resultPanels(lessons, true); reveal();
 }
 
@@ -1485,12 +1506,13 @@ function bindSlidePlayers(root) {
 const isDocPart = p => p.media_type === 'Download';
 const isPlanPart = p => /\b(lesson|session)\s*plans?\b/i.test(p.heading || '');
 async function lessonParts(lessonId) {
-  const q = `lesson_parts?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index`;
+  const q = `${T('lesson_parts')}?lesson_id=eq.${lessonId}&is_live=eq.true&is_archived=eq.false&order=order,index`;
+  if (PREVIEW.content) return rest(`${q}&select=*`);   // the CMS views carry the file (file_name, slides_base_url, ...) on the part
   try { return await rest(`${q}&select=*,lesson_files(url,filename,bytes,pages,content_type)`); }
   catch (e) { return rest(`${q}&select=*`); }   // copies table not there yet
 }
 function docFile(p) {
-  const f = Array.isArray(p.lesson_files) ? p.lesson_files[0] : p.lesson_files;
+  const f = p.asset_id ? { url: p.s3_url, filename: p.file_name, bytes: p.file_bytes, pages: p.file_pages } : Array.isArray(p.lesson_files) ? p.lesson_files[0] : p.lesson_files;
   const url = (f && f.url) || p.download_url_override || p.s3_url || '';
   const ext = ((f && f.filename) || url.split('?')[0]).match(/\.([a-z0-9]{2,4})$/i);
   return { url, filename: f && f.filename, bytes: f && f.bytes, pages: f && f.pages, type: ext ? ext[1].toUpperCase() : '' };
@@ -1532,7 +1554,7 @@ function renderParts(l, allParts, openFirst, openPart = null) {
       case 'Audio': card = `<div class="media d-block align-items-center"><div class="img-thumbnail shadow-sm img-fluid w-100 px-2 ${info ? 'mb-4' : ''}"><audio controls controlsList="nodownload" style="width:100%;" class="mt-2" preload="none"><source src="${esc(p.s3_url)}" type="audio/mpeg"></audio></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
       case 'Download': card = `<div class="media d-block align-items-center"><div class="border border-primary bg-light-purple rounded p-2 ${info ? 'mb-4' : ''}"><a href="${esc(p.s3_url)}" download class="btn btn-primary" target="_blank" rel="noopener"><i class="bi-cloud-download me-2"></i>${esc(p.download_button || 'Download File')}</a><span class="ms-3 text-primary">${esc(p.download_info || 'Save and open this file to complete this part of the lesson.')}</span></div>${info ? `<div class="media-body w-100 px-1">${infoHtml}</div>` : ''}</div>`; break;
       case 'Slides': {
-        const deck = D.slides && D.slides.get(p.google_slide_id);
+        const deck = p.slides_base_url ? { google_slide_id: 'a' + p.asset_id, slide_count: p.file_pages, width: p.slide_width, height: p.slide_height, base_url: p.slides_base_url } : D.slides && D.slides.get(p.google_slide_id);
         const show = deck ? slidePlayer(deck) : `<div class="slideshow-container" style="position: relative; width: 100%; min-height: ${info ? '280px' : '560px'};"><iframe src="https://docs.google.com/presentation/d/e/${esc(p.google_slide_id)}/embed?start=false&loop=false&delayms=60000" frameborder="0" allowfullscreen style="width: 100%; height: 100%; position:absolute; inset:0;" title="Slides"></iframe></div><small class="d-block text-mid-purple fw-light mt-2">Click the dots (<i class="text-primary bi-three-dots-vertical"></i>) to play in full-screen.</small>`;
         card = `<div class="media d-block d-md-flex align-items-center"><div class="img-thumbnail shadow-sm img-fluid ${info ? 'w-50' : 'w-100'} align-self-start me-3 p-2">${show}</div><div class="media-body px-1 ${info ? '' : 'd-none'}">${infoHtml}</div></div>`; break;
       }
@@ -1567,7 +1589,7 @@ async function pageSearch(q) {
   if (!q.trim()) { app.innerHTML = '<div class="notice mt-4">Use Search in the header to find lessons by title, topic, subject or lesson ID.</div>'; return; }
   app.innerHTML = '<div class="loading">Searching…</div>';
   const term = q.trim().replace(/[%,.()]/g, ' ').replace(/\s+/g, ' ');
-  const rows = await rest(`lessons?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration,subject_ids&order=name&limit=500`);
+  const rows = await rest(`${T('lessons')}?is_live=eq.true&search=ilike.*${encodeURIComponent(term)}*&select=id,name,description,body_opening_text,scheme_id,is_freemium,age_min,age_max,duration,subject_ids${PREVIEW.content ? ',image' : ''}&order=name&limit=500`);
   // ResultsController::search: the age filter applies (FilterScope, no subject in the URL); the policy check ignores age rights.
   const live = rows.filter(l => D.lessonById[l.id] && D.schemeById[l.scheme_id] && passesAgeFilter(l, null) && canAccessLesson(l, false));
   logSearch(q.trim(), live.length);
@@ -1605,7 +1627,14 @@ async function startApp() {
     app.innerHTML = `<div class="notice">Could not load content: ${esc(e.message)}</div>`;
   }
 }
+function previewBanner() {
+  if (!PREVIEW.on) return;
+  const what = [PREVIEW.content === 'draft' ? 'draft content (not yet published)' : PREVIEW.content === 'published' ? 'published content from the CMS' : '', PREVIEW.as ? `as a ${PREVIEW.as} account` : '', PREVIEW.ages ? `ages ${PREVIEW.ages[0]}-${PREVIEW.ages[1]}` : ''].filter(Boolean).join(' · ');
+  const b = document.createElement('div'); b.className = 'preview-banner'; b.innerHTML = `<b>Preview</b> ${esc(what)} <a href="${esc(location.pathname + location.hash)}">Exit preview</a>`;
+  document.body.prepend(b);
+}
 (async () => {
+  previewBanner();
   document.getElementById('stamp').textContent = LOADED_AT;
   // The footer date is the latest nightly content refresh when the log exists (041).
   rest('content_refreshes?select=at&order=at.desc&limit=1').then(r => { if (r && r[0]) document.getElementById('stamp').textContent = new Date(r[0].at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }).catch(() => {});
