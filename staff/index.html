@@ -136,6 +136,7 @@ nav .tree { padding: 4px 8px 24px; }
 .rows.media .row .thumb { width: 64px; height: 40px; display: grid; place-items: center; font-size: 18px; }
 .rows.media .row .uses { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 .rows.media .row .uses.none { color: var(--ink-3); }
+.rows.media .row .uses small { display: block; color: var(--ink-3); font-size: 11px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apreview { display: grid; place-items: center; }
 .apreview .big { max-width: 100%; max-height: 420px; border-radius: 8px; }
 .apreview .vwrap { position: relative; width: 100%; max-width: 760px; padding-top: 56.25%; }
@@ -337,7 +338,7 @@ label.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 </head>
 <body class="signedout">
 <header>
-  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.4</span></div>
+  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.4.1</span></div>
   <div class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" type="search" placeholder="Find a subject, category, scheme, lesson or id" autocomplete="off" aria-label="Find content">
@@ -370,9 +371,9 @@ label.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
   </form>
 </div></div>
 <div id="toast"></div>
-<script src="config.js?v=0.4"></script>
-<script src="cms.js?v=0.4"></script>
-<script src="media.js?v=0.4"></script>
-<script src="publish.js?v=0.4"></script>
+<script src="config.js?v=0.4.1"></script>
+<script src="cms.js?v=0.4.1"></script>
+<script src="media.js?v=0.4.1"></script>
+<script src="publish.js?v=0.4.1"></script>
 </body>
 </html>
