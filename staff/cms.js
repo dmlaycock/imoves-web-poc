@@ -1,4 +1,8 @@
-// imoves CMS - staff content page v0.2 (5 Nov 2026)
+// imoves CMS - staff content page v0.3 (5 Nov 2026)
+//
+// v0.3: the media library (media.js) - every picture and file is chosen from or uploaded to one
+// library; lessons can have their own picture (falling back to the scheme's); featured videos,
+// video blocks and parts pick from the library instead of pasting ids.
 //
 // Design: project doc cms/design-v0.2.md. Rebuilt after David's review of v0.1: the page is
 // designed from what teachers see, not from Quickbase's forms. One page per item (no tabs),
@@ -19,9 +23,9 @@ const when = t => t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', mont
 const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 let toastT;
 function toast(msg, err = false) { const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => t.className = '', err ? 5000 : 2200); }
-const KIND = { subject: 'Subject', group: 'Group', category: 'Category', scheme: 'Scheme', lesson: 'Lesson', media_block: 'Block', variant: 'Variant', part: 'Part' };
-const TABLE = { subject: 'subjects', group: 'groups', category: 'categories', scheme: 'schemes', lesson: 'lessons', media_block: 'media_blocks', variant: 'scheme_variants', part: 'lesson_parts' };
-const ROUTE = { subject: 'subject', group: 'group', category: 'category', scheme: 'scheme', lesson: 'lesson', media_block: 'block' };
+const KIND = { subject: 'Subject', group: 'Group', category: 'Category', scheme: 'Scheme', lesson: 'Lesson', media_block: 'Block', variant: 'Variant', part: 'Part', asset: 'File' };
+const TABLE = { subject: 'subjects', group: 'groups', category: 'categories', scheme: 'schemes', lesson: 'lessons', media_block: 'media_blocks', variant: 'scheme_variants', part: 'lesson_parts', asset: 'assets' };
+const ROUTE = { subject: 'subject', group: 'group', category: 'category', scheme: 'scheme', lesson: 'lesson', media_block: 'block', asset: 'media' };
 const href = (type, id) => `#/${ROUTE[type]}/${id}`;
 const ICON = {
   drag: '<svg viewBox="0 0 12 12" fill="currentColor"><circle cx="3" cy="2" r="1.3"/><circle cx="9" cy="2" r="1.3"/><circle cx="3" cy="6" r="1.3"/><circle cx="9" cy="6" r="1.3"/><circle cx="3" cy="10" r="1.3"/><circle cx="9" cy="10" r="1.3"/></svg>',
@@ -91,12 +95,13 @@ async function loadTree() {
   const [subjects, groups, categories, placements, waiting, ...pubs] = await Promise.all([
     getAll('subjects?select=id,name,sort,on_home,browsable,updated_at,archived&archived=eq.false&order=sort,name'),
     getAll('groups?select=id,name,updated_at,archived&archived=eq.false'),
-    getAll('categories?select=id,name,subheading,image,updated_at,archived&archived=eq.false'),
+    getAll('categories?select=id,name,subheading,image,image_asset_id,updated_at,archived&archived=eq.false'),
     getAll('placements?select=id,parent_type,parent_id,child_type,child_id,sort,is_home,heading,subheading,variant_ids&parent_type=in.(subject,group,category)&order=sort'),
     get('waiting?select=item_type,id,changed_at&order=changed_at.desc&limit=500'),
     ...['subjects', 'groups', 'categories', 'schemes', 'lessons', 'media_blocks'].map(t => getAll(`${t}_pub?select=id`)),
   ]);
   Object.assign(D, { subjects, groups, categories, placements, waiting });
+  await loadAssets(categories.map(c => c.image_asset_id));
   D.subjectById = index(subjects); D.groupById = index(groups); D.catById = index(categories);
   D.pub = {}; ['subject', 'group', 'category', 'scheme', 'lesson', 'media_block'].forEach((t, i) => D.pub[t] = new Set(pubs[i].map(r => r.id)));
   D.waitSet = new Set(waiting.map(w => `${w.item_type}:${w.id}`));
@@ -150,7 +155,7 @@ function renderTree() {
     }
     h += '</details>';
   }
-  h += `<a class="archl muted" href="#/archive">Archive</a>`;
+  h += `<div class="navlinks"><a class="archl ${cur.startsWith('#/media') ? 'active' : ''}" href="#/media">Media library</a><a class="archl muted" href="#/archive">Archive</a></div>`;
   tree.innerHTML = h;
   tree.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => { const o = new Set(JSON.parse(sessionStorage.getItem('cms.open') || '[]')); d.open ? o.add(d.dataset.key) : o.delete(d.dataset.key); sessionStorage.setItem('cms.open', JSON.stringify([...o])); }));
   tree.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
@@ -312,7 +317,7 @@ function renderPreview() {
   const pv = $('#preview'); if (!pv) return;
   const r = PAGE.row;
   let h = `<div class="pvlabel"><span>How teachers see it</span><span>live preview</span></div>`;
-  if (r.image) h += `<img class="pvimg" src="${esc(r.image)}" alt="">`;
+  const pic = PAGE.previewImage ? PAGE.previewImage() : rowImage(r); if (pic) h += `<img class="pvimg" src="${esc(pic)}" alt="">`;
   h += `<div class="pvtitle">${esc(r.name)}</div>${r.subheading || r.heading_2 ? `<div class="pvsub">${esc(r.subheading || r.heading_2)}</div>` : ''}`;
   if (r.description && r.description.trim()) h += `<p>${esc(r.description).replace(/\n/g, '<br>')}</p>`;
   h += r.body || (!r.description ? '<div class="pvempty">No page text yet.</div>' : '');
@@ -354,19 +359,25 @@ function iconPicker(key) {
   return `<div class="field" data-field="${key}"><label>Icon (beside the subject name in search results)</label><div class="iconpick" data-iconpick="${key}">${ICONS.map(i => `<button type="button" class="${v === i[0] ? 'on' : ''}" data-i="${i[0]}" title="${i[0] || 'None'}">${i[1]}</button>`).join('')}</div></div>`;
 }
 function bindIcon(root) { root.querySelectorAll('[data-iconpick]').forEach(box => box.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => { markDirty(box.dataset.iconpick, b.dataset.i || null); box.querySelectorAll('[data-i]').forEach(x => x.classList.toggle('on', x === b)); }))); }
-function imageField(key, label, { tile = false } = {}) {
-  const v = PAGE.row[key];
-  const pv = v ? `<img class="pv" src="${esc(v)}" alt="">` : tile ? `<div class="tile">${esc(PAGE.row.name || '')}</div>` : '<div class="pv"></div>';
-  return `<div class="field span" data-field="${key}"><label>${esc(label)}</label><div class="imgfield" data-imgfield="${key}" data-tile="${tile ? 1 : 0}">${pv}<div class="f"><input type="url" data-f="${key}" value="${esc(v)}" placeholder="https://…"><div class="help">${tile ? 'Leave blank and the platform draws a tile from the name (no more hand-made word tiles). ' : ''}Image upload arrives with the media library; for now paste an image address.</div></div></div></div>`;
+// A picture or file an item uses, from the library. key = the asset_id column; legacy = the old
+// address column it replaces (cleared when a choice is made, so the views read the asset).
+// fallback = what teachers see when nothing is chosen here ({ url, note }); tile = the platform
+// draws a tile from the name when there is no picture.
+function assetField(key, label, { kind = 'image', legacy = null, tile = false, fallback = null, note = '' } = {}) {
+  const a = asset(PAGE.row[key]);
+  const old = legacy && PAGE.row[legacy];
+  const fb = a ? null : fallback || (old && kind === 'image' ? { url: old, note: 'The picture from the old platform' } : null);
+  if (!a && old && kind !== 'image') note = `Currently ${old} (from the old platform; not in the library yet).`;
+  const chip = assetChip(a, { kind, fallback: fb && fb.url ? fb : null, note: note || (tile ? 'Teachers see a tile drawn from the name until a picture is chosen.' : ''), onChange: x => {
+    markDirty(key, x ? x.id : null); if (legacy) markDirty(legacy, null);
+    const box = editor.querySelector(`[data-field="${key}"]`); if (box) { const f = assetField(key, label, { kind, legacy, tile, fallback, note }); box.outerHTML = f.html; f.bind(editor); }
+  } });
+  const html = `<div class="field span" data-field="${key}"><label>${esc(label)}</label>${!a && tile && !(fb && fb.url) ? `<div class="imgfield"><div class="tile">${esc(PAGE.row.name || '')}</div><div class="f">${chip.html}</div></div>` : chip.html}</div>`;
+  return { html, bind: chip.bind };
 }
-function bindImageFields(root) {
-  root.querySelectorAll('[data-imgfield]').forEach(box => {
-    const key = box.dataset.imgfield;
-    const redraw = () => { const v = PAGE.row[key]; box.firstElementChild.outerHTML = v ? `<img class="pv" src="${esc(v)}" alt="">` : (box.dataset.tile === '1' ? `<div class="tile">${esc(PAGE.row.name || '')}</div>` : '<div class="pv"></div>'); };
-    box.querySelector('input').addEventListener('input', debounce(redraw, 300));
-    if (box.dataset.tile === '1') { const n = root.querySelector('[data-f="name"]'); if (n) n.addEventListener('input', debounce(redraw, 300)); }
-  });
-}
+function bindImageFields(root) { (PAGE.assetFields || []).forEach(f => f.bind(root)); }
+// Collects the fields a page declares so finish() can bind them: af(...) returns the html.
+function af(...args) { const f = assetField(...args); (PAGE.assetFields ||= []).push(f); return f.html; }
 async function subjectChips(key, derivedIds) {
   const subs = await get('subject_names?select=id,name&archived=eq.false&order=name');
   const extras = (PAGE.row[key] || []).map(String);
@@ -381,8 +392,9 @@ async function childRows(parentType, parentId) {
   for (const p of ps) (byType[p.child_type] ||= []).push(p.child_id);
   const rows = {};
   await Promise.all(Object.entries(byType).map(async ([t, ids]) => {
-    const sel = { media_block: 'id,heading,kind,text,updated_at', scheme: 'id,name,subheading,image,updated_at', category: 'id,name,subheading,image,updated_at', lesson: 'id,name,description,age_min,age_max,updated_at', group: 'id,name,description,updated_at', subject: 'id,name,updated_at' }[t];
+    const sel = { media_block: 'id,heading,kind,text,updated_at', scheme: 'id,name,subheading,image,image_asset_id,updated_at', category: 'id,name,subheading,image,image_asset_id,updated_at', lesson: 'id,name,description,age_min,age_max,image_asset_id,updated_at', group: 'id,name,description,updated_at', subject: 'id,name,updated_at' }[t];
     const r = await getAll(`${TABLE[t]}?id=in.(${ids.join(',')})&select=${sel}`);
+    await loadAssets(r.map(x => x.image_asset_id));
     rows[t] = index(r);
   }));
   return ps.map(p => ({ p, item: (rows[p.child_type] || {})[p.child_id] })).filter(x => x.item);
@@ -400,7 +412,7 @@ async function contentsPanel(parentType, parentId, { title = 'Contents', note = 
     const t = p.child_type; const pub = t === 'subject' ? true : isPub(t, p.child_id); const waiting = isWaiting(t, p.child_id);
     const hasChildren = ['subject', 'group', 'category', 'scheme'].includes(t);
     return `<div class="row ${pub ? '' : 'off'}" data-pid="${p.id}" data-ct="${t}" data-cid="${p.child_id}" data-name="${esc(name)}" data-children="${hasChildren ? 1 : 0}" ${t === 'subject' ? '' : `data-go="${href(t, p.child_id)}"`}>${sortable ? `<span class="handle" title="Drag to reorder">${ICON.drag}</span>` : '<span class="handle" style="cursor:default"></span>'}
-      ${item.image ? `<img class="thumb" src="${esc(item.image)}" alt="">` : ''}<span class="kind ${t}">${KIND[t]}</span>
+      ${rowImage(item) ? `<img class="thumb" src="${esc(rowImage(item))}" alt="">` : ''}<span class="kind ${t}">${KIND[t]}</span>
       <div class="title"><div class="name">${esc(name)}${p.heading ? ' <span class="muted small">(renamed here)</span>' : ''}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}</div>
       ${t === 'lesson' && item.age_min != null ? `<span class="ages">${esc(ageLabel(item.age_min, item.age_max))}</span>` : ''}${p.variant_ids ? '<span class="pill new" title="Only some age variants show here">some ages</span>' : ''}
       <div class="rt">${t === 'subject' ? '' : `<label class="sw row-sw ${waiting ? 'waiting' : ''}" title="${pub ? 'Teachers can see this' : 'Hidden from teachers'}"><input type="checkbox" data-pubsw ${pub ? 'checked' : ''} ${canEdit() ? '' : 'disabled'}></label>`}${canEdit() ? `<button class="btn icon danger" data-unplace="${p.id}" title="Remove from here">${ICON.bin}</button>` : ''}</div></div>`;
@@ -546,10 +558,12 @@ async function pageSubject(id) {
   PAGE = { type: 'subject', id, row, dirty: {}, reload: () => pageSubject(id) };
   const [groups, vis] = await Promise.all([contentsPanel('subject', id, { title: 'Groups', note: 'The groups on the subject page, in this order.' }), visibilityPanel('subject', id)]);
   const fv = row.featured_video || {}; const hasKs = !!(fv.ks1 && fv.ks2 && JSON.stringify(fv.ks1) !== JSON.stringify(fv.ks2)); const hasFree = !!fv.free;
-  const vslot = (k, label) => { const v = fv[k] || {}; return `<div class="grid" data-vslot="${k}"><div class="field"><label>${esc(label)}: video (Stream UID)</label><input type="text" data-fv="${k}.stream_uid" value="${esc(v.stream_uid)}" placeholder="Until the media library: paste the Stream UID"></div><div class="field"><label>Heading</label><input type="text" data-fv="${k}.heading" value="${esc(v.heading)}"></div><div class="field"><label>Subheading</label><input type="text" data-fv="${k}.subheading" value="${esc(v.subheading)}"></div><div class="field span"><label>Description</label><textarea data-fv="${k}.description" rows="2">${esc(v.description)}</textarea></div></div>`; };
+  await loadAssets([row.background_asset_id, ...Object.values(fv).map(v => v && v.asset_id)]);
+  PAGE.fv = JSON.parse(JSON.stringify(fv));
+  const vslot = (k, label) => { const v = fv[k] || {}; return `<div class="grid" data-vslot="${k}"><div class="field span"><label>${esc(label)}</label>${videoSlotChip('fv', k)}</div><div class="field"><label>Heading</label><input type="text" data-fv="${k}.heading" value="${esc(v.heading)}"></div><div class="field"><label>Subheading</label><input type="text" data-fv="${k}.subheading" value="${esc(v.subheading)}"></div><div class="field span"><label>Description</label><textarea data-fv="${k}.description" rows="2">${esc(v.description)}</textarea></div></div>`; };
   if (stale(nav)) return;
   editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, { name: row.name }]) + groups.html +
-    panel('Details', `<div class="grid">${field('name', 'Name')}${colourPicker('button_colour')}${iconPicker('icon')}<div class="span">${field('description', 'Description (the collapsible panel at the top of the subject page)', { type: 'textarea', rows: 3 })}</div>${imageField('background_image', 'Page background image')}
+    panel('Details', `<div class="grid">${field('name', 'Name')}${colourPicker('button_colour')}${iconPicker('icon')}<div class="span">${field('description', 'Description (the collapsible panel at the top of the subject page)', { type: 'textarea', rows: 3 })}</div>${af('background_asset_id', 'Page background picture', { legacy: 'background_image', note: 'Optional. Behind the subject page.' })}
       <div class="span" style="display:flex;gap:24px;flex-wrap:wrap">${field('on_home', 'Show on the home page', { type: 'switch' })}${field('browsable', 'Include in Browse', { type: 'switch' })}</div></div>`) +
     panel('Featured video', `<div class="help" style="margin-bottom:10px">Optional. Shown at the top of the subject page.</div>${vslot('ks2', hasKs ? 'Paying users, KS2 (ages 7-11)' : 'Video')}
       <div style="margin:10px 0 6px"><label class="sw field-sw"><input type="checkbox" id="fvKs" ${hasKs ? 'checked' : ''}> <span>Different video for KS1 (ages 4-7)</span></label></div><div id="fvKs1" ${hasKs ? '' : 'hidden'}>${vslot('ks1', 'Paying users, KS1')}</div>
@@ -559,24 +573,39 @@ async function pageSubject(id) {
   finish([groups, vis]);
   bindFeaturedVideo(); bindFeaturedTiles();
 }
+// A video slot (featured video on a subject, or a video block): the chosen video from the
+// library, kept in the slot's json as asset_id + stream_uid. store = 'fv' (PAGE.fv) or 'bv' (PAGE.bv).
+function videoSlotChip(store, k) {
+  const slot = (PAGE[store][k] ||= {}); const a = asset(slot.asset_id);
+  const chip = assetChip(a, { kind: 'video', note: slot.stream_uid && !a ? `Stream video ${slot.stream_uid} (not in the library yet)` : 'Choose a video from the library or upload one.', onChange: x => {
+    slot.asset_id = x ? x.id : null; slot.stream_uid = x ? x.stream_uid : null; if (x && !slot.duration && x.duration) slot.duration = fmtSecs(x.duration);
+    const host = editor.querySelector(`[data-vchip="${store}.${k}"]`); if (host) { host.innerHTML = videoSlotChip(store, k); bindVideoSlotChips(); }
+    (store === 'fv' ? syncFeaturedVideo : syncBlockVideo)();
+  } });
+  (PAGE.vchips ||= {})[`${store}.${k}`] = chip;
+  return `<div data-vchip="${store}.${k}">${chip.html}</div>`;
+}
+function bindVideoSlotChips() { Object.values(PAGE.vchips || {}).forEach(c => c.bind(editor)); }
+function syncFeaturedVideo() {
+  const fv = PAGE.fv, fvKs = $('#fvKs'), fvFree = $('#fvFree');
+  const has = k => fv[k] && (fv[k].asset_id || fv[k].stream_uid);
+  const clean = k => Object.fromEntries(Object.entries(fv[k]).filter(([, v]) => v != null && v !== ''));
+  const out = {}; if (has('ks2')) { out.ks2 = clean('ks2'); out.ks1 = fvKs.checked && has('ks1') ? clean('ks1') : out.ks2; }
+  if (fvFree.checked && has('free')) out.free = clean('free');
+  markDirty('featured_video', Object.keys(out).length ? out : null);
+}
 function bindFeaturedVideo() {
   const fvKs = $('#fvKs'), fvFree = $('#fvFree');
-  const read = () => {
-    const fv = {}; editor.querySelectorAll('[data-fv]').forEach(el => { const [k, f] = el.dataset.fv.split('.'); if (el.value) (fv[k] ||= {})[f] = el.value; });
-    const out = {}; if (fv.ks2 && fv.ks2.stream_uid) { out.ks2 = fv.ks2; out.ks1 = fvKs.checked && fv.ks1 && fv.ks1.stream_uid ? fv.ks1 : fv.ks2; }
-    if (fvFree.checked && fv.free && fv.free.stream_uid) out.free = fv.free;
-    return Object.keys(out).length ? out : null;
-  };
-  const sync = () => markDirty('featured_video', read());
-  editor.querySelectorAll('[data-fv]').forEach(el => el.addEventListener('input', sync));
-  fvKs.addEventListener('change', () => { $('#fvKs1').hidden = !fvKs.checked; sync(); });
-  fvFree.addEventListener('change', () => { $('#fvFree1').hidden = !fvFree.checked; sync(); });
+  editor.querySelectorAll('[data-fv]').forEach(el => el.addEventListener('input', () => { const [k, f] = el.dataset.fv.split('.'); (PAGE.fv[k] ||= {})[f] = el.value || null; syncFeaturedVideo(); }));
+  fvKs.addEventListener('change', () => { $('#fvKs1').hidden = !fvKs.checked; syncFeaturedVideo(); });
+  fvFree.addEventListener('change', () => { $('#fvFree1').hidden = !fvFree.checked; syncFeaturedVideo(); });
+  bindVideoSlotChips();
 }
 function bindFeaturedTiles() {
   const list = $('#featList');
   const draw = () => {
     const feats = PAGE.row.featured || [];
-    list.innerHTML = feats.map((f, i) => { const c = D.catById[f.category_id]; return `<div class="row" data-i="${i}" style="cursor:default">${canEdit() ? `<span class="handle">${ICON.drag}</span>` : ''}${c && c.image ? `<img class="thumb" src="${esc(c.image)}" alt="">` : ''}<div class="title"><div class="name">${esc(c ? c.name : 'Category ' + f.category_id)}</div><div class="sub" style="display:flex;gap:6px"><input type="text" placeholder="Heading (optional)" value="${esc(f.heading)}" data-fh="${i}" style="flex:1;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)"><input type="text" placeholder="Subheading (optional)" value="${esc(f.subheading)}" data-fs="${i}" style="flex:1;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)"></div></div>${canEdit() ? `<button class="btn icon danger" data-fdel="${i}">${ICON.bin}</button>` : ''}</div>`; }).join('') || '<div class="empty">No tiles yet.</div>';
+    list.innerHTML = feats.map((f, i) => { const c = D.catById[f.category_id]; return `<div class="row" data-i="${i}" style="cursor:default">${canEdit() ? `<span class="handle">${ICON.drag}</span>` : ''}${c && rowImage(c) ? `<img class="thumb" src="${esc(rowImage(c))}" alt="">` : ''}<div class="title"><div class="name">${esc(c ? c.name : 'Category ' + f.category_id)}</div><div class="sub" style="display:flex;gap:6px"><input type="text" placeholder="Heading (optional)" value="${esc(f.heading)}" data-fh="${i}" style="flex:1;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)"><input type="text" placeholder="Subheading (optional)" value="${esc(f.subheading)}" data-fs="${i}" style="flex:1;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:var(--bg)"></div></div>${canEdit() ? `<button class="btn icon danger" data-fdel="${i}">${ICON.bin}</button>` : ''}</div>`; }).join('') || '<div class="empty">No tiles yet.</div>';
     list.querySelectorAll('[data-fh],[data-fs]').forEach(el => el.addEventListener('input', () => { const i = +(el.dataset.fh ?? el.dataset.fs); const f = PAGE.row.featured[i]; if (el.dataset.fh != null) f.heading = el.value || undefined; else f.subheading = el.value || undefined; markDirty('featured', PAGE.row.featured); }));
     list.querySelectorAll('[data-fdel]').forEach(b => b.addEventListener('click', () => { PAGE.row.featured.splice(+b.dataset.fdel, 1); markDirty('featured', PAGE.row.featured); draw(); }));
     if (canEdit() && feats.length > 1) new Sortable(list, { handle: '.handle', animation: 150, onEnd: () => { const order = [...list.querySelectorAll('.row')].map(r => PAGE.row.featured[+r.dataset.i]); PAGE.row.featured = order; markDirty('featured', order); draw(); } });
@@ -602,6 +631,7 @@ async function pageCategory(id) {
   const nav = ticket();
   const [row] = await get(`categories?id=eq.${id}&select=*`); if (stale(nav)) return; if (!row) return notFound();
   PAGE = { type: 'category', id, row, dirty: {}, reload: () => pageCategory(id) };
+  await loadAssets([row.image_asset_id, row.background_asset_id]);
   const parent = parentsOf('category', id).find(p => p.is_home) || parentsOf('category', id)[0];
   const grp = parent && parent.parent_type === 'group' && D.groupById[parent.parent_id]; const subjP = grp && parentsOf('group', grp.id)[0]; const subj = subjP && D.subjectById[subjP.parent_id];
   const [contents, vis, where] = await Promise.all([contentsPanel('category', id, { title: 'Contents', note: 'Schemes, single lessons, video or document blocks and other categories, in the order teachers see them.' }), visibilityPanel('category', id), wherePanel('category', id)]);
@@ -609,7 +639,7 @@ async function pageCategory(id) {
   PAGE.row.noun = `${row.noun_singular || 'Lesson'}|${row.noun_plural || 'Lessons'}`;
   if (stale(nav)) return;
   editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, subj ? { name: subj.name, href: href('subject', subj.id) } : null, grp ? { name: grp.name, href: href('group', grp.id) } : null, { name: row.name }].filter(Boolean)) + contents.html +
-    panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (on the tile)')}<div class="span">${field('description', 'Description (on the category page)', { type: 'textarea', rows: 2 })}</div>${imageField('image', 'Tile image', { tile: true })}${imageField('background_image', 'Page background image')}
+    panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (on the tile)')}<div class="span">${field('description', 'Description (on the category page)', { type: 'textarea', rows: 2 })}</div>${af('image_asset_id', 'Tile picture', { legacy: 'image', tile: true })}${af('background_asset_id', 'Page background picture', { legacy: 'background_image', note: 'Optional. Behind the category page.' })}
       ${field('noun', 'What the items are called', { type: 'radio', options: nounOpts, help: 'Shown on the tile, e.g. "12 activities".' })}<div class="span">${field('on_subject_page', 'Show as a tile on the subject page', { type: 'switch' })}</div></div>`) + vis.html + where.html;
   PAGE.onChange = k => { if (k === 'noun') { const [s, p] = PAGE.row.noun.split('|'); delete PAGE.dirty.noun; PAGE.dirty.noun_singular = s; PAGE.dirty.noun_plural = p; PAGE.row.noun_singular = s; PAGE.row.noun_plural = p; } renderPreview(); };
   finish([contents, vis, where]);
@@ -620,20 +650,30 @@ async function pageBlock(id) {
   PAGE = { type: 'media_block', id, row, dirty: {}, reload: () => pageBlock(id) };
   const where = await wherePanel('media_block', id);
   const v = row.video || {}; const diff = !!(v.free || v.paid);
-  const vslot = (k, label) => { const x = v[k] || {}; return `<div class="grid" data-vslot="${k}"><div class="field"><label>${esc(label)}: video (Stream UID)</label><input type="text" data-bv="${k}.stream_uid" value="${esc(x.stream_uid)}"></div><div class="field"><label>Length shown on the tile (e.g. 3:20)</label><input type="text" data-bv="${k}.duration" value="${esc(x.duration)}"></div>${k !== 'all' ? `<div class="field"><label>Heading for this audience (optional)</label><input type="text" data-bv="${k}.heading" value="${esc(x.heading)}"></div><div class="field span"><label>Text for this audience (optional)</label><textarea data-bv="${k}.text" rows="2">${esc(x.text)}</textarea></div>` : ''}</div>`; };
+  await loadAssets([row.document_asset_id, ...Object.values(v).map(x => x && x.asset_id)]);
+  PAGE.bv = JSON.parse(JSON.stringify(v));
+  const vslot = (k, label) => { const x = v[k] || {}; return `<div class="grid" data-vslot="${k}"><div class="field span"><label>${esc(label)}</label>${videoSlotChip('bv', k)}</div><div class="field"><label>Length shown on the tile (e.g. 3:20)</label><input type="text" data-bv="${k}.duration" value="${esc(x.duration)}"></div>${k !== 'all' ? `<div class="field"><label>Heading for this audience (optional)</label><input type="text" data-bv="${k}.heading" value="${esc(x.heading)}"></div><div class="field span"><label>Text for this audience (optional)</label><textarea data-bv="${k}.text" rows="2">${esc(x.text)}</textarea></div>` : ''}</div>`; };
   if (stale(nav)) return;
   editor.innerHTML = pageHeader([{ name: 'Blocks' }, { name: row.heading || row.kind }], { subtitle: `${row.kind} block` }) +
     panel('Details', `<div class="grid">${field('kind', 'Kind', { type: 'radio', options: [['video', 'Video'], ['document', 'Document'], ['link', 'Link']] })}${field('heading', 'Heading')}<div class="span">${field('text', 'Text', { type: 'textarea', rows: 3 })}</div>
-      <div class="span" data-kind="document">${field('document_url', 'Document', { help: 'Upload arrives with the media library; for now a file address.' })}</div>
+      <div class="span" data-kind="document">${af('document_asset_id', 'Document', { kind: 'document', legacy: 'document_url', note: 'The file teachers open from this block.' })}</div>
       <div class="span" data-kind="link"><div class="grid">${field('link_text', 'Button text')}${field('link_url', 'Link address')}</div></div>
       <div class="span" data-kind="video">${vslot(diff ? 'paid' : 'all', diff ? 'Paying subscribers' : 'Video')}<div style="margin:10px 0 6px"><label class="sw field-sw"><input type="checkbox" id="bvDiff" ${diff ? 'checked' : ''}> <span>Show a different video to free accounts</span></label></div><div id="bvFree" ${diff ? '' : 'hidden'}>${vslot('free', 'Free accounts')}</div></div></div>`) + where.html;
   const showKind = () => editor.querySelectorAll('[data-kind]').forEach(el => el.hidden = el.dataset.kind !== PAGE.row.kind);
   PAGE.onChange = k => { if (k === 'kind') showKind(); };
   finish([where]); showKind();
   const bvDiff = $('#bvDiff');
-  const sync = () => { const vv = {}; editor.querySelectorAll('[data-bv]').forEach(el => { const [k, f] = el.dataset.bv.split('.'); if (el.value) (vv[k] ||= {})[f] = el.value; }); const out = {}; const main = vv.paid || vv.all; if (bvDiff.checked) { if (main) out.paid = main; if (vv.free) out.free = vv.free; } else if (main) out.all = main; markDirty('video', Object.keys(out).length ? out : null); };
-  editor.querySelectorAll('[data-bv]').forEach(el => el.addEventListener('input', sync));
-  bvDiff.addEventListener('change', () => { $('#bvFree').hidden = !bvDiff.checked; sync(); });
+  editor.querySelectorAll('[data-bv]').forEach(el => el.addEventListener('input', () => { const [k, f] = el.dataset.bv.split('.'); (PAGE.bv[k] ||= {})[f] = el.value || null; syncBlockVideo(); }));
+  bvDiff.addEventListener('change', () => { $('#bvFree').hidden = !bvDiff.checked; syncBlockVideo(); });
+  bindVideoSlotChips();
+}
+function syncBlockVideo() {
+  const bv = PAGE.bv, bvDiff = $('#bvDiff');
+  const has = k => bv[k] && (bv[k].asset_id || bv[k].stream_uid);
+  const clean = k => Object.fromEntries(Object.entries(bv[k]).filter(([, v]) => v != null && v !== ''));
+  const out = {}; const main = has('paid') ? 'paid' : has('all') ? 'all' : null;
+  if (bvDiff.checked) { if (main) out.paid = clean(main); if (has('free')) out.free = clean('free'); } else if (main) out.all = clean(main);
+  markDirty('video', Object.keys(out).length ? out : null);
 }
 
 // Scheme: lessons by age first (each variant its own sequence), then page text and details.
@@ -643,6 +683,7 @@ async function pageScheme(id, keepVariant) {
   const variants = (await get(`scheme_variants?scheme_id=eq.${id}&select=*`)).sort((a, b) => (a.age_min ?? 99) - (b.age_min ?? 99) || a.sort - b.sort);
   if (stale(nav)) return;
   PAGE = { type: 'scheme', id, row, dirty: {}, variants, variant: keepVariant && variants.some(v => v.id === keepVariant) ? keepVariant : variants[0] && variants[0].id, reload: () => pageScheme(id, PAGE.variant) };
+  await loadAssets([row.image_asset_id, ...variants.map(v => v.image_asset_id)]);
   const home = parentsOf('scheme', id).find(p => p.is_home) || parentsOf('scheme', id)[0];
   const cat = home && D.catById[home.parent_id];
   const derived = new Set(); for (const p of parentsOf('scheme', id)) { const g = parentsOf('category', p.parent_id)[0]; const s = g && parentsOf('group', g.parent_id)[0]; if (s) derived.add(s.parent_id); }
@@ -651,7 +692,7 @@ async function pageScheme(id, keepVariant) {
   editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, cat ? { name: cat.name, href: href('category', cat.id) } : null, { name: row.name }].filter(Boolean)) +
     panel(variants.length > 1 ? 'Lessons by age' : 'Lessons', `<div class="vtabs" id="vtabs"></div><div id="variantBox"></div>`) +
     textPanel() +
-    panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (shown under the name)')}${imageField('image', 'Image (on the scheme card and every lesson in it)')}<div class="span">${field('free_sample', 'Free sample: open to everyone, shows the Free badge', { type: 'switch' })}</div>${subj}</div>`) +
+    panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (shown under the name)')}${af('image_asset_id', 'Picture (on the scheme card, and on each lesson unless the lesson has its own)', { legacy: 'image' })}<div class="span">${field('free_sample', 'Free sample: open to everyone, shows the Free badge', { type: 'switch' })}</div>${subj}</div>`) +
     where.html;
   finish([where]);
   renderVariantTabs(); await renderVariant();
@@ -681,10 +722,12 @@ async function renderVariant() {
   const inner = lessons.html.replace(/^<div class="panel"[^>]*>/, '<div class="subpanel">').replace(/<\/div>$/, '');
   const multi = PAGE.variants.length > 1;
   box.innerHTML = `${multi ? `<details style="margin-bottom:10px"><summary class="muted small" style="cursor:pointer">${esc(ageLabel(v.age_min, v.age_max))}: change the ages, or give this range its own text or image</summary><div style="margin-top:8px"><div class="agepick" data-vagepick="${v.id}"><div class="quick">${QUICK.map(q => `<button type="button" class="chip ${v.age_min === q[1] && v.age_max === q[2] ? 'on' : ''}" data-q="${q[1]}|${q[2]}">${q[0]}</button>`).join('')}</div><div class="years">${AGES.map(a => `<label><input type="checkbox" value="${a[0]}" ${v.age_min != null && a[0] >= v.age_min && a[0] < v.age_max ? 'checked' : ''}>${a[1]}<small>${a[2]}</small></label>`).join('')}</div></div>
-    <div class="grid" style="margin-top:10px"><div class="field"><label>Subheading for this range (blank = the scheme's)</label><input type="text" data-vf="subheading" value="${esc(v.subheading)}" placeholder="${esc(PAGE.row.subheading || '')}"></div><div class="field"><label>Image for this range (blank = the scheme's)</label><input type="url" data-vf="image" value="${esc(v.image)}"></div><div class="field span"><label>Page text for this range (blank = the scheme's)</label>${rteHtml(`data-vrte="${v.id}"`, v.body, 'Only if this age range needs different text')}</div></div>
+    <div class="grid" style="margin-top:10px"><div class="field"><label>Subheading for this range (blank = the scheme's)</label><input type="text" data-vf="subheading" value="${esc(v.subheading)}" placeholder="${esc(PAGE.row.subheading || '')}"></div><div class="field span"><label>Picture for this range (otherwise the scheme's)</label><div id="vimg"></div></div><div class="field span"><label>Page text for this range (blank = the scheme's)</label>${rteHtml(`data-vrte="${v.id}"`, v.body, 'Only if this age range needs different text')}</div></div>
     ${canEdit() ? `<div style="margin-top:10px"><button class="btn sm danger" id="delVariant">Delete this age variant</button></div>` : ''}</div></details>` : ''}${inner}`;
   lessons.bind(box);
   if (multi) {
+    const drawVimg = () => { const chip = assetChip(asset(v.image_asset_id), { kind: 'image', fallback: rowImage(PAGE.row) ? { url: rowImage(PAGE.row), note: 'Using the scheme’s picture' } : null, onChange: async x => { try { Object.assign(v, await patch('scheme_variants', v.id, { image_asset_id: x ? x.id : null, image: null })); toast('Saved'); refreshStatus(); drawVimg(); } catch (e) { toast(e.message, true); } } }); $('#vimg').innerHTML = chip.html; chip.bind(box); };
+    drawVimg();
     const ap = box.querySelector('[data-vagepick]');
     const applyAges = async (min, max) => { try { Object.assign(v, await patch('scheme_variants', v.id, { age_min: min, age_max: max })); PAGE.variants.sort((a, b) => (a.age_min ?? 99) - (b.age_min ?? 99)); renderVariantTabs(); await renderVariant(); toast('Saved'); refreshStatus(); } catch (e) { toast(e.message, true); } };
     ap.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => { const [a, z] = b.dataset.q.split('|').map(Number); applyAges(a, z); }));
@@ -710,9 +753,11 @@ async function pageLesson(id) {
   PAGE = { type: 'lesson', id, row, dirty: {}, reload: () => pageLesson(id) };
   const [parts, where, vps] = await Promise.all([get(`lesson_parts?lesson_id=eq.${id}&select=*&order=sort,id`), wherePanel('lesson', id), get(`placements?child_type=eq.lesson&child_id=eq.${id}&parent_type=eq.variant&select=parent_id`)]);
   PAGE.parts = parts;
-  const derived = new Set(); let crumb = null;
-  for (const vp of vps) { const [v] = await get(`scheme_variants?id=eq.${vp.parent_id}&select=scheme_id,schemes(name)`); if (!v) continue; if (!crumb) crumb = { name: v.schemes.name, href: href('scheme', v.scheme_id) }; for (const p of parentsOf('scheme', v.scheme_id)) { const g = parentsOf('category', p.parent_id)[0]; const s = g && parentsOf('group', g.parent_id)[0]; if (s) derived.add(s.parent_id); } }
+  const derived = new Set(); let crumb = null, schemePic = null;
+  for (const vp of vps) { const [v] = await get(`scheme_variants?id=eq.${vp.parent_id}&select=scheme_id,image,image_asset_id,schemes(name,image,image_asset_id)`); if (!v) continue; if (!crumb) { crumb = { name: v.schemes.name, href: href('scheme', v.scheme_id) }; await loadAssets([v.image_asset_id, v.schemes.image_asset_id]); schemePic = rowImage(v) || rowImage(v.schemes); } for (const p of parentsOf('scheme', v.scheme_id)) { const g = parentsOf('category', p.parent_id)[0]; const s = g && parentsOf('group', g.parent_id)[0]; if (s) derived.add(s.parent_id); } }
   const subj = await subjectChips('extra_subject_ids', derived);
+  await loadAssets([row.image_asset_id, row.background_asset_id, ...parts.map(p => p.asset_id)]);
+  PAGE.previewImage = () => rowImage(PAGE.row) || schemePic;
   PAGE.row.tags_text = (row.tags || []).join(', ');
   if (stale(nav)) return;
   editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, crumb, { name: row.name }].filter(Boolean)) +
@@ -721,7 +766,7 @@ async function pageLesson(id) {
     panel('Details', `<div class="grid">${field('name', 'Name')}${field('heading_2', 'Subtitle (beside the name on the lesson page)')}${agePicker()}
       <div class="span"><div class="subhead">What to expect</div><div class="grid">${field('duration', 'Length (minutes)', { type: 'number' })}${field('preparation', 'Preparation (minutes)', { type: 'number' })}${field('intensity', 'Physical intensity', { type: 'radio', options: [['', 'Not set'], ['Low', 'Low'], ['Moderate', 'Moderate'], ['Vigorous', 'Vigorous']] })}${field('focus', 'Focus', { type: 'radio', options: [['', 'Not set'], ['Energising', 'Energising'], ['Calming', 'Calming']] })}${field('location', 'Where it can be taught', { type: 'chips', options: [['Hall', 'Hall'], ['Classroom', 'Classroom'], ['Outdoors', 'Outdoors'], ['Corridors', 'Corridors'], ['Home', 'Home']] })}</div></div>
       <div class="span" style="display:flex;gap:24px;flex-wrap:wrap">${field('free_sample', 'Free sample: open to everyone, shows the Free badge', { type: 'switch' })}${field('thumb_enabled', 'Show the thumb-o-meter', { type: 'switch' })}</div>
-      ${imageField('background_image', 'Page background image')}${subj}<div class="span">${field('tags_text', 'Search tags (comma-separated)', { help: 'For the search work: words teachers might type that are not in the text.' })}</div></div>`) +
+      ${af('image_asset_id', 'Picture (on the lesson page and on cards in search results and favourites)', { fallback: schemePic ? { url: schemePic, note: crumb ? `Using the scheme’s picture (${crumb.name})` : 'Using the scheme’s picture' } : null, note: 'Without one, the scheme’s picture is shown.' })}${af('background_asset_id', 'Page background picture', { legacy: 'background_image', note: 'Optional. Behind the lesson page.' })}${subj}<div class="span">${field('tags_text', 'Search tags (comma-separated)', { help: 'For the search work: words teachers might type that are not in the text.' })}</div></div>`) +
     where.html;
   PAGE.onChange = k => { if (k === 'tags_text') { delete PAGE.dirty.tags_text; PAGE.dirty.tags = (PAGE.row.tags_text || '').split(',').map(s => s.trim()).filter(Boolean); } renderPreview(); };
   finish([where]);
@@ -738,7 +783,6 @@ function renderParts() {
     ${canEdit() ? `<div class="inline-add"><div class="menu up" id="addPart"><button class="btn" data-addbtn>${ICON.plus} Add part</button><div class="items">${PART_TYPES.map(t => `<button data-newpart="${t[0]}">${t[1]} ${t[0]}</button>`).join('')}</div></div><span class="muted small">Video, audio, slides, images and text are numbered in order. Downloads sit outside the sequence.</span></div>` : ''}
     ${PAGE.parts.some(p => p.archived) ? `<details style="margin-top:12px"><summary class="muted small" style="cursor:pointer">Archived parts (${PAGE.parts.filter(p => p.archived).length})</summary><div class="rows" style="margin-top:8px">${PAGE.parts.filter(p => p.archived).map(p => row(p, '')).join('')}</div></details>` : ''}`;
   box.querySelectorAll('.part > .row').forEach(r => r.addEventListener('click', e => { if (e.target.closest('.handle, .rt, input, label, button')) return; const el = r.closest('.part'); el.classList.toggle('open'); if (el.classList.contains('open')) renderPartDetail(el); }));
-  const savePart = async (p, body) => { try { Object.assign(p, await patch('lesson_parts', p.id, body)); refreshStatus(); return true; } catch (e) { toast(e.message, true); return false; } };
   box.querySelectorAll('[data-partlive]').forEach(i => i.addEventListener('change', async e => { const p = PAGE.parts.find(x => x.id === +e.target.closest('.part').dataset.part); if (await savePart(p, { live: e.target.checked })) renderParts(); else e.target.checked = !e.target.checked; }));
   box.querySelectorAll('[data-partbin]').forEach(b => b.addEventListener('click', async e => { e.stopPropagation(); const p = PAGE.parts.find(x => x.id === +b.closest('.part').dataset.part); if (!p.archived && !confirm(`Remove "${p.heading || p.media_type}" from the lesson? It goes to the archived parts below and can be restored.`)) return; if (await savePart(p, { archived: !p.archived })) { toast(p.archived ? 'Part archived' : 'Part restored'); renderParts(); } }));
   if (canEdit()) {
@@ -754,12 +798,21 @@ function renderParts() {
     }));
   }
 }
+async function savePart(p, body) { try { Object.assign(p, await patch('lesson_parts', p.id, body)); refreshStatus(); return true; } catch (e) { toast(e.message, true); return false; } }
 function renderPartDetail(el) {
   const p = PAGE.parts.find(x => x.id === +el.dataset.part); const d = el.querySelector('.detail');
   const f = (k, label, type = 'text', placeholder = '') => `<div class="field"><label>${esc(label)}</label>${type === 'textarea' ? `<textarea data-pf="${k}" rows="3">${esc(p[k])}</textarea>` : `<input type="text" data-pf="${k}" value="${esc(p[k])}" placeholder="${esc(placeholder)}">`}</div>`;
-  const media = { Video: f('stream_uid', 'Video (Cloudflare Stream UID)', 'text', 'Until the media library: paste the Stream UID'), Audio: f('file_url', 'Audio file address') + f('duration', 'Length shown (e.g. 4:30)'), Image: f('file_url', 'Image address'), Download: f('file_url', 'File address'), Slides: f('google_slide_id', 'Slides (Google deck id until PDF upload arrives)'), Text: '' }[p.media_type] || '';
+  const kind = PART_KIND[p.media_type]; const a = asset(p.asset_id);
+  const legacy = !a && (p.stream_uid ? `Stream video ${p.stream_uid}` : p.google_slide_id ? 'A Google Slides deck that was never captured: upload the PDF' : p.file_url ? p.file_url : '');
+  const chip = kind ? assetChip(a, { kind, note: legacy ? `${legacy} (not in the library yet)` : `Choose from the library or upload a ${kindLabel(kind).toLowerCase()}${kind === 'slides' ? ' deck as a PDF' : ''}.`, onChange: async x => {
+    const body = { asset_id: x ? x.id : null, stream_uid: null, wistia_id: null, file_url: null, google_slide_id: null };
+    if (x && !p.heading) body.heading = x.title; if (x && !p.duration && x.duration && (kind === 'video' || kind === 'audio')) body.duration = fmtSecs(x.duration);
+    if (await savePart(p, body)) { toast('Saved'); renderParts(); const e2 = $(`[data-part="${p.id}"]`); if (e2) { e2.classList.add('open'); renderPartDetail(e2); } }
+  } }) : null;
+  const media = (chip ? `<div class="field span"><label>${esc(p.media_type === 'Download' ? 'File' : p.media_type)}</label>${chip.html}</div>` : '') + ((p.media_type === 'Audio' || p.media_type === 'Video') ? f('duration', 'Length shown (e.g. 4:30)') : '');
   d.innerHTML = `<div class="grid" style="margin-top:10px"><div class="field span"><label>Type</label><div class="chips">${PART_TYPES.map(t => `<label class="chip"><input type="radio" name="pt-${p.id}" data-pf="media_type" value="${t[0]}" ${p.media_type === t[0] ? 'checked' : ''}> ${t[1]} ${t[0]}</label>`).join('')}</div></div>${f('heading', 'Heading')}<div class="span">${f('additional_info', 'Text shown with this part', 'textarea')}</div><div class="span"><div class="grid">${media}</div></div>
     ${p.media_type === 'Download' || p.show_as_document != null ? `<div class="span"><div class="field"><label>Shown as</label><div class="chips"><label class="chip"><input type="radio" name="sd-${p.id}" data-pf="show_as_document" value="" ${p.show_as_document == null ? 'checked' : ''}> Usual for its type</label><label class="chip"><input type="radio" name="sd-${p.id}" data-pf="show_as_document" value="true" ${p.show_as_document === true ? 'checked' : ''}> A document (plan or printable)</label><label class="chip"><input type="radio" name="sd-${p.id}" data-pf="show_as_document" value="false" ${p.show_as_document === false ? 'checked' : ''}> In the numbered sequence</label></div><div class="help">A download with "Lesson plan" or "Session plan" in its heading is the lesson plan card; other downloads are printables.</div></div></div>` : ''}</div>`;
+  if (chip) chip.bind(d);
   if (!canEdit()) { d.querySelectorAll('input,textarea').forEach(x => x.disabled = true); return; }
   d.querySelectorAll('[data-pf]').forEach(x => x.addEventListener('change', debounce(async () => {
     const k = x.dataset.pf; let v = x.value === '' ? null : x.value;
@@ -813,6 +866,8 @@ async function route() {
     else if (p[0] === 'lesson') await pageLesson(id);
     else if (p[0] === 'block') await pageBlock(id);
     else if (p[0] === 'archive') await pageArchive();
+    else if (p[0] === 'media' && p[1]) await pageAsset(id);
+    else if (p[0] === 'media') await pageMedia();
     else { renderTree(); await pageSubjects(); }
   } catch (e) { editor.innerHTML = `<div class="empty" style="padding-top:80px">Something went wrong: ${esc(e.message)}</div>`; }
   editor.scrollTo(0, 0);
@@ -836,4 +891,5 @@ $('#loginform').addEventListener('submit', async e => {
   try { await Auth.signIn($('#le').value.trim(), $('#lp').value); await start(); } catch (ex) { $('#loginerror').textContent = ex.message; $('#loginerror').classList.remove('hidden'); } finally { btn.disabled = false; }
 });
 $('#signout').addEventListener('click', () => { Auth.signOut(); showLogin('You have signed out.'); });
-(async () => { if (await Auth.init()) await start(); else showLogin(); })();
+// Boot once every script has loaded (media.js comes after this file).
+window.addEventListener('DOMContentLoaded', async () => { if (await Auth.init()) await start(); else showLogin(); });
