@@ -145,6 +145,16 @@ nav .tree { padding: 4px 8px 24px; }
 .static { padding: 7px 0; font-size: 14px; } .static.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; word-break: break-all; }
 .pill.danger { background: #fde8ec; color: var(--danger); }
 .kind.video, .kind.audio, .kind.image, .kind.document, .kind.slides { background: var(--surface-2); color: var(--ink-2); }
+/* publishing */
+.pubwarn { background: var(--pending-soft); border: 1px solid var(--pending); border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px; font-size: 13px; }
+.pubok { background: var(--live-soft); color: var(--live); border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px; font-size: 13px; }
+.pubitems { display: grid; gap: 6px; margin: 8px 0 4px; font-size: 13px; }
+.pubitems > div { padding: 4px 0; border-bottom: 1px solid var(--line-2); }
+.mbody details { margin: 6px 0; } .mbody summary { cursor: pointer; font-size: 13px; padding: 6px 0; }
+.linkish { border: 0; background: none; color: var(--accent); cursor: pointer; font-weight: 600; padding: 0; font: inherit; }
+.menu .agesrow { display: flex; gap: 8px; align-items: center; padding: 8px 10px; font-size: 12.5px; color: var(--ink-2); }
+.menu .agesrow select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.rows.changes .row .name { font-weight: 400; } .rows.changes .row .name b { font-weight: 600; }
 
 section.editor { overflow: auto; padding: 0 0 80px; }
 .crumbs { padding: 14px 24px 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
@@ -327,7 +337,7 @@ label.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
 </head>
 <body class="signedout">
 <header>
-  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.3.1</span></div>
+  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.4</span></div>
   <div class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" type="search" placeholder="Find a subject, category, scheme, lesson or id" autocomplete="off" aria-label="Find content">
@@ -360,8 +370,9 @@ label.chip:has(input:focus-visible) { outline: 2px solid var(--accent); outline-
   </form>
 </div></div>
 <div id="toast"></div>
-<script src="config.js?v=0.3.1"></script>
-<script src="cms.js?v=0.3.1"></script>
-<script src="media.js?v=0.3.1"></script>
+<script src="config.js?v=0.4"></script>
+<script src="cms.js?v=0.4"></script>
+<script src="media.js?v=0.4"></script>
+<script src="publish.js?v=0.4"></script>
 </body>
 </html>

@@ -1,4 +1,8 @@
-// imoves CMS - staff content page v0.3 (5 Nov 2026)
+// imoves CMS - staff content page v0.4 (5 Nov 2026)
+//
+// v0.4: publishing (publish.js) - the publish dialog shows what goes out and what to look at
+// first; Preview opens the teacher site on this page with draft content as any audience; the
+// Waiting and Changes pages.
 //
 // v0.3: the media library (media.js) - every picture and file is chosen from or uploaded to one
 // library; lessons can have their own picture (falling back to the scheme's); featured videos,
@@ -81,7 +85,8 @@ async function api(path, { method = 'GET', body, prefer, raw = false } = {}) {
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
 const get = path => api(path);
-const getAll = async path => { const out = []; let from = 0; for (;;) { const rows = await api(`${path}${path.includes('?') ? '&' : '?'}limit=1000&offset=${from}`); out.push(...rows); if (rows.length < 1000) break; from += 1000; } return out; };
+// Paged in thousands; an order is forced (id as a tiebreak) so pages never overlap or skip rows.
+const getAll = async path => { const out = []; let from = 0; const order = /[?&]order=/.test(path) ? '' : '&order=id'; for (;;) { const rows = await api(`${path}${path.includes('?') ? '&' : '?'}limit=1000&offset=${from}${order}`); out.push(...rows); if (rows.length < 1000) break; from += 1000; } return out; };
 const patch = (table, id, body) => api(`${table}?id=eq.${id}`, { method: 'PATCH', body, prefer: 'return=representation' }).then(r => r && r[0]);
 const insert = (table, body) => api(table, { method: 'POST', body, prefer: 'return=representation' }).then(r => r && r[0]);
 const del = (table, q) => api(`${table}?${q}`, { method: 'DELETE', raw: true });
@@ -96,7 +101,7 @@ async function loadTree() {
     getAll('subjects?select=id,name,sort,on_home,browsable,updated_at,archived&archived=eq.false&order=sort,name'),
     getAll('groups?select=id,name,updated_at,archived&archived=eq.false'),
     getAll('categories?select=id,name,subheading,image,image_asset_id,updated_at,archived&archived=eq.false'),
-    getAll('placements?select=id,parent_type,parent_id,child_type,child_id,sort,is_home,heading,subheading,variant_ids&parent_type=in.(subject,group,category)&order=sort'),
+    getAll('placements?select=id,parent_type,parent_id,child_type,child_id,sort,is_home,heading,subheading,variant_ids&parent_type=in.(subject,group,category)&order=sort,id'),
     get('waiting?select=item_type,id,changed_at&order=changed_at.desc&limit=500'),
     ...['subjects', 'groups', 'categories', 'schemes', 'lessons', 'media_blocks'].map(t => getAll(`${t}_pub?select=id`)),
   ]);
@@ -155,7 +160,7 @@ function renderTree() {
     }
     h += '</details>';
   }
-  h += `<div class="navlinks"><a class="archl ${cur.startsWith('#/media') ? 'active' : ''}" href="#/media">Media library</a><a class="archl muted" href="#/archive">Archive</a></div>`;
+  h += `<div class="navlinks"><a class="archl ${cur.startsWith('#/waiting') ? 'active' : ''}" href="#/waiting">Waiting to publish</a><a class="archl ${cur.startsWith('#/changes') ? 'active' : ''}" href="#/changes">Changes</a><a class="archl ${cur.startsWith('#/media') ? 'active' : ''}" href="#/media">Media library</a><a class="archl muted" href="#/archive">Archive</a></div>`;
   tree.innerHTML = h;
   tree.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => { const o = new Set(JSON.parse(sessionStorage.getItem('cms.open') || '[]')); d.open ? o.add(d.dataset.key) : o.delete(d.dataset.key); sessionStorage.setItem('cms.open', JSON.stringify([...o])); }));
   tree.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
@@ -241,20 +246,17 @@ async function refreshStatus() {
     s.waiting ? D.waitSet.add(`${PAGE.type}:${PAGE.id}`) : D.waitSet.delete(`${PAGE.type}:${PAGE.id}`);
   } catch (e) { /* status is decoration */ }
 }
-async function publish(type, id, withChildren, name) {
+// Publishing goes through the dialog (publish.js): what goes out, what to look at first.
+async function publish(type, id, hasChildren, name) {
   if (PAGE && PAGE.type === type && PAGE.id === id && !(await save())) return false;
-  try { const v = await rpc('publish', { p_type: type, p_id: id, p_with_children: !!withChildren }); toast(`${name || KIND[type]} published (v${v})`); return true; }
-  catch (e) { toast(`Could not publish: ${e.message}`, true); return false; }
+  return publishDialog(type, id, name || KIND[type], !!hasChildren);
 }
-async function unpublish(type, id, name) {
-  if (!confirm(`Hide "${name}" from teachers? The draft is kept and you can publish it again.`)) return false;
-  try { await rpc('unpublish', { p_type: type, p_id: id }); toast('Hidden from teachers'); return true; } catch (e) { toast(`Could not unpublish: ${e.message}`, true); return false; }
-}
-// Publish switch for a row or a header: on = publish (asking about children for containers), off = unpublish.
+const unpublish = (type, id, name) => unpublishDialog(type, id, name);
+// Publish switch for a row or a header: on = publish (the dialog offers the children), off = unpublish.
 async function onSwitch(input, type, id, name, hasChildren, after) {
   const want = input.checked; input.checked = !want;
   let ok;
-  if (want) { const kidsToo = hasChildren && confirm(`Publish "${name}" with everything under it? Cancel publishes just this ${KIND[type].toLowerCase()}.`); ok = await publish(type, id, kidsToo, name); }
+  if (want) ok = await publish(type, id, hasChildren, name);
   else ok = await unpublish(type, id, name);
   if (ok) { input.checked = want; await reloadTree(); if (after) after(); }
 }
@@ -263,13 +265,14 @@ function pageHeader(crumbs, { subtitle = '' } = {}) {
   return `<div class="crumbs">${crumbs.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (c.href ? `<button data-go="${c.href}">${esc(c.name)}</button>` : `<span>${esc(c.name)}</span>`)).join('')}</div>
     <div class="edhead"><h1><span id="pageTitle">${esc(PAGE.row.name || PAGE.row.heading || '')}</span><span class="id">${KIND[PAGE.type]} ${PAGE.id}${subtitle ? ' · ' + esc(subtitle) : ''}</span></h1>
       <span class="meta" id="pubMeta"></span>
-      <div class="actions">${canEdit() ? `<button class="btn" id="saveBtn" disabled>Save draft</button><button class="btn primary" id="pubChanges" hidden title="Teachers see the last published version; this publishes your changes">Publish changes</button>` : ''}
+      <div class="actions">${previewMenu()}${canEdit() ? `<button class="btn" id="saveBtn" disabled>Save draft</button><button class="btn primary" id="pubChanges" hidden title="Teachers see the last published version; this publishes your changes">Publish changes</button>` : ''}
         <label class="sw" id="pubSwitch"><input type="checkbox" ${canEdit() ? '' : 'disabled'} data-children="${hasChildren ? 1 : 0}"> <span class="small">Teachers can see</span></label></div></div>`;
 }
 function bindHeader(root) {
   root.querySelectorAll('.crumbs [data-go]').forEach(b => b.addEventListener('click', () => location.hash = b.dataset.go));
+  bindPreviewMenu(root);
   const s = $('#saveBtn'); if (s) s.addEventListener('click', save);
-  const pc = $('#pubChanges'); if (pc) pc.addEventListener('click', async () => { if (await publish(PAGE.type, PAGE.id, false, PAGE.row.name || PAGE.row.heading)) { await reloadTree(); refreshStatus(); loadWaiting(); } });
+  const pc = $('#pubChanges'); if (pc) pc.addEventListener('click', async () => { if (await publish(PAGE.type, PAGE.id, ['subject', 'group', 'category', 'scheme'].includes(PAGE.type), PAGE.row.name || PAGE.row.heading)) { await reloadTree(); refreshStatus(); loadWaiting(); } });
   const sw = $('#pubSwitch'); if (sw) sw.querySelector('input').addEventListener('change', e => onSwitch(e.target, PAGE.type, PAGE.id, PAGE.row.name || PAGE.row.heading, e.target.dataset.children === '1', () => { refreshStatus(); loadWaiting(); }));
 }
 const panel = (title, inner, { tools = '', id = '' } = {}) => `<div class="panel" ${id ? `id="${id}"` : ''}>${title || tools ? `<h3>${title}${tools}</h3>` : ''}<div class="body">${inner}</div></div>`;
@@ -844,7 +847,7 @@ async function loadWaiting() {
 async function openWaiting() {
   await loadWaiting(); const rows = D.waiting || [];
   $('#drawerTitle').textContent = 'Waiting to publish'; $('#drawer').classList.add('open');
-  $('#drawerItems').innerHTML = (rows.length ? `<div class="help" style="margin:8px 0">Changes teachers cannot see yet. Open an item and press Publish changes, or switch it on.</div>` : '') + (rows.length ? rows.map(r => `<div class="change"><div class="top"><span class="kind ${r.item_type}">${KIND[r.item_type]}</span><button data-go="${href(r.item_type, r.id)}" style="border:0;background:none;color:var(--accent);cursor:pointer;font-weight:600;text-align:left;padding:0">${esc(r.name)}</button><span class="when">${when(r.changed_at)}</span></div><div class="what">${r.is_published ? `changed since v${r.last_version}` : 'never published'}${r.changed_by ? ` · ${esc(r.changed_by)}` : ''}</div></div>`).join('') : '<div class="empty">Nothing waiting. Everything that has changed is published.</div>');
+  $('#drawerItems').innerHTML = (rows.length ? `<div class="help" style="margin:8px 0">Changes teachers cannot see yet. Open an item and press Publish changes, or switch it on. <button data-go="#/waiting" style="border:0;background:none;color:var(--accent);cursor:pointer;font-weight:600;padding:0">Open the full list</button></div>` : '') + (rows.length ? rows.map(r => `<div class="change"><div class="top"><span class="kind ${r.item_type}">${KIND[r.item_type]}</span><button data-go="${href(r.item_type, r.id)}" style="border:0;background:none;color:var(--accent);cursor:pointer;font-weight:600;text-align:left;padding:0">${esc(r.name)}</button><span class="when">${when(r.changed_at)}</span></div><div class="what">${r.is_published ? `changed since v${r.last_version}` : 'never published'}${r.changed_by ? ` · ${esc(r.changed_by)}` : ''}</div></div>`).join('') : '<div class="empty">Nothing waiting. Everything that has changed is published.</div>');
   $('#drawerItems').querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { $('#drawer').classList.remove('open'); location.hash = b.dataset.go; }));
 }
 $('#waitingBtn').addEventListener('click', openWaiting);
@@ -868,6 +871,8 @@ async function route() {
     else if (p[0] === 'archive') await pageArchive();
     else if (p[0] === 'media' && p[1]) await pageAsset(id);
     else if (p[0] === 'media') await pageMedia();
+    else if (p[0] === 'waiting') await pageWaiting();
+    else if (p[0] === 'changes') await pageChanges();
     else { renderTree(); await pageSubjects(); }
   } catch (e) { editor.innerHTML = `<div class="empty" style="padding-top:80px">Something went wrong: ${esc(e.message)}</div>`; }
   editor.scrollTo(0, 0);
@@ -891,5 +896,5 @@ $('#loginform').addEventListener('submit', async e => {
   try { await Auth.signIn($('#le').value.trim(), $('#lp').value); await start(); } catch (ex) { $('#loginerror').textContent = ex.message; $('#loginerror').classList.remove('hidden'); } finally { btn.disabled = false; }
 });
 $('#signout').addEventListener('click', () => { Auth.signOut(); showLogin('You have signed out.'); });
-// Boot once every script has loaded (media.js comes after this file).
+// Boot once every script has loaded (media.js and publish.js come after this file).
 window.addEventListener('DOMContentLoaded', async () => { if (await Auth.init()) await start(); else showLogin(); });
