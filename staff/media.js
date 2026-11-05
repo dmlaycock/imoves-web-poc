@@ -1,4 +1,4 @@
-// imoves CMS - media library v0.1 (increment 3, 5 Nov 2026)
+// imoves CMS - media library v0.1.1 (increment 3, 5 Nov 2026)
 //
 // One library of files (content.assets): videos on Cloudflare Stream, audio, images, documents
 // and slide decks in R2. Staff upload once and use anywhere; replacing a file updates every
@@ -105,7 +105,7 @@ async function uploadAsset(file, kind, { assetId = null, title = null, onStatus 
       const fd = new FormData(); fd.append('file', file, file.name);
       await new Promise((resolve, reject) => { const x = new XMLHttpRequest(); x.open('POST', upload_url); x.upload.onprogress = e => { if (e.lengthComputable) onStatus('Uploading to Stream…', e.loaded / e.total); }; x.onload = () => x.status < 300 ? resolve() : reject(new Error(`Stream refused the file (${x.status})`)); x.onerror = () => reject(new Error('Could not reach Stream')); x.send(fd); });
       if (a.stream_uid && a.stream_uid !== uid) mediaFn('stream_delete', { uid: a.stream_uid }).catch(() => {});
-      a = await patch('assets', a.id, { stream_uid: uid, wistia_id: null, state: 'processing', url: null, thumbnail_url: `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg?time=2s` });
+      a = await patch('assets', a.id, { stream_uid: uid, wistia_id: null, state: 'processing', url: null, thumbnail_url: `https://${STREAM_DOMAIN}/${uid}/thumbnails/thumbnail.jpg?time=2s` });
       onStatus('Stream is processing the video…', 1);
       for (let i = 0; i < 200; i++) {
         await new Promise(r => setTimeout(r, i < 10 ? 2000 : 5000));
@@ -252,7 +252,7 @@ async function pageAsset(id) {
   PAGE = { type: 'asset', id, row: a, dirty: {}, reload: () => pageAsset(id) };
   const preview = a.state !== 'ready' ? `<div class="empty">${a.state === 'failed' ? `Needs attention: ${esc(a.error || 'the file is missing')}` : 'Still ' + a.state + '…'}</div>`
     : a.kind === 'image' ? `<img class="big" src="${esc(a.url)}" alt="">`
-    : a.kind === 'video' ? `<div class="vwrap"><iframe src="https://iframe.videodelivery.net/${esc(a.stream_uid)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen></iframe></div>`
+    : a.kind === 'video' ? `<div class="vwrap"><iframe src="https://${STREAM_DOMAIN}/${esc(a.stream_uid)}/iframe?preload=metadata" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`
     : a.kind === 'audio' ? `<audio controls src="${esc(a.url)}" style="width:100%"></audio>`
     : a.kind === 'slides' ? `<div class="deck">${Array.from({ length: Math.min(a.pages || 0, 12) }, (_, i) => `<img src="${esc(a.url)}/${i + 1}.png" alt="Slide ${i + 1}" loading="lazy">`).join('')}${a.pages > 12 ? `<div class="muted small">… and ${a.pages - 12} more</div>` : ''}</div>`
     : `<a class="btn" href="${esc(a.url)}" target="_blank" rel="noopener">Open the file</a>`;
