@@ -156,6 +156,35 @@ nav .tree { padding: 4px 8px 24px; }
 .menu .agesrow { display: flex; gap: 8px; align-items: center; padding: 8px 10px; font-size: 12.5px; color: var(--ink-2); }
 .menu .agesrow select { padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
 .rows.changes .row .name { font-weight: 400; } .rows.changes .row .name b { font-weight: 600; }
+/* products */
+#productsNav .prod { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
+#productsNav .prod:hover { background: var(--surface-2); } #productsNav .prod.active { background: var(--accent-soft); color: var(--accent); }
+#productsNav .prod.off { color: var(--ink-3); font-weight: 500; }
+#productsNav .prod .views { margin-left: auto; display: flex; gap: 3px; }
+#productsNav .prod .views i { font-style: normal; font-size: 10px; font-weight: 700; width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; background: var(--live-soft); color: var(--live); }
+#productsNav .prod .views i.off { background: var(--surface-2); color: var(--ink-3); }
+#productsNav details.legacy summary { display: flex; align-items: center; gap: 6px; padding: 7px 8px; cursor: pointer; font-size: 13px; list-style: none; }
+#productsNav details.legacy summary::-webkit-details-marker { display: none; }
+#productsNav details.legacy .prod { padding-left: 24px; }
+.prodtabs { margin: 6px 0 10px; }
+.prodtabs .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pending); vertical-align: middle; }
+.viewhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13.5px; }
+.viewhead .actions { display: flex; gap: 8px; align-items: center; }
+.chiprow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chiprow .chip.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; display: inline-flex; gap: 6px; align-items: center; padding-right: 4px; }
+.chiprow .chip .handle { cursor: grab; color: var(--accent); opacity: .7; display: inline-flex; } .chiprow .chip .handle svg { width: 10px; height: 12px; }
+.chiprow .chip .x { border: 0; background: none; color: inherit; cursor: pointer; font-size: 15px; line-height: 1; padding: 0 4px; opacity: .7; } .chiprow .chip .x:hover { opacity: 1; }
+.chiprow .chip.add { border-style: dashed; color: var(--ink-3); }
+.excltree details { margin: 2px 0 2px 12px; } .excltree summary { cursor: pointer; padding: 3px 0; font-size: 13px; list-style: none; display: flex; align-items: center; gap: 6px; }
+.excltree summary::before { content: '▸'; color: var(--ink-3); font-size: 11px; } .excltree details[open] > summary::before { content: '▾'; }
+.excltree summary label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.excltree .l4 { padding: 2px 0 4px 26px; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; } .excltree .l4item { display: inline-flex; gap: 5px; align-items: center; }
+.excltree input:not(:checked) + * , .excltree label:has(input:not(:checked)) { color: var(--ink-3); text-decoration: line-through; }
+.prodgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.prodcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: var(--bg); }
+.prodcard:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(20,10,60,.08); }
+.prodcard.off { opacity: .7; } .prodcard .ph { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; } .prodcard .ph b { font-size: 15px; }
+.prodcard .pv { display: grid; gap: 5px; }
 
 section.editor { overflow: auto; padding: 0 0 80px; }
 .crumbs { padding: 14px 24px 0; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
@@ -341,7 +370,7 @@ body.signedout #login { background: var(--bg); }
 </head>
 <body class="signedout">
 <header>
-  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.4.2</span></div>
+  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.5</span></div>
   <div class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" type="search" placeholder="Find a subject, category, scheme, lesson or id" autocomplete="off" aria-label="Find content">
@@ -354,7 +383,7 @@ body.signedout #login { background: var(--bg); }
 </header>
 <div class="readonly" id="readonly" hidden>You are signed in but not on the staff list, so this is read-only.</div>
 <main>
-  <nav><div class="navtools"><select id="treeSort" title="Order"><option value="platform">Platform order</option><option value="name">A to Z</option><option value="changed">Recently changed</option></select><select id="treeFilter" title="Show"><option value="all">All</option><option value="pub">Published</option><option value="hid">Hidden</option></select></div><div class="tree" id="tree"><div class="hint">Loading…</div></div></nav>
+  <nav><div class="navtools"><select id="treeSort" title="Order"><option value="platform">Platform order</option><option value="name">A to Z</option><option value="changed">Recently changed</option></select><select id="treeFilter" title="Show"><option value="all">All</option><option value="pub">Published</option><option value="hid">Hidden</option></select></div><div class="tree"><div id="productsNav"></div><div id="tree"><div class="hint">Loading…</div></div></div></nav>
   <section class="editor" id="editor">
     <div class="empty" style="padding-top:120px">
       <h2 style="font-weight:600;font-size:18px;margin-bottom:8px">Nothing open yet</h2>
@@ -374,9 +403,10 @@ body.signedout #login { background: var(--bg); }
   </form>
 </div></div>
 <div id="toast"></div>
-<script src="config.js?v=0.4.2"></script>
-<script src="cms.js?v=0.4.2"></script>
-<script src="media.js?v=0.4.2"></script>
-<script src="publish.js?v=0.4.2"></script>
+<script src="config.js?v=0.5"></script>
+<script src="cms.js?v=0.5"></script>
+<script src="media.js?v=0.5"></script>
+<script src="publish.js?v=0.5"></script>
+<script src="products.js?v=0.5"></script>
 </body>
 </html>

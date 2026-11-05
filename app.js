@@ -16,7 +16,13 @@ function apiHeaders() {
 // ?as=free|trial|paying overrides the signed-in user's entitlements; ?ages=5-7 the age rights.
 // Without these the site reads the public tables as before (Quickbase stays the master until
 // the Phase 2 flip).
-const PREVIEW = (() => { const q = new URLSearchParams(location.search); const c = q.get('content'); return { content: c === 'draft' || c === 'published' ? c : '', as: ['free', 'trial', 'paying'].includes(q.get('as')) ? q.get('as') : '', ages: /^\d+-\d+$/.test(q.get('ages') || '') ? q.get('ages').split('-').map(Number) : null, on: !!(c || q.get('as') || q.get('ages')) }; })();
+const PREVIEW = (() => { const q = new URLSearchParams(location.search); const c = q.get('content'); return { content: c === 'draft' || c === 'published' ? c : '', as: ['free', 'trial', 'paying'].includes(q.get('as')) ? q.get('as') : '', ages: /^\d+-\d+$/.test(q.get('ages') || '') ? q.get('ages').split('-').map(Number) : null, view: /^\d+$/.test(q.get('view') || '') ? +q.get('view') : null, on: !!(c || q.get('as') || q.get('ages') || q.get('view')) }; })();
+// ?view=<id>: a product view from the CMS (v0.66) - the whole experience of a teacher in it.
+PREVIEW.viewRow = null;
+async function loadPreviewView() {
+  if (!PREVIEW.view) return;
+  try { const rows = await rest(`${PREVIEW.content === 'draft' ? 'd_' : 'v_'}product_views?id=eq.${PREVIEW.view}&select=*`); PREVIEW.viewRow = rows[0] || null; } catch (e) { PREVIEW.viewRow = null; }
+}
 const T = name => PREVIEW.content ? (PREVIEW.content === 'draft' ? 'd_' : 'v_') + name : name;
 async function restFetch(path, init) {
   let r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: { ...apiHeaders(), ...(init && init.headers) } });
@@ -59,11 +65,12 @@ async function loadTree() {
     rest(`${T('lessons')}?select=id,name,is_live,scheme_id,order,description,is_freemium,age_min,age_max,duration,has_video,has_audio,has_downloads,has_slides,has_lesson_plan,has_assessment_template,subject_ids${PREVIEW.content ? ',image' : ''}&order=order`, { all: true }),
     rest(`${T('scheme_subjects')}?select=scheme_id,subject_id`, { all: true }),
   ]);
+  const ex = E.excluded || new Set();   // a CMS view leaves parts of its subjects out (v0.66)
   D.subjects = subjects.filter(s => s.is_live && (!E.niched || E.nicheIds.has(s.id)));   // LiveScope + NicheScope
-  D.subgroups = subgroups.filter(s => s.is_live);
-  D.subcategories = subcategories.filter(s => s.is_live);
-  D.schemes = schemes.filter(s => s.is_live);
-  D.lessons = lessons.filter(l => l.is_live);
+  D.subgroups = subgroups.filter(s => s.is_live && !ex.has(`group:${s.id}`));
+  D.subcategories = subcategories.filter(s => s.is_live && !ex.has(`category:${s.id}`));
+  D.schemes = schemes.filter(s => s.is_live && !ex.has(`scheme:${s.scheme_id || s.id}`) && !ex.has(`scheme:${s.id}`));
+  D.lessons = lessons.filter(l => l.is_live && !ex.has(`lesson:${l.id}`));
   D.subjectById = index(D.subjects); D.subgroupById = index(D.subgroups); D.subcatById = index(D.subcategories);
   D.schemeById = index(D.schemes); D.lessonById = index(D.lessons);
   D.lessons.sort((a, b) => (a.order ?? -1e12) - (b.order ?? -1e12) || a.id - b.id);
@@ -120,6 +127,18 @@ function initEntitlements() {
     E.allContent = PREVIEW.as === 'paying'; E.allSubjects = PREVIEW.as !== 'free'; E.complementary = false;
     E.niched = false; E.nicheIds = new Set(); if (PREVIEW.as === 'free') { E.userSubjects = new Set(); E.subjectIds = new Set(); }
     E.showUpgrade = PREVIEW.as !== 'paying';
+  }
+  const pv = PREVIEW.viewRow;
+  if (pv) {
+    const paid = pv.view === 'paid', trial = pv.view === 'trial';
+    E.freeAll = !paid && !trial; E.trialAll = trial; E.payingAll = paid;
+    E.allContent = !!pv.all_content; E.allSubjects = !!pv.all_content; E.complementary = false; E.niched = false; E.nicheIds = new Set();
+    E.userSubjects = new Set(pv.subject_ids || []); E.subjectIds = new Set(pv.subject_ids || []);
+    E.homepage = pv.home_subject_id || null; E.buttons = pv.subject_bar || []; E.browse = pv.browse_list || []; E.homeSections = pv.home_sections || [];
+    E.showUpgrade = !!pv.show_upgrade; E.upgradeText = pv.upgrade_text || 'Upgrade'; E.lessonMessage = pv.lesson_message_1 || E.lessonMessage;
+    E.banner = { show: !!pv.banner_show, text: pv.banner_text, color: pv.banner_colour, background: pv.banner_background, border: pv.banner_border };
+    E.excluded = new Set((pv.exclusions || []).map(x => `${x.type}:${x.id}`));
+    E.showBrowseMenu = true;
   }
   if (PREVIEW.ages) { const [a, z] = PREVIEW.ages; E.allAges = false; E.ageRights = [4, 5, 6, 7, 8, 9, 10].map(y => y >= a && y < z); }
 }
@@ -263,11 +282,12 @@ function renderUserContext() {
   if (up) up.classList.toggle('hidden', !E.showUpgrade);
   const bn = document.getElementById('stickybanner');
   if (bn) {
-    if (m.banner_show && m.banner_text) {
+    const b = E.banner || { show: m.banner_show, text: m.banner_text, color: m.banner_color, background: m.banner_background, border: m.banner_border };
+    if (b.show && b.text) {
       bn.classList.remove('hidden');
-      bn.textContent = m.banner_text;
-      bn.style.color = col(m.banner_color); bn.style.background = col(m.banner_background);
-      bn.style.borderColor = col(m.banner_border);
+      bn.innerHTML = /<[a-z]/i.test(b.text) ? b.text : esc(b.text);
+      bn.style.color = col(b.color); bn.style.background = col(b.background);
+      bn.style.borderColor = col(b.border);
     } else bn.classList.add('hidden');
   }
 }
@@ -1606,6 +1626,7 @@ async function pageSearch(q) {
 async function startApp() {
   try {
     app.innerHTML = '<div class="loading">Loading the library…</div>';
+    await loadPreviewView(); previewBanner();
     initEntitlements();
     await Promise.all([loadTree(), loadMyLessons(), loadSlides()]);
     watchImages();   // v0.45: lazy images fade in
@@ -1629,7 +1650,8 @@ async function startApp() {
 }
 function previewBanner() {
   if (!PREVIEW.on) return;
-  const what = [PREVIEW.content === 'draft' ? 'draft content (not yet published)' : PREVIEW.content === 'published' ? 'published content from the CMS' : '', PREVIEW.as ? `as a ${PREVIEW.as} account` : '', PREVIEW.ages ? `ages ${PREVIEW.ages[0]}-${PREVIEW.ages[1]}` : ''].filter(Boolean).join(' · ');
+  const old = document.querySelector('.preview-banner'); if (old) old.remove();
+  const what = [PREVIEW.content === 'draft' ? 'draft content (not yet published)' : PREVIEW.content === 'published' ? 'published content from the CMS' : '', PREVIEW.viewRow ? `as ${PREVIEW.viewRow.product_name} · ${{ paid: 'Paid', trial: 'Trial', after_trial: 'After trial', free: 'Free' }[PREVIEW.viewRow.view]}` : PREVIEW.view ? 'view not found' : '', PREVIEW.as ? `as a ${PREVIEW.as} account` : '', PREVIEW.ages ? `ages ${PREVIEW.ages[0]}-${PREVIEW.ages[1]}` : ''].filter(Boolean).join(' · ');
   const b = document.createElement('div'); b.className = 'preview-banner'; b.innerHTML = `<b>Preview</b> ${esc(what)} <a href="${esc(location.pathname + location.hash)}">Exit preview</a>`;
   document.body.prepend(b);
 }

@@ -1,4 +1,7 @@
-// imoves CMS - staff content page v0.4 (5 Nov 2026)
+// imoves CMS - staff content page v0.5 (5 Nov 2026)
+//
+// v0.5: products first (products.js) - the CMS opens on the five products and their views; the
+// subject tree is the stock they are built from.
 //
 // v0.4: publishing (publish.js) - the publish dialog shows what goes out and what to look at
 // first; Preview opens the teacher site on this page with draft content as any audience; the
@@ -27,10 +30,10 @@ const when = t => t ? new Date(t).toLocaleString('en-GB', { day: 'numeric', mont
 const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 let toastT;
 function toast(msg, err = false) { const t = $('#toast'); t.textContent = msg; t.className = 'show' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => t.className = '', err ? 5000 : 2200); }
-const KIND = { subject: 'Subject', group: 'Group', category: 'Category', scheme: 'Scheme', lesson: 'Lesson', media_block: 'Block', variant: 'Variant', part: 'Part', asset: 'File' };
-const TABLE = { subject: 'subjects', group: 'groups', category: 'categories', scheme: 'schemes', lesson: 'lessons', media_block: 'media_blocks', variant: 'scheme_variants', part: 'lesson_parts', asset: 'assets' };
-const ROUTE = { subject: 'subject', group: 'group', category: 'category', scheme: 'scheme', lesson: 'lesson', media_block: 'block', asset: 'media' };
-const href = (type, id) => `#/${ROUTE[type]}/${id}`;
+const KIND = { subject: 'Subject', group: 'Group', category: 'Category', scheme: 'Scheme', lesson: 'Lesson', media_block: 'Block', variant: 'Variant', part: 'Part', asset: 'File', product: 'Product', view: 'View' };
+const TABLE = { subject: 'subjects', group: 'groups', category: 'categories', scheme: 'schemes', lesson: 'lessons', media_block: 'media_blocks', variant: 'scheme_variants', part: 'lesson_parts', asset: 'assets', product: 'products', view: 'product_views' };
+const ROUTE = { subject: 'subject', group: 'group', category: 'category', scheme: 'scheme', lesson: 'lesson', media_block: 'block', asset: 'media', product: 'product' };
+const href = (type, id) => type === 'view' ? `#/product/${((D.productViews || []).find(v => v.id === id) || {}).product_id || 0}/${id}` : `#/${ROUTE[type]}/${id}`;
 const ICON = {
   drag: '<svg viewBox="0 0 12 12" fill="currentColor"><circle cx="3" cy="2" r="1.3"/><circle cx="9" cy="2" r="1.3"/><circle cx="3" cy="6" r="1.3"/><circle cx="9" cy="6" r="1.3"/><circle cx="3" cy="10" r="1.3"/><circle cx="9" cy="10" r="1.3"/></svg>',
   bin: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
@@ -103,12 +106,13 @@ async function loadTree() {
     getAll('categories?select=id,name,subheading,image,image_asset_id,updated_at,archived&archived=eq.false'),
     getAll('placements?select=id,parent_type,parent_id,child_type,child_id,sort,is_home,heading,subheading,variant_ids&parent_type=in.(subject,group,category)&order=sort,id'),
     get('waiting?select=item_type,id,changed_at&order=changed_at.desc&limit=500'),
-    ...['subjects', 'groups', 'categories', 'schemes', 'lessons', 'media_blocks'].map(t => getAll(`${t}_pub?select=id`)),
+    ...['subjects', 'groups', 'categories', 'schemes', 'lessons', 'media_blocks', 'products', 'product_views'].map(t => getAll(`${t}_pub?select=id`)),
   ]);
   Object.assign(D, { subjects, groups, categories, placements, waiting });
   await loadAssets(categories.map(c => c.image_asset_id));
   D.subjectById = index(subjects); D.groupById = index(groups); D.catById = index(categories);
-  D.pub = {}; ['subject', 'group', 'category', 'scheme', 'lesson', 'media_block'].forEach((t, i) => D.pub[t] = new Set(pubs[i].map(r => r.id)));
+  D.pub = {}; ['subject', 'group', 'category', 'scheme', 'lesson', 'media_block', 'product', 'view'].forEach((t, i) => D.pub[t] = new Set(pubs[i].map(r => r.id)));
+  await loadProducts();
   D.waitSet = new Set(waiting.map(w => `${w.item_type}:${w.id}`));
   D.children = {};
   for (const p of placements) (D.children[`${p.parent_type}:${p.parent_id}`] ||= []).push(p);
@@ -146,7 +150,8 @@ function renderTree() {
   const sub = pref.sort === 'changed' ? 'changed' : 'platform';
   const groupRows = sId => orderRows(kids('subject', sId).map(p => ({ p, g: D.groupById[p.child_id] })).filter(x => x.g), { sort: sub, pubOf: x => isPub('group', x.g.id), nameOf: x => x.g.name, changedOf: x => x.g.updated_at, sortOf: x => x.p.sort });
   const catRows = gId => orderRows(kids('group', gId).map(p => ({ p, c: D.catById[p.child_id] })).filter(x => x.c), { sort: sub, pubOf: x => isPub('category', x.c.id), nameOf: x => x.c.name, changedOf: x => x.c.updated_at, sortOf: x => x.p.sort });
-  let h = '<div class="hint">Subjects</div>';
+  renderProductsNav();
+  let h = `<a class="archl ${cur === '#/subjects' ? 'active' : ''}" href="#/subjects" style="padding-top:4px">Subjects overview</a>`;
   let hiddenStarted = false;
   for (const s of subjects) {
     if (pref.sort === 'platform' && pref.filter === 'all' && !isPub('subject', s.id) && !hiddenStarted) { hiddenStarted = true; h += '<div class="hint">Hidden subjects</div>'; }
@@ -227,7 +232,7 @@ async function save() {
     editor.querySelectorAll('.field.dirty').forEach(f => f.classList.remove('dirty'));
     const b = $('#saveBtn'); if (b) b.disabled = true;
     toast('Saved to draft');
-    const t = { subject: D.subjectById, group: D.groupById, category: D.catById }[PAGE.type]; if (t && t[PAGE.id]) { t[PAGE.id].name = PAGE.row.name; renderTree(); }
+    const t = { subject: D.subjectById, group: D.groupById, category: D.catById, product: D.productById }[PAGE.type]; if (t && t[PAGE.id]) { t[PAGE.id].name = PAGE.row.name; renderTree(); }
     const pt = $('#pageTitle'); if (pt) pt.textContent = PAGE.row.name || PAGE.row.heading || '';
     await refreshStatus(); loadWaiting();
     return true;
@@ -261,7 +266,7 @@ async function onSwitch(input, type, id, name, hasChildren, after) {
   if (ok) { input.checked = want; await reloadTree(); if (after) after(); }
 }
 function pageHeader(crumbs, { subtitle = '' } = {}) {
-  const hasChildren = ['subject', 'group', 'category', 'scheme'].includes(PAGE.type);
+  const hasChildren = ['subject', 'group', 'category', 'scheme', 'product'].includes(PAGE.type);
   return `<div class="crumbs">${crumbs.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (c.href ? `<button data-go="${c.href}">${esc(c.name)}</button>` : `<span>${esc(c.name)}</span>`)).join('')}</div>
     <div class="edhead"><h1><span id="pageTitle">${esc(PAGE.row.name || PAGE.row.heading || '')}</span><span class="id">${KIND[PAGE.type]} ${PAGE.id}${subtitle ? ' · ' + esc(subtitle) : ''}</span></h1>
       <span class="meta" id="pubMeta"></span>
@@ -272,7 +277,7 @@ function bindHeader(root) {
   root.querySelectorAll('.crumbs [data-go]').forEach(b => b.addEventListener('click', () => location.hash = b.dataset.go));
   bindPreviewMenu(root);
   const s = $('#saveBtn'); if (s) s.addEventListener('click', save);
-  const pc = $('#pubChanges'); if (pc) pc.addEventListener('click', async () => { if (await publish(PAGE.type, PAGE.id, ['subject', 'group', 'category', 'scheme'].includes(PAGE.type), PAGE.row.name || PAGE.row.heading)) { await reloadTree(); refreshStatus(); loadWaiting(); } });
+  const pc = $('#pubChanges'); if (pc) pc.addEventListener('click', async () => { if (await publish(PAGE.type, PAGE.id, ['subject', 'group', 'category', 'scheme', 'product'].includes(PAGE.type), PAGE.row.name || PAGE.row.heading)) { await reloadTree(); refreshStatus(); loadWaiting(); } });
   const sw = $('#pubSwitch'); if (sw) sw.querySelector('input').addEventListener('change', e => onSwitch(e.target, PAGE.type, PAGE.id, PAGE.row.name || PAGE.row.heading, e.target.dataset.children === '1', () => { refreshStatus(); loadWaiting(); }));
 }
 const panel = (title, inner, { tools = '', id = '' } = {}) => `<div class="panel" ${id ? `id="${id}"` : ''}>${title || tools ? `<h3>${title}${tools}</h3>` : ''}<div class="body">${inner}</div></div>`;
@@ -545,8 +550,9 @@ async function pageSubjects() {
   PAGE = { type: null, dirty: {}, reload: pageSubjects };
   const subs = orderRows(D.subjects, { pubOf: s => isPub('subject', s.id), nameOf: s => s.name, sortOf: s => s.sort ?? 1e9, changedOf: s => s.updated_at });
   if (stale(nav)) return;
-  editor.innerHTML = `<div class="crumbs"><span>Subjects</span></div><div class="edhead"><h1>Subjects</h1><span class="meta">${subs.filter(s => isPub('subject', s.id)).length} published of ${subs.length}</span></div>` +
+  editor.innerHTML = `<div class="crumbs"><button data-go="#/">Products</button><span class="sep">›</span><span>Subjects</span></div><div class="edhead"><h1>Subjects</h1><span class="meta">${subs.filter(s => isPub('subject', s.id)).length} published of ${subs.length}</span></div>` +
     panel('In the order teachers see them', `<div class="rows subjects-page" id="subjList">${subs.map(s => `<div class="row ${isPub('subject', s.id) ? '' : 'off'}" data-id="${s.id}" data-name="${esc(s.name)}" data-go="${href('subject', s.id)}">${canEdit() ? `<span class="handle">${ICON.drag}</span>` : '<span class="handle"></span>'}<div class="title"><div class="name">${esc(s.name)}</div><div class="sub">${kids('subject', s.id).length} groups${s.on_home ? ' · on the home page' : ''}${s.browsable ? ' · in Browse' : ''}</div></div><div class="rt"><label class="sw row-sw ${isWaiting('subject', s.id) ? 'waiting' : ''}"><input type="checkbox" data-pubsw ${isPub('subject', s.id) ? 'checked' : ''} ${canEdit() ? '' : 'disabled'}></label></div></div>`).join('')}</div>${canEdit() ? `<div class="inline-add"><button class="btn" id="newSubject">${ICON.plus} New subject</button><span class="muted small">Drag to change the order of the subject bar and Browse. Hidden subjects sit at the bottom.</span></div>` : ''}`);
+  editor.querySelectorAll('.crumbs [data-go]').forEach(b => b.addEventListener('click', () => location.hash = b.dataset.go));
   const list = $('#subjList');
   list.querySelectorAll('.row').forEach(r => r.addEventListener('click', e => { if (e.target.closest('.handle, .rt, input, label')) return; location.hash = r.dataset.go; }));
   list.querySelectorAll('[data-pubsw]').forEach(i => i.addEventListener('change', e => { const r = e.target.closest('.row'); onSwitch(e.target, 'subject', +r.dataset.id, r.dataset.name, true, pageSubjects); }));
@@ -565,7 +571,7 @@ async function pageSubject(id) {
   PAGE.fv = JSON.parse(JSON.stringify(fv));
   const vslot = (k, label) => { const v = fv[k] || {}; return `<div class="grid" data-vslot="${k}"><div class="field span"><label>${esc(label)}</label>${videoSlotChip('fv', k)}</div><div class="field"><label>Heading</label><input type="text" data-fv="${k}.heading" value="${esc(v.heading)}"></div><div class="field"><label>Subheading</label><input type="text" data-fv="${k}.subheading" value="${esc(v.subheading)}"></div><div class="field span"><label>Description</label><textarea data-fv="${k}.description" rows="2">${esc(v.description)}</textarea></div></div>`; };
   if (stale(nav)) return;
-  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, { name: row.name }]) + groups.html +
+  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/subjects' }, { name: row.name }]) + groups.html +
     panel('Details', `<div class="grid">${field('name', 'Name')}${colourPicker('button_colour')}${iconPicker('icon')}<div class="span">${field('description', 'Description (the collapsible panel at the top of the subject page)', { type: 'textarea', rows: 3 })}</div>${af('background_asset_id', 'Page background picture', { legacy: 'background_image', note: 'Optional. Behind the subject page.' })}
       <div class="span" style="display:flex;gap:24px;flex-wrap:wrap">${field('on_home', 'Show on the home page', { type: 'switch' })}${field('browsable', 'Include in Browse', { type: 'switch' })}</div></div>`) +
     panel('Featured video', `<div class="help" style="margin-bottom:10px">Optional. Shown at the top of the subject page.</div>${vslot('ks2', hasKs ? 'Paying users, KS2 (ages 7-11)' : 'Video')}
@@ -626,7 +632,7 @@ async function pageGroup(id) {
   const parent = parentsOf('group', id)[0]; const subj = parent && D.subjectById[parent.parent_id];
   const [cats, vis, where] = await Promise.all([contentsPanel('group', id, { title: 'Categories', note: 'The tiles in this group, in this order. A category can sit in several groups.' }), visibilityPanel('group', id), wherePanel('group', id)]);
   if (stale(nav)) return;
-  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, subj ? { name: subj.name, href: href('subject', subj.id) } : null, { name: row.name }].filter(Boolean)) + cats.html +
+  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/subjects' }, subj ? { name: subj.name, href: href('subject', subj.id) } : null, { name: row.name }].filter(Boolean)) + cats.html +
     panel('Details', `<div class="grid">${field('name', 'Name')}<div class="span">${field('description', 'Description (shown beside the group heading)', { type: 'textarea', rows: 2 })}</div></div>`) + vis.html + where.html;
   finish([cats, vis, where]);
 }
@@ -641,7 +647,7 @@ async function pageCategory(id) {
   const nounOpts = [['Lesson|Lessons', 'Lessons'], ['Activity|Activities', 'Activities'], ['Resource|Resources', 'Resources'], ['Session|Sessions', 'Sessions']];
   PAGE.row.noun = `${row.noun_singular || 'Lesson'}|${row.noun_plural || 'Lessons'}`;
   if (stale(nav)) return;
-  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, subj ? { name: subj.name, href: href('subject', subj.id) } : null, grp ? { name: grp.name, href: href('group', grp.id) } : null, { name: row.name }].filter(Boolean)) + contents.html +
+  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/subjects' }, subj ? { name: subj.name, href: href('subject', subj.id) } : null, grp ? { name: grp.name, href: href('group', grp.id) } : null, { name: row.name }].filter(Boolean)) + contents.html +
     panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (on the tile)')}<div class="span">${field('description', 'Description (on the category page)', { type: 'textarea', rows: 2 })}</div>${af('image_asset_id', 'Tile picture', { legacy: 'image', tile: true })}${af('background_asset_id', 'Page background picture', { legacy: 'background_image', note: 'Optional. Behind the category page.' })}
       ${field('noun', 'What the items are called', { type: 'radio', options: nounOpts, help: 'Shown on the tile, e.g. "12 activities".' })}<div class="span">${field('on_subject_page', 'Show as a tile on the subject page', { type: 'switch' })}</div></div>`) + vis.html + where.html;
   PAGE.onChange = k => { if (k === 'noun') { const [s, p] = PAGE.row.noun.split('|'); delete PAGE.dirty.noun; PAGE.dirty.noun_singular = s; PAGE.dirty.noun_plural = p; PAGE.row.noun_singular = s; PAGE.row.noun_plural = p; } renderPreview(); };
@@ -692,7 +698,7 @@ async function pageScheme(id, keepVariant) {
   const derived = new Set(); for (const p of parentsOf('scheme', id)) { const g = parentsOf('category', p.parent_id)[0]; const s = g && parentsOf('group', g.parent_id)[0]; if (s) derived.add(s.parent_id); }
   const [where, subj] = await Promise.all([wherePanel('scheme', id), subjectChips('extra_subject_ids', derived)]);
   if (stale(nav)) return;
-  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, cat ? { name: cat.name, href: href('category', cat.id) } : null, { name: row.name }].filter(Boolean)) +
+  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/subjects' }, cat ? { name: cat.name, href: href('category', cat.id) } : null, { name: row.name }].filter(Boolean)) +
     panel(variants.length > 1 ? 'Lessons by age' : 'Lessons', `<div class="vtabs" id="vtabs"></div><div id="variantBox"></div>`) +
     textPanel() +
     panel('Details', `<div class="grid">${field('name', 'Name')}${field('subheading', 'Subheading (shown under the name)')}${af('image_asset_id', 'Picture (on the scheme card, and on each lesson unless the lesson has its own)', { legacy: 'image' })}<div class="span">${field('free_sample', 'Free sample: open to everyone, shows the Free badge', { type: 'switch' })}</div>${subj}</div>`) +
@@ -721,7 +727,9 @@ function renderVariantTabs() {
 async function renderVariant() {
   const v = PAGE.variants.find(x => x.id === PAGE.variant); const box = $('#variantBox');
   if (!v) { box.innerHTML = '<div class="empty">No lessons yet.</div>'; return; }
+  const page = PAGE;
   const lessons = await contentsPanel('variant', v.id, { title: '', note: 'In the order teachers see them. A lesson can be in more than one scheme.', key: `variant:${v.id}` });
+  if (PAGE !== page || !$('#variantBox')) return;   // the user moved on while the lessons loaded
   const inner = lessons.html.replace(/^<div class="panel"[^>]*>/, '<div class="subpanel">').replace(/<\/div>$/, '');
   const multi = PAGE.variants.length > 1;
   box.innerHTML = `${multi ? `<details style="margin-bottom:10px"><summary class="muted small" style="cursor:pointer">${esc(ageLabel(v.age_min, v.age_max))}: change the ages, or give this range its own text or image</summary><div style="margin-top:8px"><div class="agepick" data-vagepick="${v.id}"><div class="quick">${QUICK.map(q => `<button type="button" class="chip ${v.age_min === q[1] && v.age_max === q[2] ? 'on' : ''}" data-q="${q[1]}|${q[2]}">${q[0]}</button>`).join('')}</div><div class="years">${AGES.map(a => `<label><input type="checkbox" value="${a[0]}" ${v.age_min != null && a[0] >= v.age_min && a[0] < v.age_max ? 'checked' : ''}>${a[1]}<small>${a[2]}</small></label>`).join('')}</div></div>
@@ -763,7 +771,7 @@ async function pageLesson(id) {
   PAGE.previewImage = () => rowImage(PAGE.row) || schemePic;
   PAGE.row.tags_text = (row.tags || []).join(', ');
   if (stale(nav)) return;
-  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/' }, crumb, { name: row.name }].filter(Boolean)) +
+  editor.innerHTML = pageHeader([{ name: 'Subjects', href: '#/subjects' }, crumb, { name: row.name }].filter(Boolean)) +
     panel('Parts', '<div id="partsBox"></div>') +
     textPanel() +
     panel('Details', `<div class="grid">${field('name', 'Name')}${field('heading_2', 'Subtitle (beside the name on the lesson page)')}${agePicker()}
@@ -873,7 +881,9 @@ async function route() {
     else if (p[0] === 'media') await pageMedia();
     else if (p[0] === 'waiting') await pageWaiting();
     else if (p[0] === 'changes') await pageChanges();
-    else { renderTree(); await pageSubjects(); }
+    else if (p[0] === 'product') { renderTree(); await pageProduct(id, +p[2] || null); }
+    else if (p[0] === 'subjects') { renderTree(); await pageSubjects(); }
+    else { renderTree(); await pageProducts(); }
   } catch (e) { editor.innerHTML = `<div class="empty" style="padding-top:80px">Something went wrong: ${esc(e.message)}</div>`; }
   editor.scrollTo(0, 0);
 }
