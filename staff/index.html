@@ -145,6 +145,10 @@ nav .tree { padding: 4px 8px 24px; }
 .apreview .deck img { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
 .static { padding: 7px 0; font-size: 14px; } .static.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; word-break: break-all; }
 .pill.danger { background: #fde8ec; color: var(--danger); }
+.pill.src { margin-left: 10px; font-weight: 500; }
+.pill.src.follows { background: var(--line-2); color: var(--ink-3); }
+.rows.qb .rowacts { display: flex; gap: 6px; flex-shrink: 0; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
 .kind.video, .kind.audio, .kind.image, .kind.document, .kind.slides { background: var(--surface-2); color: var(--ink-2); }
 /* publishing */
 .pubwarn { background: var(--pending-soft); border: 1px solid var(--pending); border-radius: 8px; padding: 10px 12px; margin: 8px 0 12px; font-size: 13px; }
@@ -370,7 +374,7 @@ body.signedout #login { background: var(--bg); }
 </head>
 <body class="signedout">
 <header>
-  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.5</span></div>
+  <div class="brand"><span>imoves</span> content <span class="muted small" id="ver">v0.6</span></div>
   <div class="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input id="q" type="search" placeholder="Find a subject, category, scheme, lesson or id" autocomplete="off" aria-label="Find content">
@@ -403,10 +407,11 @@ body.signedout #login { background: var(--bg); }
   </form>
 </div></div>
 <div id="toast"></div>
-<script src="config.js?v=0.5"></script>
-<script src="cms.js?v=0.5"></script>
-<script src="media.js?v=0.5"></script>
-<script src="publish.js?v=0.5"></script>
-<script src="products.js?v=0.5"></script>
+<script src="config.js?v=0.6"></script>
+<script src="cms.js?v=0.6"></script>
+<script src="media.js?v=0.6"></script>
+<script src="publish.js?v=0.6"></script>
+<script src="products.js?v=0.6"></script>
+<script src="quickbase.js?v=0.6"></script>
 </body>
 </html>

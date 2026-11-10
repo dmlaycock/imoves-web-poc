@@ -1,4 +1,8 @@
-// imoves CMS - staff content page v0.5 (5 Nov 2026)
+// imoves CMS - staff content page v0.6 (10 Nov 2026)
+//
+// v0.6: working alongside Quickbase (quickbase.js) - every item page says whether it follows
+// Quickbase or is managed in the CMS; a Quickbase page lists what is managed here and what changed
+// in both places.
 //
 // v0.5: products first (products.js) - the CMS opens on the five products and their views; the
 // subject tree is the stock they are built from.
@@ -122,7 +126,7 @@ const kids = (type, id) => D.children[`${type}:${id}`] || [];
 const isPub = (type, id) => !!(D.pub[type] && D.pub[type].has(id));
 const isWaiting = (type, id) => D.waitSet.has(`${type}:${id}`);
 const parentsOf = (type, id) => D.placements.filter(p => p.child_type === type && p.child_id === id);
-async function reloadTree() { try { await loadTree(); renderTree(); updateWaitingCount(); } catch (e) {} }
+async function reloadTree() { try { await loadTree(); renderTree(); updateWaitingCount(); loadManaged(); } catch (e) {} }
 
 // Every list defaults to the order teachers see, published first, hidden last; sort and filter
 // are per list and remembered.
@@ -165,7 +169,7 @@ function renderTree() {
     }
     h += '</details>';
   }
-  h += `<div class="navlinks"><a class="archl ${cur.startsWith('#/waiting') ? 'active' : ''}" href="#/waiting">Waiting to publish</a><a class="archl ${cur.startsWith('#/changes') ? 'active' : ''}" href="#/changes">Changes</a><a class="archl ${cur.startsWith('#/media') ? 'active' : ''}" href="#/media">Media library</a><a class="archl muted" href="#/archive">Archive</a></div>`;
+  h += `<div class="navlinks"><a class="archl ${cur.startsWith('#/waiting') ? 'active' : ''}" href="#/waiting">Waiting to publish</a><a class="archl ${cur.startsWith('#/changes') ? 'active' : ''}" href="#/changes">Changes</a><a class="archl ${cur.startsWith('#/quickbase') ? 'active' : ''}" href="#/quickbase">Quickbase <span class="pill danger" id="qbCount" ${D.qbConflicts ? '' : 'hidden'}>${D.qbConflicts || ''}</span></a><a class="archl ${cur.startsWith('#/media') ? 'active' : ''}" href="#/media">Media library</a><a class="archl muted" href="#/archive">Archive</a></div>`;
   tree.innerHTML = h;
   tree.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => { const o = new Set(JSON.parse(sessionStorage.getItem('cms.open') || '[]')); d.open ? o.add(d.dataset.key) : o.delete(d.dataset.key); sessionStorage.setItem('cms.open', JSON.stringify([...o])); }));
   tree.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
@@ -247,6 +251,7 @@ async function refreshStatus() {
     if (meta) meta.innerHTML = s.last_published_at ? `v${s.last_version} · ${when(s.last_published_at)} · ${esc(s.last_published_by)} · <button id="histBtn">history</button>` : 'never published';
     if (pc) pc.hidden = !(s.is_published && s.waiting);
     const hb = $('#histBtn'); if (hb) hb.addEventListener('click', () => openHistory());
+    sourceNote();
     if (D.pub[PAGE.type]) { s.is_published ? D.pub[PAGE.type].add(PAGE.id) : D.pub[PAGE.type].delete(PAGE.id); }
     s.waiting ? D.waitSet.add(`${PAGE.type}:${PAGE.id}`) : D.waitSet.delete(`${PAGE.type}:${PAGE.id}`);
   } catch (e) { /* status is decoration */ }
@@ -269,7 +274,7 @@ function pageHeader(crumbs, { subtitle = '' } = {}) {
   const hasChildren = ['subject', 'group', 'category', 'scheme', 'product'].includes(PAGE.type);
   return `<div class="crumbs">${crumbs.map((c, i) => (i ? '<span class="sep">›</span>' : '') + (c.href ? `<button data-go="${c.href}">${esc(c.name)}</button>` : `<span>${esc(c.name)}</span>`)).join('')}</div>
     <div class="edhead"><h1><span id="pageTitle">${esc(PAGE.row.name || PAGE.row.heading || '')}</span><span class="id">${KIND[PAGE.type]} ${PAGE.id}${subtitle ? ' · ' + esc(subtitle) : ''}</span></h1>
-      <span class="meta" id="pubMeta"></span>
+      <span class="meta" id="pubMeta"></span><span class="pill src" id="srcNote" hidden></span>
       <div class="actions">${previewMenu()}${canEdit() ? `<button class="btn" id="saveBtn" disabled>Save draft</button><button class="btn primary" id="pubChanges" hidden title="Teachers see the last published version; this publishes your changes">Publish changes</button>` : ''}
         <label class="sw" id="pubSwitch"><input type="checkbox" ${canEdit() ? '' : 'disabled'} data-children="${hasChildren ? 1 : 0}"> <span class="small">Teachers can see</span></label></div></div>`;
 }
@@ -881,6 +886,7 @@ async function route() {
     else if (p[0] === 'media') await pageMedia();
     else if (p[0] === 'waiting') await pageWaiting();
     else if (p[0] === 'changes') await pageChanges();
+    else if (p[0] === 'quickbase') { renderTree(); await pageQuickbase(); }
     else if (p[0] === 'product') { renderTree(); await pageProduct(id, +p[2] || null); }
     else if (p[0] === 'subjects') { renderTree(); await pageSubjects(); }
     else { renderTree(); await pageProducts(); }
@@ -894,7 +900,7 @@ async function start() {
   document.body.classList.remove('signedout'); $('#login').classList.remove('open');
   $('#who').textContent = Auth.email() + (Auth.isStaff() ? ' · staff' : ''); $('#signout').hidden = false;
   $('#readonly').hidden = Auth.isStaff();
-  try { await loadTree(); renderTree(); updateWaitingCount(); } catch (e) { $('#tree').innerHTML = `<div class="hint">Could not load content: ${esc(e.message)}</div>`; }
+  try { await loadTree(); renderTree(); updateWaitingCount(); loadManaged(); } catch (e) { $('#tree').innerHTML = `<div class="hint">Could not load content: ${esc(e.message)}</div>`; }
   route();
 }
 function showLogin(msg) {
